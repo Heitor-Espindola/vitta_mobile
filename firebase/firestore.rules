@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isLoggedIn() && request.auth.uid == userId;
+    }
+
+    function isHealthProfessional() {
+      return isLoggedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "health_professional"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.professionalStatus == "approved";
+    }
+
+    match /users/{userId} {
+      allow create: if isLoggedIn() && request.auth.uid == userId;
+      allow read, update: if isOwner(userId) || isHealthProfessional();
+      allow delete: if false;
+    }
+
+    match /children/{childId} {
+      allow create: if isLoggedIn()
+        && request.resource.data.responsibleId == request.auth.uid;
+
+      allow read: if isLoggedIn()
+        && (resource.data.responsibleId == request.auth.uid || isHealthProfessional());
+
+      allow update, delete: if isLoggedIn()
+        && resource.data.responsibleId == request.auth.uid;
+    }
+
+    match /vaccines/{vaccineId} {
+      allow read: if isLoggedIn();
+      allow write: if isHealthProfessional();
+    }
+
+    match /vaccination_records/{recordId} {
+      allow read: if isLoggedIn()
+        && (resource.data.responsibleId == request.auth.uid || isHealthProfessional());
+
+      allow create, update: if isHealthProfessional();
+      allow delete: if false;
+    }
+
+    match /information_posts/{postId} {
+      allow read: if isLoggedIn();
+      allow write: if isHealthProfessional();
+    }
+  }
+}

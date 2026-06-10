@@ -1,3 +1,5 @@
+import 'package:vitta_mobile/core/utils/firestore_date_parser.dart';
+
 class AppUser {
   const AppUser({
     required this.uid,
@@ -21,8 +23,8 @@ class AppUser {
       name: map['name'] as String? ?? '',
       email: map['email'] as String? ?? '',
       role: map['role'] as String? ?? '',
-      createdAt: _dateTimeFromMap(map['createdAt']),
-      updatedAt: _dateTimeFromMap(map['updatedAt']),
+      createdAt: dateTimeFromMap(map['createdAt']),
+      updatedAt: dateTimeFromMap(map['updatedAt']),
     );
   }
 
@@ -54,17 +56,4 @@ class AppUser {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-}
-
-DateTime? _dateTimeFromMap(Object? value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is DateTime) {
-    return value;
-  }
-  if (value is String) {
-    return DateTime.tryParse(value);
-  }
-  return null;
 }

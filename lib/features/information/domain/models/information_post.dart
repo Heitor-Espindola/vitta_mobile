@@ -1,3 +1,5 @@
+import 'package:vitta_mobile/core/utils/firestore_date_parser.dart';
+
 class InformationPost {
   const InformationPost({
     required this.id,
@@ -22,7 +24,7 @@ class InformationPost {
       content: map['content'] as String? ?? '',
       source: map['source'] as String?,
       category: map['category'] as String?,
-      createdAt: _dateTimeFromMap(map['createdAt']),
+      createdAt: dateTimeFromMap(map['createdAt']),
     );
   }
 
@@ -54,17 +56,4 @@ class InformationPost {
       createdAt: createdAt ?? this.createdAt,
     );
   }
-}
-
-DateTime? _dateTimeFromMap(Object? value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is DateTime) {
-    return value;
-  }
-  if (value is String) {
-    return DateTime.tryParse(value);
-  }
-  return null;
 }

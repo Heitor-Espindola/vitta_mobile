@@ -21,8 +21,8 @@ class Vaccine {
       name: map['name'] as String? ?? '',
       description: map['description'] as String?,
       recommendedAge: map['recommendedAge'] as String?,
-      doseCount: map['doseCount'] as int?,
-      intervalDays: map['intervalDays'] as int?,
+      doseCount: _intFromMap(map['doseCount']),
+      intervalDays: _intFromMap(map['intervalDays']),
     );
   }
 
@@ -54,4 +54,14 @@ class Vaccine {
       intervalDays: intervalDays ?? this.intervalDays,
     );
   }
+}
+
+int? _intFromMap(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return null;
 }

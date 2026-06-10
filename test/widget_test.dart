@@ -1,11 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitta_mobile/app/app.dart';
+import 'package:vitta_mobile/features/auth/presentation/login_screen.dart';
 
 void main() {
-  testWidgets('shows the initial splash route', (WidgetTester tester) async {
-    await tester.pumpWidget(const VittaApp());
+  testWidgets('shows the login form', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
     expect(find.text('Vitta'), findsWidgets);
-    expect(find.text('Tela inicial do aplicativo.'), findsOneWidget);
+    expect(find.text('Entrar'), findsWidgets);
+    expect(find.text('Criar conta'), findsOneWidget);
   });
 }

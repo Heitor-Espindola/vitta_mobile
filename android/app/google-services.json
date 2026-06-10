@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "733443225670",
+    "project_id": "vitta-5ec1e",
+    "storage_bucket": "vitta-5ec1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:733443225670:android:905a0fac647df2cd92b247",
+        "android_client_info": {
+          "package_name": "com.example.vitta_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsfC6Rpdwmear_5zxDJCUWNTiV_sl56uQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

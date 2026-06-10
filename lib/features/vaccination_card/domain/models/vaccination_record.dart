@@ -1,3 +1,5 @@
+import 'package:vitta_mobile/core/utils/firestore_date_parser.dart';
+
 class VaccinationRecord {
   const VaccinationRecord({
     required this.id,
@@ -36,11 +38,11 @@ class VaccinationRecord {
       vaccineName: map['vaccineName'] as String? ?? '',
       dose: map['dose'] as String? ?? '',
       status: map['status'] as String? ?? '',
-      applicationDate: _dateTimeFromMap(map['applicationDate']),
-      nextDoseDate: _dateTimeFromMap(map['nextDoseDate']),
+      applicationDate: dateTimeFromMap(map['applicationDate']),
+      nextDoseDate: dateTimeFromMap(map['nextDoseDate']),
       healthProfessionalId: map['healthProfessionalId'] as String?,
       healthUnit: map['healthUnit'] as String?,
-      createdAt: _dateTimeFromMap(map['createdAt']),
+      createdAt: dateTimeFromMap(map['createdAt']),
     );
   }
 
@@ -90,17 +92,4 @@ class VaccinationRecord {
       createdAt: createdAt ?? this.createdAt,
     );
   }
-}
-
-DateTime? _dateTimeFromMap(Object? value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is DateTime) {
-    return value;
-  }
-  if (value is String) {
-    return DateTime.tryParse(value);
-  }
-  return null;
 }
