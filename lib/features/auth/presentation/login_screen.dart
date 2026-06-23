@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.authRepository});
@@ -65,63 +66,113 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Entrar')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
+    return AuthBackground(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AuthBadge(),
+            const SizedBox(height: 18),
+            const Text(
+              'Suas vacinas,\nnum so lugar.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                height: 1.08,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Acesso seguro com criptografia de ponta a ponta.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 22),
+            AuthCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Vitta',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  TextFormField(
+                  AuthTextField(
                     controller: _emailController,
+                    label: 'Email',
+                    hintText: 'userexample@gmail.com',
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
                     validator: _validateEmail,
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
+                  const SizedBox(height: 32),
+                  AuthTextField(
                     controller: _passwordController,
+                    label: 'Senha',
+                    hintText: 'Minimo 6 caracteres',
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Senha'),
                     validator: _validatePassword,
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Text(
                       _errorMessage!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      style: const TextStyle(color: Color(0xFFFFDAD6)),
                       textAlign: TextAlign.center,
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  FilledButton(
+                  const SizedBox(height: 18),
+                  AuthPrimaryButton(
                     onPressed: _isLoading ? null : _signIn,
-                    child: Text(_isLoading ? 'Entrando...' : 'Entrar'),
-                  ),
-                  TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => Navigator.of(
-                            context,
-                          ).pushNamed(AppRoutes.register),
-                    child: const Text('Criar conta'),
+                    icon: Icons.fingerprint,
+                    label: _isLoading ? 'Entrando...' : 'Entrar',
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 46),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              children: [
+                Text(
+                  'Novo por aqui?',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.46),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () =>
+                            Navigator.of(context).pushNamed(AppRoutes.register),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('Criar conta'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Termos de uso e Privacidade.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.42),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );

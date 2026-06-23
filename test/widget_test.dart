@@ -6,7 +6,8 @@ void main() {
   testWidgets('shows the login form', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
-    expect(find.text('Vitta'), findsWidgets);
+    expect(find.text('Carteira Digital'), findsOneWidget);
+    expect(find.text('Suas vacinas,\nnum so lugar.'), findsOneWidget);
     expect(find.text('Entrar'), findsWidgets);
     expect(find.text('Criar conta'), findsOneWidget);
   });

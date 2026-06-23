@@ -6,4 +6,6 @@ abstract final class AppRoutes {
   static const children = '/children';
   static const vaccinationCard = '/vaccination-card';
   static const information = '/information';
+  static const profile = '/profile';
+  static const vaccines = '/vaccines';
 }

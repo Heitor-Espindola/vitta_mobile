@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key, this.authRepository});
@@ -16,6 +17,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _cpfController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -28,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _cpfController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -68,58 +71,115 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Criar conta')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) {
-                      return 'Informe o nome.';
-                    }
-                    return null;
-                  },
+    return AuthBackground(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _isLoading
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Voltar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: _validateEmail,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Senha'),
-                  validator: _validatePassword,
-                ),
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'Criar sua conta',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                height: 1.08,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'E rapido e seguro',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 54),
+            AuthCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AuthTextField(
+                    controller: _nameController,
+                    label: 'Nome completo',
+                    hintText: 'Como aparece no documento',
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Informe o nome.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  AuthTextField(
+                    controller: _cpfController,
+                    label: 'CPF',
+                    hintText: '000.000.000-00',
+                    keyboardType: TextInputType.number,
+                    validator: _validateCpf,
+                  ),
+                  const SizedBox(height: 12),
+                  AuthTextField(
+                    controller: _emailController,
+                    label: 'Email',
+                    hintText: 'userexample@gmail.com',
+                    keyboardType: TextInputType.emailAddress,
+                    validator: _validateEmail,
+                  ),
+                  const SizedBox(height: 12),
+                  AuthTextField(
+                    controller: _passwordController,
+                    label: 'Senha',
+                    hintText: 'Minimo 6 caracteres',
+                    obscureText: true,
+                    validator: _validatePassword,
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Color(0xFFFFDAD6)),
+                      textAlign: TextAlign.center,
                     ),
+                  ],
+                  const SizedBox(height: 8),
+                  AuthPrimaryButton(
+                    onPressed: _isLoading ? null : _signUp,
+                    label: _isLoading ? 'Cadastrando...' : 'Criar conta',
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ao continuar voce concorda com nossos Termos e Politica de Privacidade.',
                     textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _isLoading ? null : _signUp,
-                  child: Text(_isLoading ? 'Cadastrando...' : 'Cadastrar'),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -143,6 +203,17 @@ String? _validatePassword(String? value) {
   }
   if ((value ?? '').length < 6) {
     return 'A senha deve ter pelo menos 6 caracteres.';
+  }
+  return null;
+}
+
+String? _validateCpf(String? value) {
+  final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) {
+    return 'Informe o CPF.';
+  }
+  if (digits.length != 11) {
+    return 'Informe um CPF valido.';
   }
   return null;
 }

@@ -3,6 +3,7 @@ import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.authRepository});
@@ -18,63 +19,60 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final Future<AppUser?> _userFuture = _authRepository.getCurrentUser();
 
-  Future<void> _signOut() async {
-    await _authRepository.signOut();
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(
-      context,
-    ).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vitta'),
-        actions: [
-          IconButton(
-            onPressed: _signOut,
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sair',
-          ),
-        ],
-      ),
+    return VittaMobileShell(
+      title: 'Inicio',
+      currentTab: VittaTab.home,
+      showGreetingHeader: true,
       body: FutureBuilder<AppUser?>(
         future: _userFuture,
         builder: (context, snapshot) {
-          final userName = snapshot.data?.name.trim();
+          final user = snapshot.data;
+          final firstName = _firstName(user?.name);
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(26, 10, 26, 22),
             children: [
-              Text(
-                userName == null || userName.isEmpty
-                    ? 'Ola!'
-                    : 'Ola, $userName!',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              const Text('Acesse as principais areas da carteira digital.'),
+              _HomeHeader(name: firstName),
+              const SizedBox(height: 26),
+              const _DocumentCard(),
               const SizedBox(height: 24),
-              _HomeActionCard(
-                title: 'Criancas',
-                subtitle: 'Gerencie seus dependentes.',
-                icon: Icons.child_care,
-                routeName: AppRoutes.children,
+              const _ProgressTile(),
+              const SizedBox(height: 18),
+              const SectionTitle(
+                title: 'Doses Proximas',
+                action: 'Ver todas >',
               ),
-              _HomeActionCard(
-                title: 'Carteira Vacinal',
-                subtitle: 'Consulte registros vacinais.',
-                icon: Icons.vaccines,
-                routeName: AppRoutes.vaccinationCard,
+              const SizedBox(height: 12),
+              const _DoseCard(
+                title: 'BCG',
+                dose: 'Recem-nascido - Dose Unica',
+                date: 'Aplicada em: 01/04/1995',
+                status: 'Concluida',
               ),
-              _HomeActionCard(
-                title: 'Informacoes',
-                subtitle: 'Leia conteudos sobre vacinacao.',
-                icon: Icons.article_outlined,
-                routeName: AppRoutes.information,
+              const SizedBox(height: 14),
+              const _DoseCard(
+                title: 'BCG',
+                dose: 'Recem-nascido - Dose Unica',
+                date: 'Aplicada em: 01/04/1995',
+                status: 'Atrasada',
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'Vacinas Recentes'),
+              const SizedBox(height: 12),
+              const _DoseCard(
+                title: 'BCG',
+                dose: 'Recem-nascido - Dose Unica',
+                date: 'Aplicada em: 01/04/1995',
+                status: 'Concluida',
+              ),
+              const SizedBox(height: 14),
+              const _DoseCard(
+                title: 'Hepatite B',
+                dose: '0 - 6 meses - 3 Dose',
+                date: 'Aplicada em: 01/04/1995',
+                status: 'Concluida',
               ),
             ],
           );
@@ -84,29 +82,298 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HomeActionCard extends StatelessWidget {
-  const _HomeActionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.routeName,
-  });
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({required this.name});
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String routeName;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).pushNamed(routeName),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              text: 'Ola,\n',
+              style: const TextStyle(fontSize: 22, height: 1.12),
+              children: [
+                TextSpan(
+                  text: name,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFC9CED5)),
+              ),
+              child: IconButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.profile),
+                icon: const Icon(Icons.notifications_none, size: 31),
+                tooltip: 'Notificacoes',
+              ),
+            ),
+            Positioned(
+              right: 9,
+              top: 7,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DocumentCard extends StatelessWidget {
+  const _DocumentCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 176,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6EA7C7),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 9,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Seu novo documento digital',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    text: 'Cardeneta\n',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: 'Tudo verificado e atualizado',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Color(0x558EC4DE),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.verified_user_outlined,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Row(
+            children: const [
+              _DocumentButton(icon: Icons.qr_code_2, label: 'Compartilhar'),
+              SizedBox(width: 12),
+              _DocumentButton(icon: Icons.share_outlined, label: 'enviar'),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
+
+class _DocumentButton extends StatelessWidget {
+  const _DocumentButton({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 11),
+      decoration: BoxDecoration(
+        color: const Color(0x668DC0DA),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 17),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressTile extends StatelessWidget {
+  const _ProgressTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x15000000),
+            blurRadius: 7,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Color(0xFF7BDBA5), Color(0xFF6AA4FF)],
+              ),
+            ),
+            child: const Icon(
+              Icons.eco_outlined,
+              color: Colors.white,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text.rich(
+            TextSpan(
+              text: '86%\n',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+              children: [
+                TextSpan(
+                  text: 'Vacinas em dia',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoseCard extends StatelessWidget {
+  const _DoseCard({
+    required this.title,
+    required this.dose,
+    required this.date,
+    required this.status,
+  });
+
+  final String title;
+  final String dose;
+  final String date;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: vittaLineBlue),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                text: '$title\n',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  height: 1.22,
+                ),
+                children: [
+                  TextSpan(
+                    text: '$dose\n$date',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          StatusChip(label: status),
+        ],
+      ),
+    );
+  }
+}
+
+String _firstName(String? name) {
+  final trimmed = name?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return 'Eduardo';
+  }
+  return trimmed.split(RegExp(r'\s+')).first;
 }
