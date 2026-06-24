@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
+import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
@@ -18,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _cpfController = TextEditingController();
+  final _birthDateController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -31,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _nameController.dispose();
     _cpfController.dispose();
+    _birthDateController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -51,6 +54,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
+        cpf: _cpfController.text,
+        birthDate: parseBrazilianDate(_birthDateController.text)!,
       );
       if (!mounted) {
         return;
@@ -139,6 +144,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 12),
                   AuthTextField(
+                    controller: _birthDateController,
+                    label: 'Data de nascimento',
+                    hintText: 'dd/mm/aaaa',
+                    keyboardType: TextInputType.datetime,
+                    validator: _validateBirthDate,
+                  ),
+                  const SizedBox(height: 12),
+                  AuthTextField(
                     controller: _emailController,
                     label: 'Email',
                     hintText: 'userexample@gmail.com',
@@ -214,6 +227,17 @@ String? _validateCpf(String? value) {
   }
   if (digits.length != 11) {
     return 'Informe um CPF valido.';
+  }
+  return null;
+}
+
+String? _validateBirthDate(String? value) {
+  final date = parseBrazilianDate(value ?? '');
+  if (date == null) {
+    return 'Informe a data em dd/mm/aaaa.';
+  }
+  if (date.isAfter(DateTime.now())) {
+    return 'Informe uma data valida.';
   }
   return null;
 }

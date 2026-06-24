@@ -22,6 +22,20 @@ class FirebaseVaccinationRepository implements VaccinationRepository {
   }
 
   @override
+  Future<List<VaccinationRecord>> getRecordsByResponsible(
+    String responsibleId,
+  ) async {
+    final snapshot = await _firestore
+        .collection('vaccination_records')
+        .where('responsibleId', isEqualTo: responsibleId)
+        .get();
+
+    return snapshot.docs.map((document) {
+      return VaccinationRecord.fromMap({...document.data(), 'id': document.id});
+    }).toList();
+  }
+
+  @override
   Future<List<Vaccine>> getVaccines() async {
     final snapshot = await _firestore.collection('vaccines').get();
 

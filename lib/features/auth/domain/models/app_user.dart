@@ -6,6 +6,9 @@ class AppUser {
     required this.name,
     required this.email,
     required this.role,
+    this.cpf,
+    this.birthDate,
+    this.phone,
     this.createdAt,
     this.updatedAt,
   });
@@ -14,6 +17,9 @@ class AppUser {
   final String name;
   final String email;
   final String role;
+  final String? cpf;
+  final DateTime? birthDate;
+  final String? phone;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -23,6 +29,9 @@ class AppUser {
       name: map['name'] as String? ?? '',
       email: map['email'] as String? ?? '',
       role: map['role'] as String? ?? '',
+      cpf: map['cpf'] as String?,
+      birthDate: dateTimeFromMap(map['birthDate']),
+      phone: map['phone'] as String?,
       createdAt: dateTimeFromMap(map['createdAt']),
       updatedAt: dateTimeFromMap(map['updatedAt']),
     );
@@ -34,6 +43,9 @@ class AppUser {
       'name': name,
       'email': email,
       'role': role,
+      'cpf': cpf,
+      'birthDate': birthDate,
+      'phone': phone,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -44,6 +56,9 @@ class AppUser {
     String? name,
     String? email,
     String? role,
+    String? cpf,
+    DateTime? birthDate,
+    String? phone,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -52,6 +67,9 @@ class AppUser {
       name: name ?? this.name,
       email: email ?? this.email,
       role: role ?? this.role,
+      cpf: cpf ?? this.cpf,
+      birthDate: birthDate ?? this.birthDate,
+      phone: phone ?? this.phone,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -9,7 +9,11 @@ abstract interface class AuthRepository {
     required String name,
     required String email,
     required String password,
+    required String cpf,
+    required DateTime birthDate,
   });
+
+  Future<AppUser> updateProfile(AppUser user);
 
   Future<void> signOut();
 }

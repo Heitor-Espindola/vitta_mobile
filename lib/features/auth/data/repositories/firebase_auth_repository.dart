@@ -52,6 +52,8 @@ class FirebaseAuthRepository implements AuthRepository {
     required String name,
     required String email,
     required String password,
+    required String cpf,
+    required DateTime birthDate,
   }) async {
     final credential = await _firebaseAuth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -73,12 +75,27 @@ class FirebaseAuthRepository implements AuthRepository {
       name: name.trim(),
       email: firebaseUser.email ?? email.trim(),
       role: AppRoles.responsible,
+      cpf: cpf.trim(),
+      birthDate: birthDate,
       createdAt: now,
       updatedAt: now,
     );
 
     await _users.doc(firebaseUser.uid).set(appUser.toMap());
     return appUser;
+  }
+
+  @override
+  Future<AppUser> updateProfile(AppUser user) async {
+    final updatedUser = user.copyWith(updatedAt: DateTime.now());
+    await _users
+        .doc(user.uid)
+        .set(updatedUser.toMap(), SetOptions(merge: true));
+    final firebaseUser = _firebaseAuth.currentUser;
+    if (firebaseUser != null && firebaseUser.displayName != user.name) {
+      await firebaseUser.updateDisplayName(user.name);
+    }
+    return updatedUser;
   }
 
   @override

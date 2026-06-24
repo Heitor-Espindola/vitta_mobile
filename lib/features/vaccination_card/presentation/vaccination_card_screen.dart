@@ -8,9 +8,6 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
-import 'package:vitta_mobile/features/children/data/repositories/firebase_children_repository.dart';
-import 'package:vitta_mobile/features/children/domain/models/child.dart';
-import 'package:vitta_mobile/features/children/domain/repositories/children_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
@@ -22,12 +19,10 @@ class VaccinationCardScreen extends StatefulWidget {
   const VaccinationCardScreen({
     super.key,
     this.authRepository,
-    this.childrenRepository,
     this.vaccinationRepository,
   });
 
   final AuthRepository? authRepository;
-  final ChildrenRepository? childrenRepository;
   final VaccinationRepository? vaccinationRepository;
 
   @override
@@ -37,8 +32,6 @@ class VaccinationCardScreen extends StatefulWidget {
 class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   late final AuthRepository _authRepository =
       widget.authRepository ?? FirebaseAuthRepository();
-  late final ChildrenRepository _childrenRepository =
-      widget.childrenRepository ?? FirebaseChildrenRepository();
   late final VaccinationRepository _vaccinationRepository =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
   final _searchController = TextEditingController();
@@ -47,7 +40,6 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   var _filter = _VaccineFilter.all;
   final Set<String> _expandedRecordIds = {};
   AppUser? _currentUser;
-  Child? _selectedChild;
   List<VaccinationRecord> _records = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -75,20 +67,15 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       if (user == null) {
         throw Exception('Usuario nao autenticado.');
       }
-      final children = await _childrenRepository.getChildrenByResponsible(
+      final records = await _vaccinationRepository.getRecordsByResponsible(
         user.uid,
       );
-      final selectedChild = children.isEmpty ? null : children.first;
-      final records = selectedChild == null
-          ? <VaccinationRecord>[]
-          : await _vaccinationRepository.getRecordsByChild(selectedChild.id);
 
       if (!mounted) {
         return;
       }
       setState(() {
-        _currentUser = user;
-        _selectedChild = selectedChild;
+        _currentUser = _withAdultFallback(user);
         _records = records;
       });
     } catch (_) {
@@ -96,7 +83,8 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
         return;
       }
       setState(() {
-        _records = _sampleRecords;
+        _currentUser = _withAdultFallback(_currentUser);
+        _records = _adultSampleRecords;
         _errorMessage = 'Nao foi possivel carregar os dados reais agora.';
       });
     } finally {
@@ -108,7 +96,7 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
 
   List<VaccinationRecord> get _visibleRecords {
     final query = _searchController.text.trim().toLowerCase();
-    return _records.where((record) {
+    return _displayRecords.where((record) {
       final matchesQuery =
           query.isEmpty ||
           record.vaccineName.toLowerCase().contains(query) ||
@@ -131,13 +119,15 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   }
 
   Future<void> _downloadPdf() async {
-    final bytes = await _buildPdf(
-      user: _currentUser,
-      child: _selectedChild,
-      records: _records,
+    final bytes = await _buildPdf(user: _currentUser, records: _displayRecords);
+    await Printing.layoutPdf(
+      name: 'caderneta-vacinal.pdf',
+      onLayout: (_) async => bytes,
     );
-    await Printing.sharePdf(bytes: bytes, filename: 'caderneta-vacinal.pdf');
   }
+
+  List<VaccinationRecord> get _displayRecords =>
+      _records.isEmpty ? _adultSampleRecords : _records;
 
   @override
   Widget build(BuildContext context) {
@@ -159,9 +149,8 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
             if (_showBooklet)
               _BookletPreview(
                 user: _currentUser,
-                child: _selectedChild,
-                records: _records,
-                onDownload: _records.isEmpty ? null : _downloadPdf,
+                records: _displayRecords,
+                onDownload: _downloadPdf,
               )
             else ...[
               Padding(
@@ -464,24 +453,21 @@ class _DetailBubble extends StatelessWidget {
 class _BookletPreview extends StatelessWidget {
   const _BookletPreview({
     required this.user,
-    required this.child,
     required this.records,
     required this.onDownload,
   });
 
   final AppUser? user;
-  final Child? child;
   final List<VaccinationRecord> records;
   final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
-    final personName = child?.name.trim().isNotEmpty == true
-        ? child!.name
-        : _filled(user?.name, 'Pessoa cadastrada');
-    final birthDate = child?.birthDate == null
+    final personName = _filled(user?.name, 'Eduardo Carvalho');
+    final birthDate = user?.birthDate == null
         ? '--/--/----'
-        : formatBrazilianDate(child!.birthDate);
+        : formatBrazilianDate(user!.birthDate);
+    final cpf = _filled(user?.cpf, '123.456.789-00');
 
     return Column(
       children: [
@@ -498,11 +484,11 @@ class _BookletPreview extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    flex: 7,
+                    flex: 8,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _BookletTable(records: records),
+                        _BookletTable(records: records.take(8).toList()),
                         const SizedBox(height: 10),
                         _BookletTable(records: records.skip(8).toList()),
                       ],
@@ -510,7 +496,7 @@ class _BookletPreview extends StatelessWidget {
                   ),
                   const SizedBox(width: 14),
                   Expanded(
-                    flex: 3,
+                    flex: 4,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,6 +509,8 @@ class _BookletPreview extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 10),
+                        const _GovernmentMark(),
+                        const SizedBox(height: 10),
                         Text(
                           'Nome\n$personName',
                           style: const TextStyle(fontSize: 9),
@@ -533,19 +521,7 @@ class _BookletPreview extends StatelessWidget {
                           style: const TextStyle(fontSize: 9),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Responsavel\n${_filled(user?.name, '--')}',
-                          style: const TextStyle(fontSize: 9),
-                        ),
-                        const SizedBox(height: 18),
-                        const Align(
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.verified_user_outlined,
-                            color: vittaBlue,
-                            size: 34,
-                          ),
-                        ),
+                        Text('CPF\n$cpf', style: const TextStyle(fontSize: 9)),
                       ],
                     ),
                   ),
@@ -589,7 +565,7 @@ class _BookletTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = records.isEmpty
-        ? _sampleRecords.take(8).toList()
+        ? _adultSampleRecords.take(8).toList()
         : records.take(8).toList();
 
     return Table(
@@ -600,6 +576,7 @@ class _BookletTable extends StatelessWidget {
           decoration: BoxDecoration(color: Color(0xFFE8E8E8)),
           children: [
             _BookletCell('Vacina', bold: true),
+            _BookletCell('Prevencao', bold: true),
             _BookletCell('Dose', bold: true),
             _BookletCell('Data', bold: true),
             _BookletCell('Lote', bold: true),
@@ -610,6 +587,7 @@ class _BookletTable extends StatelessWidget {
           (record) => TableRow(
             children: [
               _BookletCell(record.vaccineName),
+              _BookletCell(_preventionFor(record.vaccineName)),
               _BookletCell(record.dose),
               _BookletCell(
                 record.applicationDate == null
@@ -649,18 +627,45 @@ class _BookletCell extends StatelessWidget {
   }
 }
 
+class _GovernmentMark extends StatelessWidget {
+  const _GovernmentMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF0E8F4F),
+            border: Border.all(color: const Color(0xFFF4D338), width: 3),
+          ),
+          child: const Icon(Icons.star, color: Colors.yellow, size: 18),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'Ministerio da Saude\nGoverno Federal',
+            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 Future<Uint8List> _buildPdf({
   required AppUser? user,
-  required Child? child,
   required List<VaccinationRecord> records,
 }) async {
   final doc = pw.Document();
-  final personName = child?.name.trim().isNotEmpty == true
-      ? child!.name
-      : _filled(user?.name, 'Pessoa cadastrada');
-  final birthDate = child?.birthDate == null
+  final personName = _filled(user?.name, 'Eduardo Carvalho');
+  final birthDate = user?.birthDate == null
       ? '--/--/----'
-      : formatBrazilianDate(child!.birthDate);
+      : formatBrazilianDate(user!.birthDate);
+  final cpf = _filled(user?.cpf, '123.456.789-00');
 
   doc.addPage(
     pw.Page(
@@ -689,7 +694,7 @@ Future<Uint8List> _buildPdf({
             pw.SizedBox(height: 12),
             pw.Text('Pessoa: $personName'),
             pw.Text('Nascimento: $birthDate'),
-            pw.Text('Responsavel: ${_filled(user?.name, '--')}'),
+            pw.Text('CPF: $cpf'),
             pw.Text('Email: ${_filled(user?.email, '--')}'),
             pw.SizedBox(height: 18),
             pw.TableHelper.fromTextArray(
@@ -750,40 +755,178 @@ bool _isDone(String status) {
       normalized.contains('aplic');
 }
 
+AppUser? _withAdultFallback(AppUser? user) {
+  if (user == null) {
+    return const AppUser(
+      uid: 'sample',
+      name: 'Eduardo Carvalho',
+      email: 'eduardo.carvalho@email.com',
+      role: 'responsible',
+      cpf: '123.456.789-00',
+      birthDate: null,
+    ).copyWith(birthDate: DateTime(2008, 6, 23));
+  }
+  return user.copyWith(
+    name: user.name.trim().isEmpty ? 'Eduardo Carvalho' : user.name,
+    cpf: user.cpf?.trim().isEmpty == false ? user.cpf : '123.456.789-00',
+    birthDate: user.birthDate ?? DateTime(2008, 6, 23),
+  );
+}
+
+String _preventionFor(String vaccineName) {
+  final name = vaccineName.toLowerCase();
+  if (name.contains('bcg')) {
+    return 'Tuberculose';
+  }
+  if (name.contains('hepatite')) {
+    return 'Hepatite';
+  }
+  if (name.contains('triplice') || name.contains('dtp')) {
+    return 'Difteria, tetano e coqueluche';
+  }
+  if (name.contains('poli')) {
+    return 'Poliomielite';
+  }
+  if (name.contains('sarampo') || name.contains('viral')) {
+    return 'Sarampo, caxumba e rubeola';
+  }
+  if (name.contains('hpv')) {
+    return 'HPV';
+  }
+  if (name.contains('covid')) {
+    return 'Covid-19';
+  }
+  if (name.contains('gripe')) {
+    return 'Influenza';
+  }
+  return 'Imunizacao';
+}
+
 String _filled(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
 }
 
-final _sampleRecords = [
+final _adultSampleRecords = [
   VaccinationRecord(
-    id: 'BCG-A22-019',
-    childId: 'sample',
-    responsibleId: 'sample',
-    vaccineName: 'Tetano',
-    dose: 'Recem-nascido - Dose Unica',
-    status: 'Pendente',
-    applicationDate: DateTime(1995, 4),
-    healthUnit: 'Maternidade Sao Luiz',
-  ),
-  VaccinationRecord(
-    id: 'GRP-A22-019',
-    childId: 'sample',
-    responsibleId: 'sample',
-    vaccineName: 'Gripe',
-    dose: 'Recem-nascido - Dose Unica',
-    status: 'Pendente',
-    applicationDate: DateTime(1995, 4),
-    healthUnit: 'Maternidade Sao Luiz',
-  ),
-  VaccinationRecord(
-    id: 'BCG-1995',
-    childId: 'sample',
+    id: 'BCG-2008-001',
+    childId: '',
     responsibleId: 'sample',
     vaccineName: 'BCG',
-    dose: 'Recem-nascido - Dose Unica',
+    dose: 'Dose unica',
     status: 'Concluida',
-    applicationDate: DateTime(1995, 4),
+    applicationDate: DateTime(2008, 6, 24),
+    vaccineId: 'BCG-08A-451',
     healthUnit: 'Maternidade Sao Luiz',
+  ),
+  VaccinationRecord(
+    id: 'HEPB-2008-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Hepatite B',
+    dose: '1ª dose',
+    status: 'Concluida',
+    applicationDate: DateTime(2008, 6, 24),
+    vaccineId: 'HB-08B-119',
+    healthUnit: 'Maternidade Sao Luiz',
+  ),
+  VaccinationRecord(
+    id: 'PENTA-2008-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Pentavalente',
+    dose: '3ª dose',
+    status: 'Concluida',
+    applicationDate: DateTime(2008, 12, 23),
+    vaccineId: 'PENTA-08C-778',
+    healthUnit: 'UBS Jardim Europa',
+  ),
+  VaccinationRecord(
+    id: 'POLIO-2009-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Poliomielite',
+    dose: 'Reforco',
+    status: 'Concluida',
+    applicationDate: DateTime(2009, 9, 10),
+    vaccineId: 'VIP-09D-302',
+    healthUnit: 'UBS Jardim Europa',
+  ),
+  VaccinationRecord(
+    id: 'TRIVIRAL-2009-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Triplice Viral',
+    dose: '1ª dose',
+    status: 'Concluida',
+    applicationDate: DateTime(2009, 6, 26),
+    vaccineId: 'SCR-09F-882',
+    healthUnit: 'Clinica Vida Plena',
+  ),
+  VaccinationRecord(
+    id: 'DTP-2012-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'DTP',
+    dose: '2º reforco',
+    status: 'Concluida',
+    applicationDate: DateTime(2012, 8, 3),
+    vaccineId: 'DTP-12G-440',
+    healthUnit: 'UBS Central',
+  ),
+  VaccinationRecord(
+    id: 'FEBRE-2017-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Febre Amarela',
+    dose: 'Dose unica',
+    status: 'Concluida',
+    applicationDate: DateTime(2017, 4, 18),
+    vaccineId: 'FA-17H-221',
+    healthUnit: 'Posto Municipal Norte',
+  ),
+  VaccinationRecord(
+    id: 'HPV-2021-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'HPV',
+    dose: '2ª dose',
+    status: 'Concluida',
+    applicationDate: DateTime(2021, 11, 12),
+    vaccineId: 'HPV-21K-654',
+    healthUnit: 'UBS Central',
+  ),
+  VaccinationRecord(
+    id: 'MENINGO-2022-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Meningococica ACWY',
+    dose: 'Dose unica',
+    status: 'Concluida',
+    applicationDate: DateTime(2022, 5, 7),
+    vaccineId: 'ACWY-22M-710',
+    healthUnit: 'Clinica Sao Bento',
+  ),
+  VaccinationRecord(
+    id: 'COVID-2024-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Covid-19',
+    dose: 'Reforco',
+    status: 'Concluida',
+    applicationDate: DateTime(2024, 3, 15),
+    vaccineId: 'COV-24N-503',
+    healthUnit: 'Centro de Imunizacao Paulista',
+  ),
+  VaccinationRecord(
+    id: 'GRIPE-2026-001',
+    childId: '',
+    responsibleId: 'sample',
+    vaccineName: 'Gripe',
+    dose: 'Campanha anual',
+    status: 'Pendente',
+    nextDoseDate: DateTime(2026, 7, 10),
+    vaccineId: 'INF-26P-090',
+    healthUnit: 'UBS Central',
   ),
 ];

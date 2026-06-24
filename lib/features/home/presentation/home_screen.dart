@@ -30,11 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, snapshot) {
           final user = snapshot.data;
           final firstName = _firstName(user?.name);
+          final age = _age(user?.birthDate ?? DateTime(2008, 6, 23));
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(26, 10, 26, 22),
             children: [
-              _HomeHeader(name: firstName),
+              _HomeHeader(name: firstName, age: age),
               const SizedBox(height: 26),
               const _DocumentCard(),
               const SizedBox(height: 24),
@@ -46,32 +47,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
               const _DoseCard(
-                title: 'BCG',
-                dose: 'Recem-nascido - Dose Unica',
-                date: 'Aplicada em: 01/04/1995',
-                status: 'Concluida',
+                title: 'Gripe',
+                dose: 'Campanha anual',
+                date: 'Prevista para: 10/07/2026',
+                status: 'Pendente',
               ),
               const SizedBox(height: 14),
               const _DoseCard(
-                title: 'BCG',
-                dose: 'Recem-nascido - Dose Unica',
-                date: 'Aplicada em: 01/04/1995',
-                status: 'Atrasada',
+                title: 'Covid-19',
+                dose: 'Reforco conforme calendario',
+                date: 'Aplicada em: 15/03/2024',
+                status: 'Concluida',
               ),
               const SizedBox(height: 18),
               const SectionTitle(title: 'Vacinas Recentes'),
               const SizedBox(height: 12),
               const _DoseCard(
-                title: 'BCG',
-                dose: 'Recem-nascido - Dose Unica',
-                date: 'Aplicada em: 01/04/1995',
+                title: 'Meningococica ACWY',
+                dose: 'Dose unica',
+                date: 'Aplicada em: 07/05/2022',
                 status: 'Concluida',
               ),
               const SizedBox(height: 14),
               const _DoseCard(
-                title: 'Hepatite B',
-                dose: '0 - 6 meses - 3 Dose',
-                date: 'Aplicada em: 01/04/1995',
+                title: 'HPV',
+                dose: '2ª dose',
+                date: 'Aplicada em: 12/11/2021',
                 status: 'Concluida',
               ),
             ],
@@ -83,9 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.name});
+  const _HomeHeader({required this.name, required this.age});
 
   final String name;
+  final int age;
 
   @override
   Widget build(BuildContext context) {
@@ -99,8 +101,15 @@ class _HomeHeader extends StatelessWidget {
               style: const TextStyle(fontSize: 22, height: 1.12),
               children: [
                 TextSpan(
-                  text: name,
+                  text: '$name\n',
                   style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                TextSpan(
+                  text: '$age anos',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -376,4 +385,16 @@ String _firstName(String? name) {
     return 'Eduardo';
   }
   return trimmed.split(RegExp(r'\s+')).first;
+}
+
+int _age(DateTime birthDate) {
+  final today = DateTime.now();
+  var years = today.year - birthDate.year;
+  final birthdayPassed =
+      today.month > birthDate.month ||
+      (today.month == birthDate.month && today.day >= birthDate.day);
+  if (!birthdayPassed) {
+    years--;
+  }
+  return years;
 }

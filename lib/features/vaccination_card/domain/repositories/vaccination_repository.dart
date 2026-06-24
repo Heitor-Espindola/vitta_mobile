@@ -5,4 +5,6 @@ abstract interface class VaccinationRepository {
   Future<List<Vaccine>> getVaccines();
 
   Future<List<VaccinationRecord>> getRecordsByChild(String childId);
+
+  Future<List<VaccinationRecord>> getRecordsByResponsible(String responsibleId);
 }
