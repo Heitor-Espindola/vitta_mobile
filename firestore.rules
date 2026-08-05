@@ -1,0 +1,155 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasValidUserKeys() {
+      return request.resource.data.keys().hasAll([
+        'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
+        'normalizedName', 'email', 'role', 'roles', 'accountStatus', 'cpf',
+        'cpfDigits', 'cpfFormatted', 'guardianIds', 'dependentIds',
+        'managedByUserIds', 'birthDate', 'phone', 'photoUrl', 'createdAt',
+        'updatedAt', 'lastLoginAt'
+      ]) && request.resource.data.keys().hasOnly([
+        'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
+        'normalizedName', 'email', 'role', 'roles', 'accountStatus', 'cpf',
+        'cpfDigits', 'cpfFormatted', 'guardianIds', 'dependentIds',
+        'managedByUserIds', 'birthDate', 'phone', 'photoUrl', 'createdAt',
+        'updatedAt', 'lastLoginAt'
+      ]);
+    }
+
+    function hasValidUserTypes() {
+      return request.resource.data.uid is string
+        && request.resource.data.id is string
+        && request.resource.data.authUid is string
+        && request.resource.data.canAuthenticate is bool
+        && request.resource.data.name is string
+        && request.resource.data.fullName is string
+        && request.resource.data.normalizedName is string
+        && request.resource.data.email is string
+        && request.resource.data.role is string
+        && request.resource.data.roles is list
+        && request.resource.data.accountStatus is string
+        && request.resource.data.cpf is string
+        && request.resource.data.cpf.size() == 11
+        && request.resource.data.cpfDigits is string
+        && request.resource.data.cpfDigits == request.resource.data.cpf
+        && request.resource.data.cpfFormatted is string
+        && request.resource.data.guardianIds is list
+        && request.resource.data.dependentIds is list
+        && request.resource.data.managedByUserIds is list
+        && (request.resource.data.birthDate == null
+          || request.resource.data.birthDate is timestamp)
+        && (request.resource.data.phone == null
+          || request.resource.data.phone is string)
+        && (request.resource.data.photoUrl == null
+          || request.resource.data.photoUrl is string)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (request.resource.data.lastLoginAt == null
+          || request.resource.data.lastLoginAt is timestamp);
+    }
+
+    function validUserCreation(userId) {
+      return isOwner(userId)
+        && hasValidUserKeys()
+        && hasValidUserTypes()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.id == request.auth.uid
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.canAuthenticate == true
+        && request.resource.data.role == 'responsible'
+        && request.resource.data.roles == ['user']
+        && request.resource.data.accountStatus == 'active'
+        && request.resource.data.guardianIds.size() == 0
+        && request.resource.data.dependentIds.size() == 0
+        && request.resource.data.managedByUserIds.size() == 0;
+    }
+
+    function immutableUserFields() {
+      return request.resource.data.uid == resource.data.uid
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.authUid == resource.data.authUid
+        && request.resource.data.canAuthenticate == resource.data.canAuthenticate
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.roles == resource.data.roles
+        && request.resource.data.accountStatus == resource.data.accountStatus
+        && request.resource.data.cpf == resource.data.cpf
+        && request.resource.data.cpfDigits == resource.data.cpfDigits
+        && request.resource.data.cpfFormatted == resource.data.cpfFormatted
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.guardianIds == resource.data.guardianIds
+        && request.resource.data.dependentIds == resource.data.dependentIds
+        && request.resource.data.managedByUserIds == resource.data.managedByUserIds;
+    }
+
+    function onlyAllowedUserChanges() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name', 'fullName', 'normalizedName', 'birthDate', 'phone', 'photoUrl',
+        'updatedAt', 'lastLoginAt'
+      ]);
+    }
+
+    match /users/{userId} {
+      allow create: if validUserCreation(userId);
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow update: if isOwner(userId)
+        && hasValidUserKeys()
+        && hasValidUserTypes()
+        && immutableUserFields()
+        && onlyAllowedUserChanges();
+      allow delete: if false;
+    }
+
+    match /cpf_registry/{cpfHash} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && cpfHash.size() == 64
+        && request.resource.data.keys().hasAll(['ownerUid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
+        && request.resource.data.ownerUid is string
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+
+    // Coleções legítimas já consumidas pelas telas existentes.
+    match /children/{childId} {
+      allow create: if signedIn()
+        && request.resource.data.responsibleId == request.auth.uid;
+      allow read, update, delete: if signedIn()
+        && resource.data.responsibleId == request.auth.uid;
+    }
+
+    match /vaccination_records/{recordId} {
+      allow read: if signedIn()
+        && resource.data.responsibleId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /vaccines/{vaccineId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /information_posts/{postId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

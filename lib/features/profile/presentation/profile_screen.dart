@@ -40,13 +40,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _signOut() async {
-    await _authRepository.signOut();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sair da conta'),
+        content: const Text('Deseja realmente sair da sua conta?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await _authRepository.signOut();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível sair. Tente novamente.'),
+          ),
+        );
+      }
+      return;
+    }
     if (!mounted) {
       return;
     }
     Navigator.of(
       context,
-    ).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+    ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
   }
 
   Future<void> _editProfile() async {
@@ -289,9 +324,11 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _cpfController,
-                decoration: const InputDecoration(labelText: 'CPF'),
-                keyboardType: TextInputType.number,
-                validator: _validateCpf,
+                enabled: false,
+                decoration: const InputDecoration(
+                  labelText: 'CPF',
+                  helperText: 'O CPF não pode ser alterado.',
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -497,17 +534,6 @@ String _initials(String name) {
 String _filled(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
-}
-
-String? _validateCpf(String? value) {
-  final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
-  if (digits.isEmpty) {
-    return 'Informe o CPF.';
-  }
-  if (digits.length != 11) {
-    return 'Informe um CPF valido.';
-  }
-  return null;
 }
 
 String? _validateBirthDate(String? value) {

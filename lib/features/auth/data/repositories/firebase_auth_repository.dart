@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/core/constants/app_roles.dart';
+import 'package:vitta_mobile/features/auth/data/cpf_registry_key.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
@@ -14,6 +17,25 @@ class FirebaseAuthRepository implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
 
+  static Future<void> configurePersistence() async {
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
+  }
+
+  @override
+  Stream<AppUser?> authStateChanges() =>
+      _firebaseAuth.authStateChanges().asyncExpand((firebaseUser) {
+        if (firebaseUser == null) return Stream.value(null);
+        return _users.doc(firebaseUser.uid).snapshots().map((snapshot) {
+          if (!snapshot.exists || snapshot.data() == null) return null;
+          return AppUser.fromMap({
+            ...snapshot.data()!,
+            'uid': firebaseUser.uid,
+          });
+        });
+      });
+
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
@@ -24,7 +46,7 @@ class FirebaseAuthRepository implements AuthRepository {
       return null;
     }
 
-    return _getOrCreateUserProfile(firebaseUser);
+    return _getUserProfile(firebaseUser);
   }
 
   @override
@@ -33,7 +55,7 @@ class FirebaseAuthRepository implements AuthRepository {
     required String password,
   }) async {
     final credential = await _firebaseAuth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: normalizeEmail(email),
       password: password,
     );
     final firebaseUser = credential.user;
@@ -44,7 +66,13 @@ class FirebaseAuthRepository implements AuthRepository {
       );
     }
 
-    return _getOrCreateUserProfile(firebaseUser);
+    final appUser = await _getUserProfile(firebaseUser);
+    final now = DateTime.now();
+    await _users.doc(firebaseUser.uid).update({
+      'lastLoginAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return appUser.copyWith(lastLoginAt: now, updatedAt: now);
   }
 
   @override
@@ -56,7 +84,7 @@ class FirebaseAuthRepository implements AuthRepository {
     required DateTime birthDate,
   }) async {
     final credential = await _firebaseAuth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: normalizeEmail(email),
       password: password,
     );
     final firebaseUser = credential.user;
@@ -68,12 +96,13 @@ class FirebaseAuthRepository implements AuthRepository {
     }
 
     await firebaseUser.updateDisplayName(name.trim());
+    await firebaseUser.sendEmailVerification();
 
     final now = DateTime.now();
     final appUser = AppUser(
       uid: firebaseUser.uid,
       name: name.trim(),
-      email: firebaseUser.email ?? email.trim(),
+      email: firebaseUser.email ?? normalizeEmail(email),
       role: AppRoles.responsible,
       cpf: cpf.trim(),
       birthDate: birthDate,
@@ -81,8 +110,36 @@ class FirebaseAuthRepository implements AuthRepository {
       updatedAt: now,
     );
 
-    await _users.doc(firebaseUser.uid).set(appUser.toMap());
-    return appUser;
+    final cpfHash = cpfRegistryKey(cpf);
+    final registryDocument = _firestore.collection('cpf_registry').doc(cpfHash);
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final registrySnapshot = await transaction.get(registryDocument);
+        if (registrySnapshot.exists) {
+          throw FirebaseAuthException(
+            code: 'cpf-already-in-use',
+            message: 'Este CPF já está cadastrado.',
+          );
+        }
+
+        transaction.set(_users.doc(firebaseUser.uid), {
+          ...appUser.toMap(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': null,
+        });
+        transaction.set(registryDocument, {
+          'ownerUid': firebaseUser.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      });
+      return appUser;
+    } catch (_) {
+      // Evita deixar uma conta de Authentication sem perfil após falha atômica.
+      await firebaseUser.delete();
+      rethrow;
+    }
   }
 
   @override
@@ -99,28 +156,25 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> sendPasswordResetEmail(String email) {
+    return _firebaseAuth.sendPasswordResetEmail(email: normalizeEmail(email));
+  }
+
+  @override
   Future<void> signOut() {
     return _firebaseAuth.signOut();
   }
 
-  Future<AppUser> _getOrCreateUserProfile(User firebaseUser) async {
+  Future<AppUser> _getUserProfile(User firebaseUser) async {
     final userDocument = _users.doc(firebaseUser.uid);
     final snapshot = await userDocument.get();
     if (snapshot.exists && snapshot.data() != null) {
       return AppUser.fromMap({...snapshot.data()!, 'uid': firebaseUser.uid});
     }
 
-    final now = DateTime.now();
-    final appUser = AppUser(
-      uid: firebaseUser.uid,
-      name: firebaseUser.displayName ?? '',
-      email: firebaseUser.email ?? '',
-      role: AppRoles.responsible,
-      createdAt: now,
-      updatedAt: now,
+    throw FirebaseAuthException(
+      code: 'profile-not-found',
+      message: 'Perfil do usuário não encontrado.',
     );
-
-    await userDocument.set(appUser.toMap());
-    return appUser;
   }
 }

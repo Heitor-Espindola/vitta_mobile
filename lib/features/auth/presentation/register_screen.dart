@@ -4,6 +4,7 @@ import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
 import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
       Navigator.of(
         context,
-      ).pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
+      ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
     } on FirebaseAuthException catch (error) {
       setState(() => _errorMessage = _authErrorMessage(error));
     } catch (_) {
@@ -153,10 +154,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 12),
                   AuthTextField(
                     controller: _emailController,
-                    label: 'Email',
+                    label: 'Gmail',
                     hintText: 'userexample@gmail.com',
                     keyboardType: TextInputType.emailAddress,
-                    validator: _validateEmail,
+                    validator: validateGmail,
                   ),
                   const SizedBox(height: 12),
                   AuthTextField(
@@ -197,17 +198,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-}
-
-String? _validateEmail(String? value) {
-  final email = value?.trim() ?? '';
-  if (email.isEmpty) {
-    return 'Informe o email.';
-  }
-  if (!email.contains('@') || !email.contains('.')) {
-    return 'Informe um email valido.';
-  }
-  return null;
 }
 
 String? _validatePassword(String? value) {

@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
+import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
+import 'package:vitta_mobile/features/auth/presentation/controllers/password_reset_controller.dart';
 import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
+import 'package:vitta_mobile/features/auth/presentation/widgets/password_reset_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.authRepository});
@@ -50,9 +54,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
     } on FirebaseAuthException catch (error) {
-      setState(() => _errorMessage = _authErrorMessage(error));
+      setState(() => _errorMessage = mapSignInError(error));
     } catch (_) {
       setState(
         () => _errorMessage = 'Nao foi possivel entrar. Tente novamente.',
@@ -61,6 +67,21 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final controller = PasswordResetController(_authRepository);
+    final sent = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PasswordResetDialog(controller: controller),
+    );
+    controller.dispose();
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(passwordResetNeutralMessage)),
+      );
     }
   }
 
@@ -99,10 +120,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   AuthTextField(
                     controller: _emailController,
-                    label: 'Email',
+                    label: 'Gmail',
                     hintText: 'userexample@gmail.com',
                     keyboardType: TextInputType.emailAddress,
-                    validator: _validateEmail,
+                    validator: validateGmail,
                   ),
                   const SizedBox(height: 32),
                   AuthTextField(
@@ -111,6 +132,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintText: 'Minimo 6 caracteres',
                     obscureText: true,
                     validator: _validatePassword,
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _resetPassword,
+                      child: const Text('Esqueci minha senha'),
+                    ),
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
@@ -179,17 +207,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-String? _validateEmail(String? value) {
-  final email = value?.trim() ?? '';
-  if (email.isEmpty) {
-    return 'Informe o email.';
-  }
-  if (!email.contains('@') || !email.contains('.')) {
-    return 'Informe um email valido.';
-  }
-  return null;
-}
-
 String? _validatePassword(String? value) {
   if ((value ?? '').isEmpty) {
     return 'Informe a senha.';
@@ -198,15 +215,4 @@ String? _validatePassword(String? value) {
     return 'A senha deve ter pelo menos 6 caracteres.';
   }
   return null;
-}
-
-String _authErrorMessage(FirebaseAuthException error) {
-  return switch (error.code) {
-    'invalid-email' => 'Email invalido.',
-    'user-not-found' ||
-    'wrong-password' ||
-    'invalid-credential' => 'Email ou senha invalidos.',
-    'network-request-failed' => 'Falha de conexao. Verifique sua internet.',
-    _ => error.message ?? 'Erro de autenticacao. Tente novamente.',
-  };
 }

@@ -213,11 +213,13 @@ class VittaSearchField extends StatelessWidget {
     this.hint = 'Pesquise',
     this.controller,
     this.onChanged,
+    this.onSubmitted,
   });
 
   final String hint;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +228,7 @@ class VittaSearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(fontSize: 12),
