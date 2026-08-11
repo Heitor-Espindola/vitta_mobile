@@ -1,23 +1,6 @@
-DateTime? parseBrazilianDate(String value) {
-  final parts = value.trim().split('/');
-  if (parts.length != 3) {
-    return null;
-  }
+import 'package:vitta_mobile/core/validators/birth_date_validator.dart';
 
-  final day = int.tryParse(parts[0]);
-  final month = int.tryParse(parts[1]);
-  final year = int.tryParse(parts[2]);
-  if (day == null || month == null || year == null) {
-    return null;
-  }
-
-  final date = DateTime(year, month, day);
-  if (date.day != day || date.month != month || date.year != year) {
-    return null;
-  }
-
-  return date;
-}
+DateTime? parseBrazilianDate(String value) => parseBirthDate(value);
 
 String formatBrazilianDate(DateTime? date) {
   if (date == null) {

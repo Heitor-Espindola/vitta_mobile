@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -11,6 +12,7 @@ import 'package:vitta_mobile/features/information/domain/models/news_article.dar
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
+import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
 
 const articleJson = {
   'source': {'name': 'Agência Saúde'},
@@ -234,6 +236,73 @@ void main() {
       expect(failed.state, NewsState.error);
       expect(failed.errorMessage, contains('Sem conexão'));
     });
+  });
+
+  testWidgets('Conteúdos renders news returned by the repository', (
+    tester,
+  ) async {
+    final repository = ImmediateRepository(
+      NewsResponse(
+        articles: [
+          const NewsArticle(
+            sourceName: 'Agência Saúde',
+            title: 'Campanha nacional de vacinação',
+            description: 'Postos de saúde ampliam o atendimento.',
+            url: 'https://example.com/campanha',
+          ),
+        ],
+        totalResults: 1,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notícias externas'), findsOneWidget);
+    expect(find.text('Agência Saúde · Data não informada'), findsOneWidget);
+    expect(find.text('Campanha nacional de vacinação'), findsOneWidget);
+    expect(find.text('Ler notícia'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('educational cards open content and trigger related search', (
+    tester,
+  ) async {
+    final repository = ImmediateRepository(nextResponse([article('1')]));
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('educational-content-0')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('A vacinação na infância ajuda'),
+      findsOneWidget,
+    );
+    expect(find.text('Buscar notícias relacionadas'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('search-related-news')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('search-related-news')));
+    await tester.pumpAndSettle();
+    expect(repository.lastQuery, 'vacinação infantil');
+    expect(find.text('Limpar: vacinação infantil'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('educational-content-1')));
+    await tester.tap(find.byKey(const Key('educational-content-1')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pesquisas em imunização'), findsOneWidget);
+    await tester.tap(find.byTooltip('Fechar'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('educational-content-2')));
+    await tester.tap(find.byKey(const Key('educational-content-2')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Informações confiáveis'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 

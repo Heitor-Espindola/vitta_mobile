@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class NewsLoadingList extends StatelessWidget {
   const NewsLoadingList({super.key});
+
   @override
   Widget build(BuildContext context) => const Padding(
     padding: EdgeInsets.symmetric(vertical: 42),
@@ -15,8 +16,10 @@ class NewsErrorState extends StatelessWidget {
     required this.onRetry,
     super.key,
   });
+
   final String message;
   final VoidCallback onRetry;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 28),
@@ -37,14 +40,26 @@ class NewsErrorState extends StatelessWidget {
 }
 
 class NewsEmptyState extends StatelessWidget {
-  const NewsEmptyState({super.key});
+  const NewsEmptyState({this.onClearSearch, super.key});
+
+  final VoidCallback? onClearSearch;
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 36),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 36),
     child: Center(
-      child: Text(
-        'Nenhuma notícia relacionada foi encontrada.',
-        textAlign: TextAlign.center,
+      child: Column(
+        children: [
+          const Text('Nenhuma notícia encontrada', textAlign: TextAlign.center),
+          if (onClearSearch != null) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onClearSearch,
+              icon: const Icon(Icons.close),
+              label: const Text('Limpar busca'),
+            ),
+          ],
+        ],
       ),
     ),
   );

@@ -8,7 +8,7 @@ const vittaLineBlue = Color(0xFF83ACD4);
 const vittaPink = Color(0xFFFF3DAD);
 const vittaSurface = Color(0xFFF8FAFC);
 
-enum VittaTab { home, card, content, vaccines }
+enum VittaTab { home, card, content, vaccines, profile }
 
 class VittaMobileShell extends StatelessWidget {
   const VittaMobileShell({
@@ -68,8 +68,8 @@ class VittaTopBar extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            left: 54,
-            right: 88,
+            left: 24,
+            right: 24,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -82,21 +82,6 @@ class VittaTopBar extends StatelessWidget {
                   fontSize: 20,
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            right: 20,
-            top: 12,
-            child: IconButton.filledTonal(
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.profile),
-              icon: const Icon(Icons.person_outline, color: Colors.white),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.white, width: 1.2),
-                fixedSize: const Size(54, 54),
-              ),
-              tooltip: 'Perfil',
             ),
           ),
         ],
@@ -112,47 +97,64 @@ class VittaBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-
-    return Container(
-      height: 54 + bottomPadding,
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      decoration: const BoxDecoration(
-        color: vittaSoftBlue,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          _NavItem(
-            icon: Icons.home_outlined,
-            label: 'Inicio',
-            tab: VittaTab.home,
-            currentTab: currentTab,
-            routeName: AppRoutes.home,
-          ),
-          _NavItem(
-            icon: Icons.article_outlined,
-            label: 'Carteira',
-            tab: VittaTab.card,
-            currentTab: currentTab,
-            routeName: AppRoutes.vaccinationCard,
-          ),
-          _NavItem(
-            icon: Icons.menu_book_outlined,
-            label: 'Conteudo',
-            tab: VittaTab.content,
-            currentTab: currentTab,
-            routeName: AppRoutes.information,
-          ),
-          _NavItem(
-            icon: Icons.vaccines_outlined,
-            label: 'Vacinas',
-            tab: VittaTab.vaccines,
-            currentTab: currentTab,
-            routeName: AppRoutes.vaccines,
-          ),
-        ],
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+      child: Container(
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE8EDF0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x180C527E),
+              blurRadius: 24,
+              offset: Offset(0, 9),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _NavItem(
+              icon: Icons.home_outlined,
+              label: 'Início',
+              tab: VittaTab.home,
+              currentTab: currentTab,
+              routeName: AppRoutes.home,
+            ),
+            _NavItem(
+              icon: Icons.article_outlined,
+              label: 'Carteira',
+              tab: VittaTab.card,
+              currentTab: currentTab,
+              routeName: AppRoutes.vaccinationCard,
+            ),
+            _NavItem(
+              icon: Icons.menu_book_outlined,
+              label: 'Conteúdo',
+              tab: VittaTab.content,
+              currentTab: currentTab,
+              routeName: AppRoutes.information,
+            ),
+            _NavItem(
+              icon: Icons.vaccines_outlined,
+              label: 'Vacinas',
+              tab: VittaTab.vaccines,
+              currentTab: currentTab,
+              routeName: AppRoutes.vaccines,
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Perfil',
+              tab: VittaTab.profile,
+              currentTab: currentTab,
+              routeName: AppRoutes.profile,
+              replaceCurrentRoute: false,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -165,6 +167,7 @@ class _NavItem extends StatelessWidget {
     required this.tab,
     required this.currentTab,
     required this.routeName,
+    this.replaceCurrentRoute = true,
   });
 
   final IconData icon;
@@ -172,31 +175,60 @@ class _NavItem extends StatelessWidget {
   final VittaTab tab;
   final VittaTab currentTab;
   final String routeName;
+  final bool replaceCurrentRoute;
 
   @override
   Widget build(BuildContext context) {
     final selected = currentTab == tab;
-    final color = selected ? Colors.white : vittaDarkBlue;
+    final color = selected ? vittaDarkBlue : const Color(0xFF849199);
 
     return Expanded(
       child: InkWell(
         onTap: selected
             ? null
-            : () => Navigator.of(context).pushReplacementNamed(routeName),
-        child: Container(
+            : () {
+                if (replaceCurrentRoute) {
+                  Navigator.of(context).pushReplacementNamed(routeName);
+                } else {
+                  Navigator.of(context).pushNamed(routeName);
+                }
+              },
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           height: double.infinity,
-          color: selected ? const Color(0xFF3E82B3) : Colors.transparent,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          decoration: const BoxDecoration(color: Colors.transparent),
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Icon(icon, color: color, size: 27),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color, size: selected ? 25 : 23),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 9.5,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                bottom: 1,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: selected ? 5 : 0,
+                  height: selected ? 5 : 0,
+                  decoration: const BoxDecoration(
+                    color: vittaDarkBlue,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
             ],
@@ -214,12 +246,14 @@ class VittaSearchField extends StatelessWidget {
     this.controller,
     this.onChanged,
     this.onSubmitted,
+    this.onSearchTap,
   });
 
   final String hint;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onSearchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +266,11 @@ class VittaSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(fontSize: 12),
-          suffixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: IconButton(
+            tooltip: 'Pesquisar',
+            onPressed: onSearchTap,
+            icon: const Icon(Icons.search, size: 18),
+          ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           filled: true,
           fillColor: const Color(0xFFF4F8FB),

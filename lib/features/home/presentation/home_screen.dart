@@ -1,14 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
+import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
+import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
+import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
+import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
+import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_card_screen.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.authRepository});
+  const HomeScreen({
+    super.key,
+    this.authRepository,
+    this.vaccinationRepository,
+    this.peopleRepository,
+  });
 
   final AuthRepository? authRepository;
+  final VaccinationRepository? vaccinationRepository;
+  final PeopleRepository? peopleRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -17,65 +32,437 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final AuthRepository _authRepository =
       widget.authRepository ?? FirebaseAuthRepository();
-  late final Future<AppUser?> _userFuture = _authRepository.getCurrentUser();
+  late final VaccinationRepository _vaccinationRepository =
+      widget.vaccinationRepository ?? FirebaseVaccinationRepository();
+  late final PeopleRepository _peopleRepository =
+      widget.peopleRepository ?? FirebasePeopleRepository();
+  late Future<_HomeData> _data = _loadData();
+  String? _selectedPersonId;
+
+  Future<_HomeData> _loadData() async {
+    final user = await _authRepository.getCurrentUser();
+    if (user == null) return const _HomeData();
+    var people = <AppUser>[user];
+    try {
+      people = await _peopleRepository.getAvailablePeople(user.uid);
+    } catch (_) {
+      // A carteira principal continua disponível durante falhas de dependentes.
+    }
+    final selected = people.firstWhere(
+      (person) => person.uid == _selectedPersonId,
+      orElse: () => user,
+    );
+    try {
+      final records = await _vaccinationRepository.getRecordsByPerson(
+        personId: selected.uid,
+        responsibleId: user.uid,
+      );
+      return _HomeData(
+        user: user,
+        selectedPerson: selected,
+        people: people,
+        records: records,
+      );
+    } catch (_) {
+      return _HomeData(user: user, selectedPerson: selected, people: people);
+    }
+  }
+
+  void _selectPerson(AppUser person) {
+    setState(() {
+      _selectedPersonId = person.uid;
+      _data = _loadData();
+    });
+  }
+
+  Future<void> _addDependent() async {
+    final created = await Navigator.of(context).push<AppUser>(
+      MaterialPageRoute(
+        builder: (_) => DependentsScreen(
+          authRepository: _authRepository,
+          peopleRepository: _peopleRepository,
+        ),
+      ),
+    );
+    if (created != null && mounted) {
+      setState(() {
+        _selectedPersonId = created.uid;
+        _data = _loadData();
+      });
+    }
+  }
+
+  void _openCard(AppUser person) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VaccinationCardScreen(
+          authRepository: _authRepository,
+          vaccinationRepository: _vaccinationRepository,
+          selectedPerson: person,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => VittaMobileShell(
+    title: 'Início',
+    currentTab: VittaTab.home,
+    showGreetingHeader: true,
+    body: FutureBuilder<_HomeData>(
+      future: _data,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const _HomeData();
+        final applied = data.applied;
+        final upcoming = data.upcoming;
+        final recent = data.recent;
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+              sliver: SliverList.list(
+                children: [
+                  _HomeHeader(name: _firstName(data.user?.name)),
+                  const SizedBox(height: 24),
+                  _SummaryCard(appliedCount: applied.length),
+                  const SizedBox(height: 28),
+                  _SectionHeader(
+                    title: 'Carteiras',
+                    actionLabel: '+ Adicionar dependente',
+                    onAction: _addDependent,
+                  ),
+                  const SizedBox(height: 14),
+                  _PeopleSelector(
+                    people: data.people,
+                    ownerId: data.user?.uid ?? '',
+                    selectedId: data.selectedPerson?.uid,
+                    records: data.records,
+                    onSelected: _selectPerson,
+                    onOpen: _openCard,
+                  ),
+                  const SizedBox(height: 28),
+                  const _SectionHeader(title: 'Próximas doses'),
+                  const SizedBox(height: 14),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const _HomeLoading()
+                  else if (upcoming.isEmpty)
+                    const _EmptyCard(
+                      icon: Icons.event_available_outlined,
+                      text: 'Nenhuma próxima dose cadastrada.',
+                    )
+                  else
+                    _DoseTimeline(records: upcoming),
+                  const SizedBox(height: 30),
+                  const _SectionHeader(title: 'Últimas vacinas'),
+                  const SizedBox(height: 14),
+                  if (recent.isEmpty)
+                    const _EmptyCard(
+                      icon: Icons.vaccines_outlined,
+                      text: 'As vacinas aplicadas aparecerão aqui.',
+                    )
+                  else
+                    ...recent.map(_RecentVaccineCard.new),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF5FC),
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(color: Color(0x140A5B91), blurRadius: 12),
+          ],
+        ),
+        child: const Icon(Icons.vaccines_outlined, color: vittaBlue, size: 27),
+      ),
+      const SizedBox(width: 13),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Olá, $name',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+            ),
+            const Text(
+              'Minha Carteira',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const Text(
+              'Digital de Vacinação',
+              style: TextStyle(fontSize: 11, color: Color(0xFF718096)),
+            ),
+          ],
+        ),
+      ),
+      Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              shadowColor: const Color(0x25000000),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.notifications_none_rounded),
+            tooltip: 'Notificações',
+          ),
+          Positioned(
+            right: 8,
+            top: 7,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE84B4B),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.appliedCount});
+
+  final int appliedCount;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF3C9FE3), Color(0xFF267BB8)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(26),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x383A92D3),
+          blurRadius: 22,
+          offset: Offset(0, 12),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$appliedCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 46,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'vacinas aplicadas',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Sua carteira digital está atualizada',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check_rounded, color: Colors.white, size: 45),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
+        ),
+        if (actionLabel != null)
+          TextButton(
+            onPressed: onAction,
+            child: Text(
+              constraints.maxWidth < 380 ? '+ Dependente' : actionLabel!,
+              maxLines: 1,
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _PeopleSelector extends StatelessWidget {
+  const _PeopleSelector({
+    required this.people,
+    required this.ownerId,
+    required this.selectedId,
+    required this.records,
+    required this.onSelected,
+    required this.onOpen,
+  });
+
+  final List<AppUser> people;
+  final String ownerId;
+  final String? selectedId;
+  final List<VaccinationRecord> records;
+  final ValueChanged<AppUser> onSelected;
+  final ValueChanged<AppUser> onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return VittaMobileShell(
-      title: 'Inicio',
-      currentTab: VittaTab.home,
-      showGreetingHeader: true,
-      body: FutureBuilder<AppUser?>(
-        future: _userFuture,
-        builder: (context, snapshot) {
-          final user = snapshot.data;
-          final firstName = _firstName(user?.name);
-          final age = _age(user?.birthDate ?? DateTime(2008, 6, 23));
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(26, 10, 26, 22),
-            children: [
-              _HomeHeader(name: firstName, age: age),
-              const SizedBox(height: 26),
-              const _DocumentCard(),
-              const SizedBox(height: 24),
-              const _ProgressTile(),
-              const SizedBox(height: 18),
-              const SectionTitle(
-                title: 'Doses Proximas',
-                action: 'Ver todas >',
+    if (people.isEmpty) {
+      return const _EmptyCard(
+        icon: Icons.person_outline_rounded,
+        text: 'Não foi possível carregar as carteiras.',
+      );
+    }
+    return SizedBox(
+      height: 154,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: people.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final person = people[index];
+          final selected = person.uid == selectedId;
+          final isOwner = person.uid == ownerId;
+          return Semantics(
+            button: true,
+            label: 'Abrir carteira de ${person.name}',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                if (!selected) {
+                  onSelected(person);
+                }
+                onOpen(person);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 226,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFFEAF5FC) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected
+                        ? const Color(0xFFB8DDF4)
+                        : const Color(0xFFEDF1F4),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0C000000),
+                      blurRadius: 12,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: selected
+                          ? vittaBlue
+                          : const Color(0xFFDDEFFC),
+                      foregroundColor: selected ? Colors.white : vittaDarkBlue,
+                      child: Text(_initials(person.name)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _filledName(person.name),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            isOwner
+                                ? 'Minha carteira'
+                                : (person.relationshipToGuardian ??
+                                      'Dependente'),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF718096),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            selected
+                                ? '${records.where(_isApplied).length} vacinas registradas • toque para abrir'
+                                : 'Toque para abrir',
+                            maxLines: 2,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: vittaDarkBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              const _DoseCard(
-                title: 'Gripe',
-                dose: 'Campanha anual',
-                date: 'Prevista para: 10/07/2026',
-                status: 'Pendente',
-              ),
-              const SizedBox(height: 14),
-              const _DoseCard(
-                title: 'Covid-19',
-                dose: 'Reforco conforme calendario',
-                date: 'Aplicada em: 15/03/2024',
-                status: 'Concluida',
-              ),
-              const SizedBox(height: 18),
-              const SectionTitle(title: 'Vacinas Recentes'),
-              const SizedBox(height: 12),
-              const _DoseCard(
-                title: 'Meningococica ACWY',
-                dose: 'Dose unica',
-                date: 'Aplicada em: 07/05/2022',
-                status: 'Concluida',
-              ),
-              const SizedBox(height: 14),
-              const _DoseCard(
-                title: 'HPV',
-                dose: '2ª dose',
-                date: 'Aplicada em: 12/11/2021',
-                status: 'Concluida',
-              ),
-            ],
+            ),
           );
         },
       ),
@@ -83,318 +470,281 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.name, required this.age});
+class _DoseTimeline extends StatelessWidget {
+  const _DoseTimeline({required this.records});
 
-  final String name;
-  final int age;
+  final List<VaccinationRecord> records;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              text: 'Ola,\n',
-              style: const TextStyle(fontSize: 22, height: 1.12),
-              children: [
-                TextSpan(
-                  text: '$name\n',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                TextSpan(
-                  text: '$age anos',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Stack(
-          clipBehavior: Clip.none,
+  Widget build(BuildContext context) => Column(
+    children: List.generate(records.length, (index) {
+      final record = records[index];
+      final overdue = _isOverdue(record);
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFC9CED5)),
-              ),
-              child: IconButton(
-                onPressed: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.profile),
-                icon: const Icon(Icons.notifications_none, size: 31),
-                tooltip: 'Notificacoes',
+            SizedBox(
+              width: 24,
+              child: Column(
+                children: [
+                  Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: overdue
+                          ? const Color(0xFFE85B61)
+                          : const Color(0xFF4C9ED5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x22000000), blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                  if (index < records.length - 1)
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        color: const Color(0xFFDCE8F0),
+                      ),
+                    ),
+                ],
               ),
             ),
-            Positioned(
-              right: 9,
-              top: 7,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _UpcomingDoseCard(record: record, overdue: overdue),
               ),
             ),
           ],
         ),
+      );
+    }),
+  );
+}
+
+class _UpcomingDoseCard extends StatelessWidget {
+  const _UpcomingDoseCard({required this.record, required this.overdue});
+
+  final VaccinationRecord record;
+  final bool overdue;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: overdue ? const Color(0xFFFFEEEE) : Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: overdue ? const Color(0xFFFFD2D2) : const Color(0xFFE8EEF3),
+      ),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x10000000),
+          blurRadius: 14,
+          offset: Offset(0, 6),
+        ),
       ],
-    );
-  }
-}
-
-class _DocumentCard extends StatelessWidget {
-  const _DocumentCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 176,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF6EA7C7),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 9,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Seu novo documento digital',
-            style: TextStyle(color: Colors.white, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          Row(
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    text: 'Cardeneta\n',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: 'Tudo verificado e atualizado',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: Color(0x558EC4DE),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.verified_user_outlined,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Row(
-            children: const [
-              _DocumentButton(icon: Icons.qr_code_2, label: 'Compartilhar'),
-              SizedBox(width: 12),
-              _DocumentButton(icon: Icons.share_outlined, label: 'enviar'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DocumentButton extends StatelessWidget {
-  const _DocumentButton({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 11),
-      decoration: BoxDecoration(
-        color: const Color(0x668DC0DA),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 17),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProgressTile extends StatelessWidget {
-  const _ProgressTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x15000000),
-            blurRadius: 7,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFF7BDBA5), Color(0xFF6AA4FF)],
-              ),
-            ),
-            child: const Icon(
-              Icons.eco_outlined,
-              color: Colors.white,
-              size: 19,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text.rich(
-            TextSpan(
-              text: '86%\n',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                height: 1,
-              ),
-              children: [
-                TextSpan(
-                  text: 'Vacinas em dia',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DoseCard extends StatelessWidget {
-  const _DoseCard({
-    required this.title,
-    required this.dose,
-    required this.date,
-    required this.status,
-  });
-
-  final String title;
-  final String dose;
-  final String date;
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: vittaLineBlue),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                text: '$title\n',
+              Text(
+                record.vaccineName,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  height: 1.22,
                 ),
-                children: [
-                  TextSpan(
-                    text: '$dose\n$date',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                record.dose,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                overdue
+                    ? 'Dose atrasada desde ${formatBrazilianDate(record.nextDoseDate)}'
+                    : 'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: overdue
+                      ? const Color(0xFFC53D44)
+                      : const Color(0xFF426B86),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          StatusChip(label: status),
-        ],
-      ),
-    );
+        ),
+        Icon(
+          overdue ? Icons.warning_amber_rounded : Icons.calendar_month_outlined,
+          color: overdue ? const Color(0xFFE85B61) : vittaBlue,
+        ),
+      ],
+    ),
+  );
+}
+
+class _RecentVaccineCard extends StatelessWidget {
+  const _RecentVaccineCard(this.record);
+
+  final VaccinationRecord record;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF4F9FC),
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Color(0xFFDDEFFC),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.vaccines_outlined, color: vittaDarkBlue),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                record.vaccineName,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${record.dose} • ${formatBrazilianDate(record.applicationDate)}',
+                style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+              ),
+            ],
+          ),
+        ),
+        const Icon(Icons.check_circle, color: vittaBlue, size: 22),
+      ],
+    ),
+  );
+}
+
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12)],
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: const Color(0xFF8AA7BA)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _HomeLoading extends StatelessWidget {
+  const _HomeLoading();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.all(24),
+    child: Center(child: CircularProgressIndicator()),
+  );
+}
+
+class _HomeData {
+  const _HomeData({
+    this.user,
+    this.selectedPerson,
+    this.people = const [],
+    this.records = const [],
+  });
+
+  final AppUser? user;
+  final AppUser? selectedPerson;
+  final List<AppUser> people;
+  final List<VaccinationRecord> records;
+
+  List<VaccinationRecord> get applied {
+    return records.where(_isApplied).toList();
   }
+
+  List<VaccinationRecord> get upcoming {
+    final result = records
+        .where((record) => !_isApplied(record) && record.nextDoseDate != null)
+        .toList();
+    result.sort((a, b) => a.nextDoseDate!.compareTo(b.nextDoseDate!));
+    return result.take(3).toList();
+  }
+
+  List<VaccinationRecord> get recent {
+    final result = records
+        .where((record) => _isApplied(record) && record.applicationDate != null)
+        .toList();
+    result.sort((a, b) => b.applicationDate!.compareTo(a.applicationDate!));
+    return result.take(3).toList();
+  }
+}
+
+String _initials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty);
+  final value = parts.take(2).map((part) => part[0]).join().toUpperCase();
+  return value.isEmpty ? 'U' : value;
+}
+
+String _filledName(String name) =>
+    name.trim().isEmpty ? 'Usuário' : name.trim();
+
+bool _isApplied(VaccinationRecord record) {
+  final status = record.status.toLowerCase();
+  return status == 'applied' ||
+      status.contains('aplic') ||
+      status.contains('conclu');
+}
+
+bool _isOverdue(VaccinationRecord record) {
+  final status = record.status.toLowerCase();
+  final date = record.nextDoseDate;
+  return status == 'late' ||
+      status.contains('atras') ||
+      (date != null && date.isBefore(DateTime.now()));
 }
 
 String _firstName(String? name) {
-  final trimmed = name?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return 'Eduardo';
-  }
-  return trimmed.split(RegExp(r'\s+')).first;
-}
-
-int _age(DateTime birthDate) {
-  final today = DateTime.now();
-  var years = today.year - birthDate.year;
-  final birthdayPassed =
-      today.month > birthDate.month ||
-      (today.month == birthDate.month && today.day >= birthDate.day);
-  if (!birthdayPassed) {
-    years--;
-  }
-  return years;
+  final value = name?.trim();
+  return value == null || value.isEmpty
+      ? 'usuário'
+      : value.split(RegExp(r'\s+')).first;
 }

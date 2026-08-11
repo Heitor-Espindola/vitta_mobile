@@ -1,15 +1,18 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
@@ -20,10 +23,12 @@ class VaccinationCardScreen extends StatefulWidget {
     super.key,
     this.authRepository,
     this.vaccinationRepository,
+    this.selectedPerson,
   });
 
   final AuthRepository? authRepository;
   final VaccinationRepository? vaccinationRepository;
+  final AppUser? selectedPerson;
 
   @override
   State<VaccinationCardScreen> createState() => _VaccinationCardScreenState();
@@ -32,901 +37,927 @@ class VaccinationCardScreen extends StatefulWidget {
 class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   late final AuthRepository _authRepository =
       widget.authRepository ?? FirebaseAuthRepository();
-  late final VaccinationRepository _vaccinationRepository =
+  late final VaccinationRepository _repository =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
   final _searchController = TextEditingController();
-
-  var _showBooklet = false;
-  var _filter = _VaccineFilter.all;
-  final Set<String> _expandedRecordIds = {};
-  AppUser? _currentUser;
-  List<VaccinationRecord> _records = [];
-  bool _isLoading = true;
-  String? _errorMessage;
+  StreamSubscription<List<VaccinationRecord>>? _recordsSubscription;
+  AppUser? _guardian;
+  AppUser? _person;
+  List<VaccinationRecord> _records = const [];
+  List<Vaccine> _vaccines = const [];
+  _VaccineFilter _filter = _VaccineFilter.all;
+  bool _showBooklet = false;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() => setState(() {}));
-    _loadInitialData();
+    _searchController.addListener(_refresh);
+    _load();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _recordsSubscription?.cancel();
+    _searchController
+      ..removeListener(_refresh)
+      ..dispose();
     super.dispose();
   }
 
-  Future<void> _loadInitialData() async {
+  void _refresh() => setState(() {});
+
+  Future<void> _load() async {
+    await _recordsSubscription?.cancel();
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      _loading = true;
+      _error = null;
     });
     try {
-      final user = await _authRepository.getCurrentUser();
-      if (user == null) {
-        throw Exception('Usuario nao autenticado.');
-      }
-      final records = await _vaccinationRepository.getRecordsByResponsible(
-        user.uid,
-      );
-
-      if (!mounted) {
-        return;
-      }
+      final guardian = await _authRepository.getCurrentUser();
+      if (guardian == null) throw StateError('Usuário não autenticado.');
+      final person = widget.selectedPerson ?? guardian;
+      final vaccines = await _repository.getVaccines();
+      if (!mounted) return;
       setState(() {
-        _currentUser = _withAdultFallback(user);
-        _records = records;
+        _guardian = guardian;
+        _person = person;
+        _vaccines = vaccines;
       });
+      _recordsSubscription = _repository
+          .watchRecordsByPerson(
+            personId: person.uid,
+            responsibleId: guardian.uid,
+          )
+          .listen(
+            (records) {
+              if (mounted) {
+                setState(() {
+                  _records = records;
+                  _loading = false;
+                  _error = null;
+                });
+              }
+            },
+            onError: (_) {
+              if (mounted) {
+                setState(() {
+                  _loading = false;
+                  _error = 'Não foi possível atualizar a carteira.';
+                });
+              }
+            },
+          );
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _currentUser = _withAdultFallback(_currentUser);
-        _records = _adultSampleRecords;
-        _errorMessage = 'Nao foi possivel carregar os dados reais agora.';
-      });
-    } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _loading = false;
+          _error = 'Não foi possível carregar a carteira.';
+        });
       }
     }
   }
 
   List<VaccinationRecord> get _visibleRecords {
     final query = _searchController.text.trim().toLowerCase();
-    return _displayRecords.where((record) {
+    final records = _records.where((record) {
       final matchesQuery =
           query.isEmpty ||
           record.vaccineName.toLowerCase().contains(query) ||
-          record.dose.toLowerCase().contains(query) ||
-          statusLabel(record.status).toLowerCase().contains(query) ||
-          (record.healthUnit ?? '').toLowerCase().contains(query);
-
-      if (!matchesQuery) {
-        return false;
-      }
-
+          record.dose.toLowerCase().contains(query);
+      if (!matchesQuery) return false;
       return switch (_filter) {
         _VaccineFilter.all => true,
-        _VaccineFilter.late => _isLate(record.status),
-        _VaccineFilter.next =>
-          _isPending(record.status) || record.nextDoseDate != null,
-        _VaccineFilter.done => _isDone(record.status),
+        _VaccineFilter.late => _isLate(record),
+        _VaccineFilter.next => _isPending(record),
+        _VaccineFilter.done => _isDone(record),
       };
     }).toList();
+    records.sort((a, b) {
+      final aDate = a.applicationDate ?? a.nextDoseDate;
+      final bDate = b.applicationDate ?? b.nextDoseDate;
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+    return records;
   }
 
-  Future<void> _downloadPdf() async {
-    final bytes = await _buildPdf(user: _currentUser, records: _displayRecords);
+  Vaccine? _vaccineFor(VaccinationRecord record) {
+    for (final vaccine in _vaccines) {
+      if ((record.vaccineId?.isNotEmpty ?? false) &&
+          vaccine.id == record.vaccineId) {
+        return vaccine;
+      }
+      if (vaccine.name.trim().toLowerCase() ==
+          record.vaccineName.trim().toLowerCase()) {
+        return vaccine;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openDetails(VaccinationRecord record) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          _VaccineDetails(record: record, vaccine: _vaccineFor(record)),
+    );
+  }
+
+  Future<void> _exportPdf() async {
+    final bytes = await _buildPdf(person: _person, records: _records);
     await Printing.layoutPdf(
-      name: 'caderneta-vacinal.pdf',
+      name: 'carteira-vacinal-${_person?.uid ?? 'vitta'}.pdf',
       onLayout: (_) async => bytes,
     );
   }
 
-  List<VaccinationRecord> get _displayRecords =>
-      _records.isEmpty ? _adultSampleRecords : _records;
+  @override
+  Widget build(BuildContext context) => VittaMobileShell(
+    title: 'Carteira',
+    currentTab: VittaTab.card,
+    body: RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+        children: [
+          _PersonHeader(
+            person: _person,
+            isOwner: _person?.uid == _guardian?.uid,
+          ),
+          const SizedBox(height: 18),
+          _ModeSelector(
+            showBooklet: _showBooklet,
+            onChanged: (value) => setState(() => _showBooklet = value),
+          ),
+          const SizedBox(height: 22),
+          if (_error != null) _MessageCard(message: _error!, error: true),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_showBooklet)
+            _DigitalBooklet(
+              person: _person,
+              records: _records,
+              onRecordTap: _openDetails,
+              onExport: _exportPdf,
+            )
+          else ...[
+            TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Pesquisar vacina',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _Filters(
+              selected: _filter,
+              onSelected: (value) => setState(() => _filter = value),
+            ),
+            const SizedBox(height: 20),
+            if (_visibleRecords.isEmpty)
+              const _MessageCard(
+                message: 'Nenhum registro encontrado para esta carteira.',
+              )
+            else
+              ..._visibleRecords.map(
+                (record) => _RecordCard(
+                  record: record,
+                  onTap: () => _openDetails(record),
+                ),
+              ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _PersonHeader extends StatelessWidget {
+  const _PersonHeader({required this.person, required this.isOwner});
+  final AppUser? person;
+  final bool isOwner;
 
   @override
   Widget build(BuildContext context) {
-    final visibleRecords = _visibleRecords;
-
-    return VittaMobileShell(
-      title: 'Carteira',
-      currentTab: VittaTab.card,
-      body: RefreshIndicator(
-        onRefresh: _loadInitialData,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 28, 12, 24),
-          children: [
-            _CardTabs(
-              showBooklet: _showBooklet,
-              onChanged: (value) => setState(() => _showBooklet = value),
+    final name = _present(person?.name, 'Usuário');
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(const Color(0xFFEAF5FC)),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 25,
+            backgroundColor: vittaBlue,
+            foregroundColor: Colors.white,
+            child: Text(_initials(name)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isOwner
+                      ? 'Minha carteira'
+                      : _present(person?.relationshipToGuardian, 'Dependente'),
+                  style: const TextStyle(color: Color(0xFF54758A)),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            if (_showBooklet)
-              _BookletPreview(
-                user: _currentUser,
-                records: _displayRecords,
-                onDownload: _downloadPdf,
-              )
-            else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: VittaSearchField(controller: _searchController),
-              ),
-              const SizedBox(height: 24),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _FilterPill(
-                      label: 'Todas',
-                      selected: _filter == _VaccineFilter.all,
-                      onTap: () => setState(() => _filter = _VaccineFilter.all),
-                    ),
-                    const SizedBox(width: 14),
-                    _FilterPill(
-                      label: 'Atrasadas',
-                      selected: _filter == _VaccineFilter.late,
-                      onTap: () =>
-                          setState(() => _filter = _VaccineFilter.late),
-                    ),
-                    const SizedBox(width: 14),
-                    _FilterPill(
-                      label: 'Proximas',
-                      selected: _filter == _VaccineFilter.next,
-                      onTap: () =>
-                          setState(() => _filter = _VaccineFilter.next),
-                    ),
-                    const SizedBox(width: 14),
-                    _FilterPill(
-                      label: 'Concluidas',
-                      selected: _filter == _VaccineFilter.done,
-                      onTap: () =>
-                          setState(() => _filter = _VaccineFilter.done),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 38),
-              if (_errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                ),
-              if (_isLoading)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (visibleRecords.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'Nenhuma vacina encontrada para este filtro.',
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else
-                ...visibleRecords.map(
-                  (record) => _RecordTile(
-                    record: record,
-                    expanded: _expandedRecordIds.contains(record.id),
-                    onToggle: () => setState(() {
-                      if (_expandedRecordIds.contains(record.id)) {
-                        _expandedRecordIds.remove(record.id);
-                      } else {
-                        _expandedRecordIds.add(record.id);
-                      }
-                    }),
-                  ),
-                ),
-            ],
-          ],
-        ),
+          ),
+          const Icon(Icons.verified_user_outlined, color: vittaBlue),
+        ],
       ),
     );
   }
 }
 
-class _CardTabs extends StatelessWidget {
-  const _CardTabs({required this.showBooklet, required this.onChanged});
-
+class _ModeSelector extends StatelessWidget {
+  const _ModeSelector({required this.showBooklet, required this.onChanged});
   final bool showBooklet;
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Row(
-        children: [
-          _TabButton(
-            label: 'Minhas Vacinas',
-            selected: !showBooklet,
-            onTap: () => onChanged(false),
-          ),
-          const Spacer(),
-          _TabButton(
-            label: 'Cardeneta',
-            selected: showBooklet,
-            onTap: () => onChanged(true),
-          ),
-        ],
+  Widget build(BuildContext context) => SegmentedButton<bool>(
+    segments: const [
+      ButtonSegment(
+        value: false,
+        label: Text('Vacinas'),
+        icon: Icon(Icons.vaccines_outlined),
       ),
-    );
-  }
+      ButtonSegment(
+        value: true,
+        label: Text('Caderneta'),
+        icon: Icon(Icons.auto_stories_outlined),
+      ),
+    ],
+    selected: {showBooklet},
+    onSelectionChanged: (values) => onChanged(values.first),
+    showSelectedIcon: false,
+  );
 }
 
-class _TabButton extends StatelessWidget {
-  const _TabButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+class _Filters extends StatelessWidget {
+  const _Filters({required this.selected, required this.onSelected});
+  final _VaccineFilter selected;
+  final ValueChanged<_VaccineFilter> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? vittaDarkBlue : Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black,
-            fontSize: 16,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: _VaccineFilter.values.map((filter) {
+        final labels = {
+          _VaccineFilter.all: 'Todas',
+          _VaccineFilter.late: 'Atrasadas',
+          _VaccineFilter.next: 'Próximas',
+          _VaccineFilter.done: 'Concluídas',
+        };
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            label: Text(labels[filter]!),
+            selected: selected == filter,
+            onSelected: (_) => onSelected(filter),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }).toList(),
+    ),
+  );
 }
 
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? Colors.black : const Color(0xFFD0D5DB),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecordTile extends StatelessWidget {
-  const _RecordTile({
-    required this.record,
-    required this.expanded,
-    required this.onToggle,
-  });
-
+class _RecordCard extends StatelessWidget {
+  const _RecordCard({required this.record, required this.onTap});
   final VaccinationRecord record;
-  final bool expanded;
-  final VoidCallback onToggle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final date = record.applicationDate == null
-        ? 'Aplicada em: --/--/----'
-        : 'Aplicada em: ${formatBrazilianDate(record.applicationDate)}';
-    final unit = _filled(record.healthUnit, 'Maternidade Sao Luiz');
-    final lot = _filled(record.vaccineId, 'BCG-A22-019');
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 30, left: 30, right: 30),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
+    final date = record.applicationDate ?? record.nextDoseDate;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: vittaLineBlue),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onToggle,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDecoration(Colors.white),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _statusColor(record).withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.vaccines_outlined,
+                    color: _statusColor(record),
+                  ),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text.rich(
-                    TextSpan(
-                      text: '${record.vaccineName}\n',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        height: 1.15,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _present(record.vaccineName, 'Vacina'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                      children: [
-                        TextSpan(
-                          text: '${record.dose}\n$date',
+                      const SizedBox(height: 5),
+                      if (record.dose.trim().isNotEmpty)
+                        Text(
+                          record.dose,
+                          style: const TextStyle(color: Color(0xFF718096)),
+                        ),
+                      if (date != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '${record.applicationDate != null ? 'Aplicada' : 'Prevista'} em ${formatBrazilianDate(date)}',
                           style: const TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: Color(0xFF54758A),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                StatusChip(label: record.status),
-                const SizedBox(width: 12),
-                Icon(
-                  expanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  size: 16,
-                ),
+                const SizedBox(width: 8),
+                _StatusChip(record: record),
               ],
             ),
           ),
-          if (expanded) ...[
-            const SizedBox(height: 24),
-            _DetailBubble(label: 'LOCAL DE APLICACAO', value: unit),
-            const SizedBox(height: 10),
-            _DetailBubble(label: 'Lote', value: lot),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailBubble extends StatelessWidget {
-  const _DetailBubble({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Text.rich(
-        TextSpan(
-          text: '$label\n',
-          style: const TextStyle(color: Color(0xFF555555), fontSize: 8.5),
-          children: [
-            TextSpan(
-              text: value,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 }
 
-class _BookletPreview extends StatelessWidget {
-  const _BookletPreview({
-    required this.user,
-    required this.records,
-    required this.onDownload,
-  });
-
-  final AppUser? user;
-  final List<VaccinationRecord> records;
-  final VoidCallback? onDownload;
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.record});
+  final VaccinationRecord record;
 
   @override
-  Widget build(BuildContext context) {
-    final personName = _filled(user?.name, 'Eduardo Carvalho');
-    final birthDate = user?.birthDate == null
-        ? '--/--/----'
-        : formatBrazilianDate(user!.birthDate);
-    final cpf = _filled(user?.cpf, '123.456.789-00');
-
-    return Column(
-      children: [
-        const SizedBox(height: 28),
-        Container(
-          height: 392,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: const BoxDecoration(color: Colors.white),
-          child: RotatedBox(
-            quarterTurns: 1,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 8,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _BookletTable(records: records.take(8).toList()),
-                        const SizedBox(height: 10),
-                        _BookletTable(records: records.skip(8).toList()),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Carteira Nacional de Vacinacao Digital',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const _GovernmentMark(),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Nome\n$personName',
-                          style: const TextStyle(fontSize: 9),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Nascimento\n$birthDate',
-                          style: const TextStyle(fontSize: 9),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('CPF\n$cpf', style: const TextStyle(fontSize: 9)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
-        SizedBox(
-          height: 48,
-          width: 235,
-          child: FilledButton.icon(
-            onPressed: onDownload,
-            icon: const Icon(Icons.download, color: vittaDarkBlue),
-            label: const Text('Baixar  PDF'),
-            style: FilledButton.styleFrom(
-              backgroundColor: vittaSoftBlue,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: const Color(0xFFB8CFDD),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(7),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BookletTable extends StatelessWidget {
-  const _BookletTable({required this.records});
-
-  final List<VaccinationRecord> records;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = records.isEmpty
-        ? _adultSampleRecords.take(8).toList()
-        : records.take(8).toList();
-
-    return Table(
-      border: TableBorder.all(color: Colors.black87, width: .55),
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      children: [
-        const TableRow(
-          decoration: BoxDecoration(color: Color(0xFFE8E8E8)),
-          children: [
-            _BookletCell('Vacina', bold: true),
-            _BookletCell('Prevencao', bold: true),
-            _BookletCell('Dose', bold: true),
-            _BookletCell('Data', bold: true),
-            _BookletCell('Lote', bold: true),
-            _BookletCell('Unid.', bold: true),
-          ],
-        ),
-        ...rows.map(
-          (record) => TableRow(
-            children: [
-              _BookletCell(record.vaccineName),
-              _BookletCell(_preventionFor(record.vaccineName)),
-              _BookletCell(record.dose),
-              _BookletCell(
-                record.applicationDate == null
-                    ? '--/--/----'
-                    : formatBrazilianDate(record.applicationDate),
-              ),
-              _BookletCell(_filled(record.vaccineId, record.id)),
-              _BookletCell(_filled(record.healthUnit, '--')),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BookletCell extends StatelessWidget {
-  const _BookletCell(this.text, {this.bold = false});
-
-  final String text;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(3),
-      child: Text(
-        text,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 6.5,
-          fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-        ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+    decoration: BoxDecoration(
+      color: _statusColor(record).withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      _statusLabel(record),
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        color: _statusColor(record),
       ),
-    );
-  }
-}
-
-class _GovernmentMark extends StatelessWidget {
-  const _GovernmentMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF0E8F4F),
-            border: Border.all(color: const Color(0xFFF4D338), width: 3),
-          ),
-          child: const Icon(Icons.star, color: Colors.yellow, size: 18),
-        ),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'Ministerio da Saude\nGoverno Federal',
-            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-Future<Uint8List> _buildPdf({
-  required AppUser? user,
-  required List<VaccinationRecord> records,
-}) async {
-  final doc = pw.Document();
-  final personName = _filled(user?.name, 'Eduardo Carvalho');
-  final birthDate = user?.birthDate == null
-      ? '--/--/----'
-      : formatBrazilianDate(user!.birthDate);
-  final cpf = _filled(user?.cpf, '123.456.789-00');
-
-  doc.addPage(
-    pw.Page(
-      pageFormat: PdfPageFormat.a4.landscape,
-      margin: const pw.EdgeInsets.all(28),
-      build: (context) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  'Carteira Nacional de Vacinacao Digital',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.Text(
-                  'Vitta',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 12),
-            pw.Text('Pessoa: $personName'),
-            pw.Text('Nascimento: $birthDate'),
-            pw.Text('CPF: $cpf'),
-            pw.Text('Email: ${_filled(user?.email, '--')}'),
-            pw.SizedBox(height: 18),
-            pw.TableHelper.fromTextArray(
-              headers: const [
-                'Vacina',
-                'Dose',
-                'Status',
-                'Aplicacao',
-                'Proxima dose',
-                'Unidade',
-                'Lote',
-              ],
-              data: records.map((record) {
-                return [
-                  record.vaccineName,
-                  record.dose,
-                  statusLabel(record.status),
-                  record.applicationDate == null
-                      ? '--/--/----'
-                      : formatBrazilianDate(record.applicationDate),
-                  record.nextDoseDate == null
-                      ? '--/--/----'
-                      : formatBrazilianDate(record.nextDoseDate),
-                  _filled(record.healthUnit, '--'),
-                  _filled(record.vaccineId, record.id),
-                ];
-              }).toList(),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              cellStyle: const pw.TextStyle(fontSize: 8),
-              cellAlignment: pw.Alignment.centerLeft,
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.grey300,
-              ),
-            ),
-          ],
-        );
-      },
     ),
   );
-
-  return Uint8List.fromList(await doc.save());
 }
 
-bool _isLate(String status) {
-  final normalized = status.toLowerCase();
-  return normalized.contains('atras') || normalized.contains('late');
-}
+class _DigitalBooklet extends StatelessWidget {
+  const _DigitalBooklet({
+    required this.person,
+    required this.records,
+    required this.onRecordTap,
+    required this.onExport,
+  });
+  final AppUser? person;
+  final List<VaccinationRecord> records;
+  final ValueChanged<VaccinationRecord> onRecordTap;
+  final VoidCallback onExport;
 
-bool _isPending(String status) {
-  final normalized = status.toLowerCase();
-  return normalized.contains('pend') || normalized.contains('pending');
-}
-
-bool _isDone(String status) {
-  final normalized = status.toLowerCase();
-  return normalized.contains('concl') ||
-      normalized.contains('applied') ||
-      normalized.contains('aplic');
-}
-
-AppUser? _withAdultFallback(AppUser? user) {
-  if (user == null) {
-    return const AppUser(
-      uid: 'sample',
-      name: 'Eduardo Carvalho',
-      email: 'eduardo.carvalho@email.com',
-      role: 'responsible',
-      cpf: '123.456.789-00',
-      birthDate: null,
-    ).copyWith(birthDate: DateTime(2008, 6, 23));
+  @override
+  Widget build(BuildContext context) {
+    final groups = <String, List<VaccinationRecord>>{};
+    for (final record in records) {
+      final date = record.applicationDate ?? record.nextDoseDate;
+      final label = _ageLabel(person?.birthDate, date);
+      groups.putIfAbsent(label, () => []).add(record);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Caderneta digital',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+            ),
+            IconButton(
+              onPressed: onExport,
+              tooltip: 'Exportar PDF',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Histórico organizado pela idade na data da aplicação ou previsão.',
+          style: TextStyle(color: Color(0xFF718096)),
+        ),
+        const SizedBox(height: 20),
+        if (records.isEmpty)
+          const _MessageCard(
+            message: 'Nenhum registro disponível na caderneta.',
+          )
+        else
+          ...groups.entries.map(
+            (entry) => _BookletGroup(
+              title: entry.key,
+              records: entry.value,
+              onRecordTap: onRecordTap,
+            ),
+          ),
+      ],
+    );
   }
-  return user.copyWith(
-    name: user.name.trim().isEmpty ? 'Eduardo Carvalho' : user.name,
-    cpf: user.cpf?.trim().isEmpty == false ? user.cpf : '123.456.789-00',
-    birthDate: user.birthDate ?? DateTime(2008, 6, 23),
+}
+
+class _BookletGroup extends StatelessWidget {
+  const _BookletGroup({
+    required this.title,
+    required this.records,
+    required this.onRecordTap,
+  });
+  final String title;
+  final List<VaccinationRecord> records;
+  final ValueChanged<VaccinationRecord> onRecordTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 22),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: vittaDarkBlue,
+          ),
+        ),
+        const Divider(height: 22, color: Color(0xFFDCE8F0)),
+        ...records.map(
+          (record) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              _isDone(record)
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              color: _statusColor(record),
+            ),
+            title: Text(
+              _present(record.vaccineName, 'Vacina'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              [
+                if (record.dose.trim().isNotEmpty) record.dose,
+                if (record.applicationDate != null)
+                  'Aplicada em ${formatBrazilianDate(record.applicationDate)}',
+                if (record.applicationDate == null &&
+                    record.nextDoseDate != null)
+                  'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
+              ].join(' • '),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => onRecordTap(record),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
-String _preventionFor(String vaccineName) {
-  final name = vaccineName.toLowerCase();
-  if (name.contains('bcg')) {
-    return 'Tuberculose';
+class _VaccineDetails extends StatelessWidget {
+  const _VaccineDetails({required this.record, required this.vaccine});
+  final VaccinationRecord record;
+  final Vaccine? vaccine;
+
+  @override
+  Widget build(BuildContext context) {
+    final applicationFields = <MapEntry<String, String>>[
+      MapEntry('Situação', _statusLabel(record)),
+      if (record.dose.trim().isNotEmpty) MapEntry('Dose', record.dose),
+      if (record.applicationDate != null)
+        MapEntry(
+          'Data de aplicação',
+          formatBrazilianDate(record.applicationDate),
+        ),
+      if ((record.batchNumber ?? '').trim().isNotEmpty)
+        MapEntry('Lote', record.batchNumber!),
+      if ((record.manufacturer ?? '').trim().isNotEmpty)
+        MapEntry('Fabricante', record.manufacturer!),
+      if ((record.healthUnit ?? '').trim().isNotEmpty)
+        MapEntry('Unidade de saúde', record.healthUnit!),
+      if ((record.professionalId ?? record.healthProfessionalId ?? '')
+          .trim()
+          .isNotEmpty)
+        MapEntry(
+          'Profissional responsável',
+          record.professionalId ?? record.healthProfessionalId!,
+        ),
+      if ((record.notes ?? '').trim().isNotEmpty)
+        MapEntry('Observação', record.notes!),
+    ];
+    return DraggableScrollableSheet(
+      initialChildSize: .88,
+      minChildSize: .55,
+      maxChildSize: .96,
+      builder: (context, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD3DAE0),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              _present(record.vaccineName, vaccine?.name ?? 'Vacina'),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            _StatusChip(record: record),
+            const SizedBox(height: 24),
+            const _DetailTitle('Dados da aplicação'),
+            const SizedBox(height: 10),
+            ...applicationFields.map(
+              (field) => _DetailRow(label: field.key, value: field.value),
+            ),
+            if (vaccine != null && _hasEducationalContent(vaccine!)) ...[
+              const SizedBox(height: 26),
+              const _DetailTitle('Sobre esta vacina'),
+              if ((vaccine!.description ?? '').trim().isNotEmpty)
+                _TextSection(
+                  title: 'Para que serve',
+                  text: vaccine!.description!,
+                ),
+              if (vaccine!.prevents.isNotEmpty)
+                _ListSection(
+                  title: 'Protege contra',
+                  values: vaccine!.prevents,
+                ),
+              if (vaccine!.doseSchedule.isNotEmpty)
+                _ListSection(
+                  title: 'Esquema de doses',
+                  values: vaccine!.doseSchedule
+                      .map(_scheduleText)
+                      .where((value) => value.isNotEmpty)
+                      .toList(),
+                ),
+              if (vaccine!.targetGroups.isNotEmpty)
+                _ListSection(
+                  title: 'Público/faixa etária',
+                  values: vaccine!.targetGroups,
+                ),
+              if (vaccine!.expectedReactions.isNotEmpty)
+                _ListSection(
+                  title: 'Reações esperadas',
+                  values: vaccine!.expectedReactions,
+                ),
+              if (vaccine!.warningSigns.isNotEmpty)
+                _ListSection(
+                  title: 'Quando procurar atendimento',
+                  values: vaccine!.warningSigns,
+                ),
+              if (vaccine!.contraindications.isNotEmpty)
+                _ListSection(
+                  title: 'Contraindicações e observações',
+                  values: vaccine!.contraindications,
+                ),
+              if ((vaccine!.sourceName ?? '').trim().isNotEmpty)
+                _SourceLink(vaccine: vaccine!),
+            ] else ...[
+              const SizedBox(height: 24),
+              const _MessageCard(
+                message:
+                    'O conteúdo educativo oficial desta vacina ainda não foi cadastrado.',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
-  if (name.contains('hepatite')) {
-    return 'Hepatite';
-  }
-  if (name.contains('triplice') || name.contains('dtp')) {
-    return 'Difteria, tetano e coqueluche';
-  }
-  if (name.contains('poli')) {
-    return 'Poliomielite';
-  }
-  if (name.contains('sarampo') || name.contains('viral')) {
-    return 'Sarampo, caxumba e rubeola';
-  }
-  if (name.contains('hpv')) {
-    return 'HPV';
-  }
-  if (name.contains('covid')) {
-    return 'Covid-19';
-  }
-  if (name.contains('gripe')) {
-    return 'Influenza';
-  }
-  return 'Imunizacao';
 }
 
-String _filled(String? value, String fallback) {
+class _DetailTitle extends StatelessWidget {
+  const _DetailTitle(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+  );
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(label, style: const TextStyle(color: Color(0xFF718096))),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TextSection extends StatelessWidget {
+  const _TextSection({required this.title, required this.text});
+  final String title;
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        Text(
+          text,
+          style: const TextStyle(height: 1.45, color: Color(0xFF4A5568)),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ListSection extends StatelessWidget {
+  const _ListSection({required this.title, required this.values});
+  final String title;
+  final List<String> values;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 5),
+        ...values.map(
+          (value) => Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '• $value',
+              style: const TextStyle(height: 1.4, color: Color(0xFF4A5568)),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SourceLink extends StatelessWidget {
+  const _SourceLink({required this.vaccine});
+  final Vaccine vaccine;
+  @override
+  Widget build(BuildContext context) {
+    final updatedAt = vaccine.sourceUpdatedAt;
+    return Padding(
+      padding: const EdgeInsets.only(top: 22),
+      child: OutlinedButton.icon(
+        onPressed: (vaccine.sourceUrl ?? '').trim().isEmpty
+            ? null
+            : () async {
+                final uri = Uri.tryParse(vaccine.sourceUrl!);
+                if (uri != null) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+        icon: const Icon(Icons.verified_outlined),
+        label: Text(
+          'Fonte: ${vaccine.sourceName}'
+          '${updatedAt == null ? '' : ' • atualizada em ${formatBrazilianDate(updatedAt)}'}',
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageCard extends StatelessWidget {
+  const _MessageCard({required this.message, this.error = false});
+  final String message;
+  final bool error;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: _cardDecoration(error ? const Color(0xFFFFF0F0) : Colors.white),
+    child: Row(
+      children: [
+        Icon(
+          error ? Icons.error_outline : Icons.info_outline,
+          color: error ? Colors.red : vittaBlue,
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(message)),
+      ],
+    ),
+  );
+}
+
+BoxDecoration _cardDecoration(Color color) => BoxDecoration(
+  color: color,
+  borderRadius: BorderRadius.circular(20),
+  border: Border.all(color: const Color(0xFFEDF1F4)),
+  boxShadow: const [
+    BoxShadow(color: Color(0x0C000000), blurRadius: 14, offset: Offset(0, 6)),
+  ],
+);
+
+bool _isDone(VaccinationRecord record) {
+  final status = record.status.toLowerCase();
+  return status.contains('concl') ||
+      status.contains('aplic') ||
+      status == 'applied';
+}
+
+bool _isLate(VaccinationRecord record) {
+  final status = record.status.toLowerCase();
+  final date = record.nextDoseDate;
+  return status.contains('atras') ||
+      status == 'late' ||
+      (!_isDone(record) && date != null && date.isBefore(DateTime.now()));
+}
+
+bool _isPending(VaccinationRecord record) =>
+    !_isDone(record) && !_isLate(record);
+
+Color _statusColor(VaccinationRecord record) {
+  if (_isDone(record)) return const Color(0xFF268A5B);
+  if (_isLate(record)) return const Color(0xFFC53D44);
+  return const Color(0xFF287EB5);
+}
+
+String _statusLabel(VaccinationRecord record) {
+  if (_isDone(record)) return 'Concluída';
+  if (_isLate(record)) return 'Atrasada';
+  return 'Pendente';
+}
+
+String _present(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
 }
 
-final _adultSampleRecords = [
-  VaccinationRecord(
-    id: 'BCG-2008-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'BCG',
-    dose: 'Dose unica',
-    status: 'Concluida',
-    applicationDate: DateTime(2008, 6, 24),
-    vaccineId: 'BCG-08A-451',
-    healthUnit: 'Maternidade Sao Luiz',
-  ),
-  VaccinationRecord(
-    id: 'HEPB-2008-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Hepatite B',
-    dose: '1ª dose',
-    status: 'Concluida',
-    applicationDate: DateTime(2008, 6, 24),
-    vaccineId: 'HB-08B-119',
-    healthUnit: 'Maternidade Sao Luiz',
-  ),
-  VaccinationRecord(
-    id: 'PENTA-2008-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Pentavalente',
-    dose: '3ª dose',
-    status: 'Concluida',
-    applicationDate: DateTime(2008, 12, 23),
-    vaccineId: 'PENTA-08C-778',
-    healthUnit: 'UBS Jardim Europa',
-  ),
-  VaccinationRecord(
-    id: 'POLIO-2009-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Poliomielite',
-    dose: 'Reforco',
-    status: 'Concluida',
-    applicationDate: DateTime(2009, 9, 10),
-    vaccineId: 'VIP-09D-302',
-    healthUnit: 'UBS Jardim Europa',
-  ),
-  VaccinationRecord(
-    id: 'TRIVIRAL-2009-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Triplice Viral',
-    dose: '1ª dose',
-    status: 'Concluida',
-    applicationDate: DateTime(2009, 6, 26),
-    vaccineId: 'SCR-09F-882',
-    healthUnit: 'Clinica Vida Plena',
-  ),
-  VaccinationRecord(
-    id: 'DTP-2012-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'DTP',
-    dose: '2º reforco',
-    status: 'Concluida',
-    applicationDate: DateTime(2012, 8, 3),
-    vaccineId: 'DTP-12G-440',
-    healthUnit: 'UBS Central',
-  ),
-  VaccinationRecord(
-    id: 'FEBRE-2017-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Febre Amarela',
-    dose: 'Dose unica',
-    status: 'Concluida',
-    applicationDate: DateTime(2017, 4, 18),
-    vaccineId: 'FA-17H-221',
-    healthUnit: 'Posto Municipal Norte',
-  ),
-  VaccinationRecord(
-    id: 'HPV-2021-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'HPV',
-    dose: '2ª dose',
-    status: 'Concluida',
-    applicationDate: DateTime(2021, 11, 12),
-    vaccineId: 'HPV-21K-654',
-    healthUnit: 'UBS Central',
-  ),
-  VaccinationRecord(
-    id: 'MENINGO-2022-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Meningococica ACWY',
-    dose: 'Dose unica',
-    status: 'Concluida',
-    applicationDate: DateTime(2022, 5, 7),
-    vaccineId: 'ACWY-22M-710',
-    healthUnit: 'Clinica Sao Bento',
-  ),
-  VaccinationRecord(
-    id: 'COVID-2024-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Covid-19',
-    dose: 'Reforco',
-    status: 'Concluida',
-    applicationDate: DateTime(2024, 3, 15),
-    vaccineId: 'COV-24N-503',
-    healthUnit: 'Centro de Imunizacao Paulista',
-  ),
-  VaccinationRecord(
-    id: 'GRIPE-2026-001',
-    childId: '',
-    responsibleId: 'sample',
-    vaccineName: 'Gripe',
-    dose: 'Campanha anual',
-    status: 'Pendente',
-    nextDoseDate: DateTime(2026, 7, 10),
-    vaccineId: 'INF-26P-090',
-    healthUnit: 'UBS Central',
-  ),
-];
+String _initials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty);
+  final value = parts.take(2).map((part) => part[0]).join().toUpperCase();
+  return value.isEmpty ? 'U' : value;
+}
+
+String _ageLabel(DateTime? birthDate, DateTime? eventDate) {
+  if (birthDate == null || eventDate == null || eventDate.isBefore(birthDate)) {
+    return 'Data não informada';
+  }
+  final months =
+      (eventDate.year - birthDate.year) * 12 +
+      eventDate.month -
+      birthDate.month -
+      (eventDate.day < birthDate.day ? 1 : 0);
+  if (months <= 0) return 'Ao nascer';
+  if (months < 12) return '$months ${months == 1 ? 'mês' : 'meses'}';
+  final years = months ~/ 12;
+  return '$years ${years == 1 ? 'ano' : 'anos'}';
+}
+
+bool _hasEducationalContent(Vaccine vaccine) =>
+    (vaccine.description ?? '').trim().isNotEmpty ||
+    vaccine.prevents.isNotEmpty ||
+    vaccine.targetGroups.isNotEmpty ||
+    vaccine.doseSchedule.isNotEmpty ||
+    vaccine.expectedReactions.isNotEmpty ||
+    vaccine.warningSigns.isNotEmpty ||
+    vaccine.contraindications.isNotEmpty ||
+    (vaccine.sourceName ?? '').trim().isNotEmpty;
+
+String _scheduleText(Object? value) {
+  if (value is String) return value;
+  if (value is Map) {
+    return [value['doseNumber'], value['recommendedAge'], value['notes']]
+        .whereType<Object>()
+        .map((part) => part.toString())
+        .where((part) => part.isNotEmpty)
+        .join(' • ');
+  }
+  return '';
+}
+
+Future<Uint8List> _buildPdf({
+  required AppUser? person,
+  required List<VaccinationRecord> records,
+}) async {
+  final document = pw.Document();
+  document.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (_) => [
+        pw.Text(
+          'Carteira Digital de Vacinação',
+          style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Text('Pessoa: ${_present(person?.name, 'Usuário')}'),
+        if (person?.birthDate != null)
+          pw.Text('Nascimento: ${formatBrazilianDate(person!.birthDate)}'),
+        pw.SizedBox(height: 18),
+        if (records.isEmpty)
+          pw.Text('Nenhum registro disponível.')
+        else
+          pw.TableHelper.fromTextArray(
+            headers: const [
+              'Vacina',
+              'Dose',
+              'Situação',
+              'Aplicação',
+              'Próxima dose',
+              'Unidade',
+              'Lote',
+            ],
+            data: records
+                .map(
+                  (record) => [
+                    record.vaccineName,
+                    record.dose,
+                    _statusLabel(record),
+                    formatBrazilianDate(record.applicationDate),
+                    formatBrazilianDate(record.nextDoseDate),
+                    record.healthUnit ?? '',
+                    record.batchNumber ?? '',
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+          ),
+      ],
+    ),
+  );
+  return Uint8List.fromList(await document.save());
+}

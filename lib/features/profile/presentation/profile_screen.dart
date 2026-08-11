@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
+import 'package:vitta_mobile/core/input_formatters/date_input_formatter.dart';
+import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/core/validators/birth_date_validator.dart';
+import 'package:vitta_mobile/core/validators/full_name_validator.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -34,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     setState(() {
-      _user = _withEduardoFallback(user);
+      _user = user;
       _isLoading = false;
     });
   }
@@ -109,11 +113,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _user;
-    final name = user?.name ?? 'Eduardo Carvalho';
-    final email = user?.email ?? 'eduardo.carvalho@email.com';
-    final cpf = _filled(user?.cpf, '123.456.789-00');
+    final name = _filled(user?.name, 'Usuário');
+    final email = _filled(user?.email, 'E-mail não informado');
+    final cpf = _filled(user?.cpf, 'Não informado');
     final birthDate = user?.birthDate == null
-        ? '23/06/2008'
+        ? 'Não informada'
         : formatBrazilianDate(user!.birthDate);
 
     return Scaffold(
@@ -285,6 +289,22 @@ class _ProfileEditorState extends State<_ProfileEditor> {
     text: widget.user.phone ?? '',
   );
 
+  Future<void> _pickBirthDate() async {
+    final today = DateTime.now();
+    final current = parseBirthDate(_birthDateController.text);
+    final selected = await showDatePicker(
+      context: context,
+      locale: const Locale('pt', 'BR'),
+      initialDate:
+          current ?? widget.user.birthDate ?? DateTime(today.year - 18),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(today.year, today.month, today.day),
+    );
+    if (selected != null) {
+      _birthDateController.text = formatBrazilianDate(selected);
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -318,8 +338,8 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Nome completo'),
-                validator: (value) =>
-                    (value ?? '').trim().isEmpty ? 'Informe o nome.' : null,
+                inputFormatters: [NameInputFormatter()],
+                validator: validateFullName,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -333,11 +353,18 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _birthDateController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Data de nascimento',
+                  hintText: 'DD/MM/AAAA',
+                  suffixIcon: IconButton(
+                    tooltip: 'Selecionar data',
+                    onPressed: _pickBirthDate,
+                    icon: const Icon(Icons.calendar_month),
+                  ),
                 ),
-                keyboardType: TextInputType.datetime,
-                validator: _validateBirthDate,
+                keyboardType: TextInputType.number,
+                inputFormatters: [DateInputFormatter()],
+                validator: validateBirthDate,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -511,22 +538,10 @@ class _ToggleOff extends StatelessWidget {
   }
 }
 
-AppUser? _withEduardoFallback(AppUser? user) {
-  if (user == null) {
-    return null;
-  }
-  final fallbackBirthDate = DateTime(2008, 6, 23);
-  return user.copyWith(
-    name: user.name.trim().isEmpty ? 'Eduardo Carvalho' : user.name,
-    cpf: user.cpf?.trim().isEmpty == false ? user.cpf : '123.456.789-00',
-    birthDate: user.birthDate ?? fallbackBirthDate,
-  );
-}
-
 String _initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+'));
   if (parts.isEmpty) {
-    return 'EC';
+    return 'U';
   }
   return parts.take(2).map((part) => part[0]).join().toUpperCase();
 }
@@ -534,15 +549,4 @@ String _initials(String name) {
 String _filled(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
-}
-
-String? _validateBirthDate(String? value) {
-  final date = parseBrazilianDate(value ?? '');
-  if (date == null) {
-    return 'Informe a data em dd/mm/aaaa.';
-  }
-  if (date.isAfter(DateTime.now())) {
-    return 'Informe uma data valida.';
-  }
-  return null;
 }

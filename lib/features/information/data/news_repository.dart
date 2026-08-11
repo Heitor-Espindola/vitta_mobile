@@ -6,7 +6,7 @@ class ApiNewsRepository implements NewsRepository {
   ApiNewsRepository({NewsApiService? service})
     : _service = service ?? NewsApiService();
   final NewsApiService _service;
-  final Map<String, _CacheEntry> _cache = {};
+  static final Map<String, _CacheEntry> _cache = {};
   static const cacheDuration = Duration(minutes: 5);
 
   @override

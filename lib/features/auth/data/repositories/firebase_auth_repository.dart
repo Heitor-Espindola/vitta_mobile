@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/core/constants/app_roles.dart';
+import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
+import 'package:vitta_mobile/core/validators/password_validator.dart';
 import 'package:vitta_mobile/features/auth/data/cpf_registry_key.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -83,6 +85,13 @@ class FirebaseAuthRepository implements AuthRepository {
     required String cpf,
     required DateTime birthDate,
   }) async {
+    final passwordError = validateStrongPassword(password);
+    if (passwordError != null) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: passwordError,
+      );
+    }
     final credential = await _firebaseAuth.createUserWithEmailAndPassword(
       email: normalizeEmail(email),
       password: password,
@@ -95,13 +104,14 @@ class FirebaseAuthRepository implements AuthRepository {
       );
     }
 
-    await firebaseUser.updateDisplayName(name.trim());
+    final formattedName = formatPersonName(name);
+    await firebaseUser.updateDisplayName(formattedName);
     await firebaseUser.sendEmailVerification();
 
     final now = DateTime.now();
     final appUser = AppUser(
       uid: firebaseUser.uid,
-      name: name.trim(),
+      name: formattedName,
       email: firebaseUser.email ?? normalizeEmail(email),
       role: AppRoles.responsible,
       cpf: cpf.trim(),
@@ -144,13 +154,16 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser> updateProfile(AppUser user) async {
-    final updatedUser = user.copyWith(updatedAt: DateTime.now());
+    final updatedUser = user.copyWith(
+      name: formatPersonName(user.name),
+      updatedAt: DateTime.now(),
+    );
     await _users
         .doc(user.uid)
         .set(updatedUser.toMap(), SetOptions(merge: true));
     final firebaseUser = _firebaseAuth.currentUser;
-    if (firebaseUser != null && firebaseUser.displayName != user.name) {
-      await firebaseUser.updateDisplayName(user.name);
+    if (firebaseUser != null && firebaseUser.displayName != updatedUser.name) {
+      await firebaseUser.updateDisplayName(updatedUser.name);
     }
     return updatedUser;
   }

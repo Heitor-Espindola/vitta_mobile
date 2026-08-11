@@ -10,6 +10,16 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function userExistsAfter(userId) {
+      return existsAfter(
+        /databases/$(database)/documents/users/$(userId)
+      );
+    }
+
+    function userAfter(userId) {
+      return getAfter(/databases/$(database)/documents/users/$(userId));
+    }
+
     function hasValidUserKeys() {
       return request.resource.data.keys().hasAll([
         'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
@@ -21,8 +31,8 @@ service cloud.firestore {
         'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
         'normalizedName', 'email', 'role', 'roles', 'accountStatus', 'cpf',
         'cpfDigits', 'cpfFormatted', 'guardianIds', 'dependentIds',
-        'managedByUserIds', 'birthDate', 'phone', 'photoUrl', 'createdAt',
-        'updatedAt', 'lastLoginAt'
+        'managedByUserIds', 'relationshipToGuardian', 'birthDate', 'phone',
+        'photoUrl', 'createdAt', 'updatedAt', 'lastLoginAt'
       ]);
     }
 
@@ -46,6 +56,9 @@ service cloud.firestore {
         && request.resource.data.guardianIds is list
         && request.resource.data.dependentIds is list
         && request.resource.data.managedByUserIds is list
+        && (!request.resource.data.keys().hasAny(['relationshipToGuardian'])
+          || request.resource.data.relationshipToGuardian == null
+          || request.resource.data.relationshipToGuardian is string)
         && (request.resource.data.birthDate == null
           || request.resource.data.birthDate is timestamp)
         && (request.resource.data.phone == null
@@ -69,9 +82,31 @@ service cloud.firestore {
         && request.resource.data.role == 'responsible'
         && request.resource.data.roles == ['user']
         && request.resource.data.accountStatus == 'active'
+        && request.resource.data.cpf.size() == 11
         && request.resource.data.guardianIds.size() == 0
         && request.resource.data.dependentIds.size() == 0
         && request.resource.data.managedByUserIds.size() == 0;
+    }
+
+    function validDependentCreation(userId) {
+      return signedIn()
+        && hasValidUserKeys()
+        && hasValidUserTypes()
+        && request.resource.data.uid == userId
+        && request.resource.data.id == userId
+        && request.resource.data.authUid == ''
+        && request.resource.data.canAuthenticate == false
+        && request.resource.data.email == ''
+        && request.resource.data.role == 'dependent'
+        && request.resource.data.roles == ['dependent']
+        && request.resource.data.accountStatus == 'active'
+        && request.resource.data.guardianIds == [request.auth.uid]
+        && request.resource.data.dependentIds.size() == 0
+        && request.resource.data.managedByUserIds == [request.auth.uid]
+        && request.resource.data.relationshipToGuardian is string
+        && request.resource.data.relationshipToGuardian.size() > 0
+        && userExistsAfter(request.auth.uid)
+        && userAfter(request.auth.uid).data.dependentIds.hasAny([userId]);
     }
 
     function immutableUserFields() {
@@ -99,16 +134,60 @@ service cloud.firestore {
       ]);
     }
 
-    match /users/{userId} {
-      allow create: if validUserCreation(userId);
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow update: if isOwner(userId)
+    function validDependentLinkUpdate(userId) {
+      return isOwner(userId)
         && hasValidUserKeys()
         && hasValidUserTypes()
-        && immutableUserFields()
-        && onlyAllowedUserChanges();
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'dependentIds', 'updatedAt'
+        ])
+        && request.resource.data.dependentIds.size()
+          == resource.data.dependentIds.size() + 1
+        && request.resource.data.dependentIds.hasAll(resource.data.dependentIds)
+        && !resource.data.dependentIds.hasAny([
+          request.resource.data.dependentIds[
+            request.resource.data.dependentIds.size() - 1
+          ]
+        ])
+        && request.resource.data.dependentIds.toSet()
+          .difference(resource.data.dependentIds.toSet()).hasOnly([
+            request.resource.data.dependentIds[
+              request.resource.data.dependentIds.size() - 1
+            ]
+          ])
+        && userExistsAfter(
+          request.resource.data.dependentIds[
+            request.resource.data.dependentIds.size() - 1
+          ]
+        )
+        && userAfter(
+          request.resource.data.dependentIds[
+            request.resource.data.dependentIds.size() - 1
+          ]
+        ).data.guardianIds == [request.auth.uid]
+        && userAfter(
+          request.resource.data.dependentIds[
+            request.resource.data.dependentIds.size() - 1
+          ]
+        ).data.managedByUserIds == [request.auth.uid];
+    }
+
+    match /users/{userId} {
+      allow create: if validUserCreation(userId) || validDependentCreation(userId);
+      allow get: if isOwner(userId)
+        || (signedIn() && resource.data.managedByUserIds.hasAny([request.auth.uid]));
+      allow list: if false;
+      allow update: if (isOwner(userId)
+          && hasValidUserKeys()
+          && hasValidUserTypes()
+          && immutableUserFields()
+          && onlyAllowedUserChanges())
+        || validDependentLinkUpdate(userId);
       allow delete: if false;
+
+      match /devices/{deviceId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
     }
 
     match /cpf_registry/{cpfHash} {
@@ -116,11 +195,23 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn()
         && cpfHash.size() == 64
-        && request.resource.data.keys().hasAll(['ownerUid', 'createdAt'])
-        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
         && request.resource.data.ownerUid is string
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        && ((request.resource.data.keys().hasAll(['ownerUid', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
+            && request.resource.data.ownerUid == request.auth.uid)
+          || (request.resource.data.keys().hasAll([
+                'ownerUid', 'guardianUid', 'createdAt'
+              ])
+            && request.resource.data.keys().hasOnly([
+                'ownerUid', 'guardianUid', 'createdAt'
+            ])
+            && request.resource.data.guardianUid == request.auth.uid
+            && userExistsAfter(request.resource.data.ownerUid)
+            && userAfter(request.resource.data.ownerUid).data.guardianIds
+              == [request.auth.uid]
+            && userAfter(request.resource.data.ownerUid).data.managedByUserIds
+              == [request.auth.uid]));
       allow update, delete: if false;
     }
 
@@ -139,6 +230,11 @@ service cloud.firestore {
     }
 
     match /vaccines/{vaccineId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /vaccination_schedules/{scheduleId} {
       allow read: if signedIn();
       allow write: if false;
     }

@@ -3,7 +3,7 @@
 Para executar com notícias no ambiente de desenvolvimento:
 
 ```bash
-flutter run -d edge --dart-define=NEWS_API_KEY=SUA_CHAVE
+flutter run -d edge --dart-define-from-file=config/news_api.json
 ```
 
 No Flutter Web, valores de `--dart-define` podem ser inspecionados no código

@@ -1,3 +1,5 @@
+import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
+import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/firestore_date_parser.dart';
 
 class AppUser {
@@ -6,6 +8,14 @@ class AppUser {
     required this.name,
     required this.email,
     required this.role,
+    this.authUid,
+    this.canAuthenticate = true,
+    this.roles = const ['user'],
+    this.accountStatus = 'active',
+    this.guardianIds = const [],
+    this.dependentIds = const [],
+    this.managedByUserIds = const [],
+    this.relationshipToGuardian,
     this.cpf,
     this.birthDate,
     this.phone,
@@ -19,6 +29,14 @@ class AppUser {
   final String name;
   final String email;
   final String role;
+  final String? authUid;
+  final bool canAuthenticate;
+  final List<String> roles;
+  final String accountStatus;
+  final List<String> guardianIds;
+  final List<String> dependentIds;
+  final List<String> managedByUserIds;
+  final String? relationshipToGuardian;
   final String? cpf;
   final DateTime? birthDate;
   final String? phone;
@@ -33,6 +51,14 @@ class AppUser {
       name: map['fullName'] as String? ?? map['name'] as String? ?? '',
       email: map['email'] as String? ?? '',
       role: map['role'] as String? ?? '',
+      authUid: map['authUid'] as String?,
+      canAuthenticate: map['canAuthenticate'] as bool? ?? true,
+      roles: _stringList(map['roles'], fallback: const ['user']),
+      accountStatus: map['accountStatus'] as String? ?? 'active',
+      guardianIds: _stringList(map['guardianIds']),
+      dependentIds: _stringList(map['dependentIds']),
+      managedByUserIds: _stringList(map['managedByUserIds']),
+      relationshipToGuardian: map['relationshipToGuardian'] as String?,
       cpf: map['cpfFormatted'] as String? ?? map['cpf'] as String?,
       birthDate: dateTimeFromMap(map['birthDate']),
       phone: map['phone'] as String?,
@@ -44,26 +70,29 @@ class AppUser {
   }
 
   Map<String, dynamic> toMap() {
-    final cpfDigits = cpf?.replaceAll(RegExp(r'\D'), '') ?? '';
-    final cpfFormatted = _formatCpf(cpfDigits);
+    final cpfDigits = cpfDigitsOnly(cpf ?? '');
+    final cpfFormatted = formatCpf(cpfDigits);
+    final formattedName = formatPersonName(name);
     return {
       'uid': uid,
       'id': uid,
-      'authUid': uid,
-      'canAuthenticate': true,
-      'name': name,
-      'fullName': name,
-      'normalizedName': name.trim().toLowerCase(),
+      'authUid': authUid ?? (canAuthenticate ? uid : ''),
+      'canAuthenticate': canAuthenticate,
+      'name': formattedName,
+      'fullName': formattedName,
+      'normalizedName': normalizedPersonName(formattedName),
       'email': email,
       'role': role,
-      'roles': const ['user'],
-      'accountStatus': 'active',
+      'roles': roles,
+      'accountStatus': accountStatus,
       'cpf': cpfDigits,
       'cpfDigits': cpfDigits,
       'cpfFormatted': cpfFormatted,
-      'guardianIds': const <String>[],
-      'dependentIds': const <String>[],
-      'managedByUserIds': const <String>[],
+      'guardianIds': guardianIds,
+      'dependentIds': dependentIds,
+      'managedByUserIds': managedByUserIds,
+      if (relationshipToGuardian != null)
+        'relationshipToGuardian': relationshipToGuardian,
       'birthDate': birthDate,
       'phone': phone,
       'photoUrl': photoUrl,
@@ -78,6 +107,14 @@ class AppUser {
     String? name,
     String? email,
     String? role,
+    String? authUid,
+    bool? canAuthenticate,
+    List<String>? roles,
+    String? accountStatus,
+    List<String>? guardianIds,
+    List<String>? dependentIds,
+    List<String>? managedByUserIds,
+    String? relationshipToGuardian,
     String? cpf,
     DateTime? birthDate,
     String? phone,
@@ -91,6 +128,15 @@ class AppUser {
       name: name ?? this.name,
       email: email ?? this.email,
       role: role ?? this.role,
+      authUid: authUid ?? this.authUid,
+      canAuthenticate: canAuthenticate ?? this.canAuthenticate,
+      roles: roles ?? this.roles,
+      accountStatus: accountStatus ?? this.accountStatus,
+      guardianIds: guardianIds ?? this.guardianIds,
+      dependentIds: dependentIds ?? this.dependentIds,
+      managedByUserIds: managedByUserIds ?? this.managedByUserIds,
+      relationshipToGuardian:
+          relationshipToGuardian ?? this.relationshipToGuardian,
       cpf: cpf ?? this.cpf,
       birthDate: birthDate ?? this.birthDate,
       phone: phone ?? this.phone,
@@ -102,8 +148,7 @@ class AppUser {
   }
 }
 
-String _formatCpf(String digits) {
-  if (digits.length != 11) return digits;
-  return '${digits.substring(0, 3)}.${digits.substring(3, 6)}.'
-      '${digits.substring(6, 9)}-${digits.substring(9)}';
+List<String> _stringList(Object? value, {List<String> fallback = const []}) {
+  if (value is! List) return fallback;
+  return value.whereType<String>().toList(growable: false);
 }
