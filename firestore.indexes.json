@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "vaccination_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "patientUid", "order": "ASCENDING"},
+        {"fieldPath": "appliedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "vaccination_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "patientId", "order": "ASCENDING"},
+        {"fieldPath": "appliedAt", "order": "DESCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

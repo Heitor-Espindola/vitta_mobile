@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:vitta_mobile/core/config/app_environment.dart';
 import 'package:vitta_mobile/core/errors/news_exception.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
+import 'package:vitta_mobile/features/information/domain/services/news_relevance_filter.dart';
 
 class NewsApiService {
   NewsApiService({
@@ -18,7 +19,7 @@ class NewsApiService {
        _timeout = timeout;
 
   static const defaultQuery =
-      '("vacinação" OR "vacinas" OR "imunização" OR "campanha de vacinação" OR "calendário vacinal")';
+      '("vacina" OR "vacinas" OR "vacinação" OR "imunização" OR "imunizante" OR "calendário vacinal" OR "cobertura vacinal" OR "campanha de vacinação")';
   final http.Client _client;
   final bool _ownsClient;
   final String _apiKey;
@@ -64,7 +65,13 @@ class NewsApiService {
       if (decoded is! Map<String, dynamic> || decoded['status'] != 'ok') {
         throw const NewsException(NewsErrorType.invalidResponse);
       }
-      return NewsResponse.fromJson(decoded);
+      final parsed = NewsResponse.fromJson(decoded);
+      return NewsResponse(
+        articles: parsed.articles
+            .where(NewsRelevanceFilter.isRelevant)
+            .toList(growable: false),
+        totalResults: parsed.totalResults,
+      );
     } on TimeoutException {
       throw const NewsException(NewsErrorType.timeout);
     } on http.ClientException {

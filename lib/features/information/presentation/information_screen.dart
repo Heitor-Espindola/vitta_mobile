@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/data/news_repository.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
+import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_states.dart';
@@ -76,16 +78,13 @@ class _InformationScreenState extends State<InformationScreen> {
       onRefresh: _controller.refreshNews,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 22, 14, 22),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22),
-            child: VittaSearchField(
-              hint: 'Pesquisar notícias',
-              controller: _searchController,
-              onSubmitted: _search,
-              onSearchTap: () => _search(_searchController.text),
-            ),
+          ExpandableSearch(
+            hint: 'Pesquisar notícias',
+            controller: _searchController,
+            onSubmitted: _search,
+            onClosed: _clearSearch,
           ),
           if (_controller.currentQuery.isNotEmpty)
             Align(
@@ -96,9 +95,37 @@ class _InformationScreenState extends State<InformationScreen> {
                 label: Text('Limpar: ${_controller.currentQuery}'),
               ),
             ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: NewsCategory.values
+                  .map((category) {
+                    final selected = _controller.selectedCategory == category;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 7),
+                      child: ChoiceChip(
+                        key: Key('news-category-${category.name}'),
+                        label: Text(category.label),
+                        selected: selected,
+                        showCheckmark: false,
+                        onSelected: _controller.isLoading
+                            ? null
+                            : (_) => _controller.selectCategory(category),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+          ),
           const SizedBox(height: 18),
-          const Text('Conteúdos educativos', style: TextStyle(fontSize: 11)),
-          const SizedBox(height: 10),
+          const SectionTitle(
+            title: 'Conteúdos educativos',
+            action: 'Ver todos ›',
+            compact: true,
+          ),
+          const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -106,7 +133,7 @@ class _InformationScreenState extends State<InformationScreen> {
                 final content = _educationalContents[index];
                 return Padding(
                   padding: EdgeInsets.only(
-                    right: index == _educationalContents.length - 1 ? 0 : 18,
+                    right: index == _educationalContents.length - 1 ? 0 : 10,
                   ),
                   child: _ContentCard(
                     key: Key('educational-content-$index'),
@@ -121,12 +148,12 @@ class _InformationScreenState extends State<InformationScreen> {
               }),
             ),
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 20),
           Row(
             children: [
               const Expanded(
                 child: Text(
-                  'Notícias externas',
+                  'Notícias recentes',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -141,7 +168,7 @@ class _InformationScreenState extends State<InformationScreen> {
           ),
           const Text(
             'As notícias são fornecidas por fontes externas. Consulte sempre os canais oficiais de saúde.',
-            style: TextStyle(fontSize: 10, color: Colors.black54),
+            style: AppTypography.caption,
           ),
           const SizedBox(height: 12),
           _newsBody(),
@@ -165,39 +192,48 @@ class _InformationScreenState extends State<InformationScreen> {
         onClearSearch: _controller.currentQuery.isEmpty ? null : _clearSearch,
       );
     }
-    return Column(
-      children: [
-        ..._controller.articles.map(
-          (article) => NewsArticleCard(article: article),
-        ),
-        if (_controller.state == NewsState.error) ...[
-          Text(
-            _controller.errorMessage ??
-                'Não foi possível carregar mais notícias.',
-          ),
-          TextButton(
-            onPressed: _controller.retry,
-            child: const Text('Tentar novamente'),
-          ),
-        ] else if (_controller.hasMore)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: OutlinedButton.icon(
-              onPressed: _controller.isLoadingMore
-                  ? null
-                  : _controller.loadMore,
-              icon: _controller.isLoadingMore
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.expand_more),
-              label: Text(
-                _controller.isLoadingMore ? 'Carregando...' : 'Carregar mais',
+    return SizedBox(
+      height: 250,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount:
+            _controller.articles.length +
+            (_controller.hasMore || _controller.state == NewsState.error
+                ? 1
+                : 0),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          if (index < _controller.articles.length) {
+            return NewsArticleCard(
+              article: _controller.articles[index],
+              horizontal: true,
+            );
+          }
+          return SizedBox(
+            width: 180,
+            child: Center(
+              child: OutlinedButton.icon(
+                onPressed: _controller.isLoadingMore
+                    ? null
+                    : _controller.state == NewsState.error
+                    ? _controller.retry
+                    : _controller.loadMore,
+                icon: _controller.isLoadingMore
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_forward_rounded),
+                label: Text(
+                  _controller.state == NewsState.error
+                      ? 'Tentar novamente'
+                      : 'Mais notícias',
+                ),
               ),
             ),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }
@@ -222,26 +258,26 @@ class _ContentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 88,
+    width: 108,
     child: Column(
       children: [
         Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             child: Ink(
-              width: 82,
-              height: 82,
+              width: 108,
+              height: 64,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: selected ? vittaDarkBlue : vittaLineBlue,
                   width: selected ? 2 : 1,
                 ),
               ),
-              child: Icon(icon, size: 44, color: iconColor),
+              child: Icon(icon, size: 28, color: iconColor),
             ),
           ),
         ),
@@ -251,11 +287,11 @@ class _ContentCard extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
         ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          width: 82,
+          width: 108,
           height: selected ? 4 : 0,
           margin: const EdgeInsets.only(top: 3),
           color: vittaDarkBlue,

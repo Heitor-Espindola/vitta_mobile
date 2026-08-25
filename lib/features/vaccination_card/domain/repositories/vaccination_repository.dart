@@ -17,4 +17,7 @@ abstract interface class VaccinationRepository {
     required String personId,
     required String responsibleId,
   });
+
+  Stream<List<VaccinationRecord>> watchPatientRecords(String patientId) =>
+      watchRecordsByPerson(personId: patientId, responsibleId: patientId);
 }

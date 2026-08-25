@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
 
-const vittaDarkBlue = Color(0xFF2B6D9D);
-const vittaBlue = Color(0xFF3A92D3);
+const vittaDarkBlue = AppColors.primaryDark;
+const vittaBlue = AppColors.primary;
 const vittaSoftBlue = Color(0xFF78B5D4);
 const vittaLineBlue = Color(0xFF83ACD4);
 const vittaPink = Color(0xFFFF3DAD);
-const vittaSurface = Color(0xFFF8FAFC);
+const vittaSurface = AppColors.background;
 
 enum VittaTab { home, card, content, vaccines, profile }
 
@@ -17,7 +18,7 @@ class VittaMobileShell extends StatelessWidget {
     required this.currentTab,
     required this.body,
     this.showGreetingHeader = false,
-    this.appBarHeight = 78,
+    this.appBarHeight = 58,
   });
 
   final String title;
@@ -55,36 +56,19 @@ class VittaTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: height,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [vittaDarkBlue, vittaBlue],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        border: Border(bottom: BorderSide(color: Color(0xFF1599F5), width: 3)),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            left: 24,
-            right: 24,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                ),
-              ),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.pageTitle,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -99,19 +83,19 @@ class VittaBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Container(
-        height: 68,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppRadius.large),
           border: Border.all(color: const Color(0xFFE8EDF0)),
           boxShadow: const [
             BoxShadow(
               color: Color(0x180C527E),
-              blurRadius: 24,
-              offset: Offset(0, 9),
+              blurRadius: 14,
+              offset: Offset(0, 5),
             ),
           ],
         ),
@@ -205,7 +189,7 @@ class _NavItem extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, color: color, size: selected ? 25 : 23),
+                  Icon(icon, color: color, size: selected ? 22 : 21),
                   const SizedBox(height: 2),
                   Text(
                     label,
@@ -213,7 +197,7 @@ class _NavItem extends StatelessWidget {
                     overflow: TextOverflow.fade,
                     style: TextStyle(
                       color: color,
-                      fontSize: 9.5,
+                      fontSize: 9,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                     ),
                   ),
@@ -237,6 +221,140 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class AppPageHeader extends StatelessWidget {
+  const AppPageHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.showBack = false,
+    this.action,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool showBack;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.normal,
+      AppSpacing.sm,
+      AppSpacing.normal,
+      AppSpacing.md,
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showBack) ...[
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Voltar',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.pageTitle),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle!, style: AppTypography.caption),
+              ],
+            ],
+          ),
+        ),
+        ?action,
+      ],
+    ),
+  );
+}
+
+class ExpandableSearch extends StatefulWidget {
+  const ExpandableSearch({
+    super.key,
+    required this.controller,
+    this.hint = 'Pesquisar',
+    this.onChanged,
+    this.onSubmitted,
+    this.onClosed,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onClosed;
+
+  @override
+  State<ExpandableSearch> createState() => _ExpandableSearchState();
+}
+
+class _ExpandableSearchState extends State<ExpandableSearch> {
+  final _focusNode = FocusNode();
+  bool _expanded = false;
+
+  void _open() {
+    setState(() => _expanded = true);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
+  }
+
+  void _close() {
+    widget.controller.clear();
+    widget.onChanged?.call('');
+    widget.onClosed?.call();
+    _focusNode.unfocus();
+    setState(() => _expanded = false);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    child: _expanded
+        ? SizedBox(
+            key: const ValueKey('expanded-search'),
+            height: 44,
+            child: TextField(
+              key: const Key('expandable-search-field'),
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                suffixIcon: IconButton(
+                  tooltip: 'Fechar pesquisa',
+                  onPressed: _close,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
+              ),
+            ),
+          )
+        : Align(
+            key: const ValueKey('collapsed-search'),
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              tooltip: 'Pesquisar',
+              onPressed: _open,
+              icon: const Icon(Icons.search_rounded),
+            ),
+          ),
+  );
 }
 
 class VittaSearchField extends StatelessWidget {
@@ -406,12 +524,12 @@ class StatusChip extends StatelessWidget {
 String statusLabel(String status) {
   switch (status.toLowerCase()) {
     case 'applied':
-      return 'Concluida';
+      return 'Aplicada';
     case 'pending':
       return 'Pendente';
     case 'late':
       return 'Atrasada';
     default:
-      return status.isEmpty ? 'Concluida' : status;
+      return status.isEmpty ? 'Aplicada' : status;
   }
 }

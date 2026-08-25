@@ -8,6 +8,7 @@ const databaseRoot = `projects/${projectId}/databases/(default)`;
 const apiRoot = `http://${firestoreHost}/v1/${databaseRoot}`;
 
 const timestamp = () => ({ timestampValue: new Date().toISOString() });
+const dateTimestamp = (value) => ({ timestampValue: value });
 const string = (value) => ({ stringValue: value });
 const boolean = (value) => ({ booleanValue: value });
 const nullableString = (value) =>
@@ -51,6 +52,7 @@ function userFields({
   return {
     uid: string(uid),
     id: string(uid),
+    personId: string(uid),
     authUid: string(authUid),
     canAuthenticate: boolean(canAuthenticate),
     name: string(name),
@@ -69,7 +71,8 @@ function userFields({
     ...(relationshipToGuardian == null
       ? {}
       : { relationshipToGuardian: string(relationshipToGuardian) }),
-    birthDate: timestamp(),
+    birthDate: dateTimestamp('2000-01-01T00:00:00.000Z'),
+    majorityAt: dateTimestamp('2018-01-01T00:00:00.000Z'),
     phone: nullableString(null),
     photoUrl: nullableString(null),
     createdAt: timestamp(),
@@ -104,10 +107,120 @@ async function read(token, path) {
   });
 }
 
+async function queryVaccinationRecords(token, patientId) {
+  return fetch(`${apiRoot}/documents:runQuery`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'vaccination_records' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'patientId' },
+            op: 'EQUAL',
+            value: string(patientId),
+          },
+        },
+        orderBy: [
+          { field: { fieldPath: 'appliedAt' }, direction: 'DESCENDING' },
+        ],
+      },
+    }),
+  });
+}
+
 async function adminRead(path) {
   return fetch(`${apiRoot}/documents/${path}`, {
     headers: { authorization: 'Bearer owner' },
   });
+}
+
+async function adminCommit(writes) {
+  return commit('owner', writes);
+}
+
+function userCreateWrite(uid, fields) {
+  return {
+    update: { name: documentName(`users/${uid}`), fields },
+    currentDocument: { exists: false },
+  };
+}
+
+function authLinkCreateWrite(authUid, personId = authUid) {
+  return {
+    update: {
+      name: documentName(`auth_links/${authUid}`),
+      fields: { personId: string(personId) },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists: false },
+  };
+}
+
+function cpfRegistryCreateWrite(cpf, ownerUid) {
+  const cpfHash = createHash('sha256').update(cpf).digest('hex');
+  return {
+    update: {
+      name: documentName(`cpf_registry/${cpfHash}`),
+      fields: {
+        ownerUid: string(ownerUid),
+        createdAt: timestamp(),
+      },
+    },
+    currentDocument: { exists: false },
+  };
+}
+
+function lastLoginUpdateWrite(uid) {
+  return {
+    update: {
+      name: documentName(`users/${uid}`),
+      fields: {
+        lastLoginAt: timestamp(),
+        updatedAt: timestamp(),
+      },
+    },
+    updateMask: { fieldPaths: ['lastLoginAt', 'updatedAt'] },
+    currentDocument: { exists: true },
+  };
+}
+
+async function registerAccount(account, fields, cpf) {
+  await commit(account.token, [
+    userCreateWrite(account.uid, fields),
+    cpfRegistryCreateWrite(cpf, account.uid),
+    authLinkCreateWrite(account.uid),
+  ]);
+}
+
+function vaccinationCreateWrite(
+  recordId,
+  { patientId, professionalUid, source = 'professional_panel' },
+) {
+  return {
+    update: {
+      name: documentName(`vaccination_records/${recordId}`),
+      fields: {
+        patientId: string(patientId),
+        vaccineId: string('bcg'),
+        vaccineName: string('BCG'),
+        doseLabel: string('Dose única'),
+        appliedAt: timestamp(),
+        professionalUid: string(professionalUid),
+        source: string(source),
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists: false },
+  };
 }
 
 function assert(condition, message) {
@@ -129,15 +242,140 @@ const guardianFields = userFields({
   canAuthenticate: true,
 });
 
-await commit(guardian.token, [
-  {
-    update: {
-      name: documentName(guardianPath),
-      fields: guardianFields,
+await registerAccount(guardian, guardianFields, guardianCpf);
+
+const ownAuthLinkResponse = await read(
+  guardian.token,
+  `auth_links/${guardian.uid}`,
+);
+assert(
+  ownAuthLinkResponse.status === 200,
+  'Cadastro novo não criou ou não leu o próprio auth_link.',
+);
+const ownAuthLink = await ownAuthLinkResponse.json();
+assert(
+  ownAuthLink.fields.personId.stringValue === guardian.uid,
+  'auth_link não aponta para o personId correto.',
+);
+assert(
+  (await read(guardian.token, guardianPath)).status === 200,
+  'Login novo com auth_link não leu users/{personId}.',
+);
+const guardianCpfHash = createHash('sha256').update(guardianCpf).digest('hex');
+assert(
+  (await read(guardian.token, `cpf_registry/${guardianCpfHash}`)).status === 200,
+  'Cadastro novo não criou cpf_registry.',
+);
+
+const legacyUser = await createAuthUser('legacy');
+const legacyFields = userFields({
+  uid: legacyUser.uid,
+  name: 'Usuário Legado',
+  cpf: '16899535009',
+  role: 'responsible',
+  roles: ['user'],
+  authUid: legacyUser.uid,
+  canAuthenticate: true,
+});
+delete legacyFields.personId;
+delete legacyFields.majorityAt;
+await adminCommit([userCreateWrite(legacyUser.uid, legacyFields)]);
+assert(
+  (await read(legacyUser.token, `auth_links/${legacyUser.uid}`)).status === 404,
+  'Conta legada recebeu auth_link inesperado.',
+);
+assert(
+  (await read(legacyUser.token, `users/${legacyUser.uid}`)).status === 200,
+  'Login legado sem auth_link não conseguiu usar auth.uid.',
+);
+await commit(legacyUser.token, [lastLoginUpdateWrite(legacyUser.uid)]);
+
+const attacker = await createAuthUser('auth-link-attacker');
+assert(
+  (await read(attacker.token, `auth_links/${guardian.uid}`)).status === 403,
+  'Usuário leu auth_link de outra pessoa.',
+);
+assert(
+  (await read(guardian.token, 'auth_links')).status === 403,
+  'Listagem de auth_links foi permitida.',
+);
+await commit(
+  attacker.token,
+  [authLinkCreateWrite(attacker.uid, guardian.uid)],
+  403,
+);
+await commit(
+  attacker.token,
+  [authLinkCreateWrite(guardian.uid, guardian.uid)],
+  403,
+);
+await commit(
+  guardian.token,
+  [
+    {
+      update: {
+        name: documentName(`auth_links/${guardian.uid}`),
+        fields: { personId: string(guardian.uid) },
+      },
+      updateMask: { fieldPaths: ['personId'] },
+      currentDocument: { exists: true },
     },
-    currentDocument: { exists: false },
+  ],
+  403,
+);
+await commit(
+  guardian.token,
+  [{ delete: documentName(`auth_links/${guardian.uid}`) }],
+  403,
+);
+
+await commit(
+  guardian.token,
+  [
+    {
+      update: {
+        name: documentName(guardianPath),
+        fields: {
+          majorityAt: dateTimestamp('2030-01-01T00:00:00.000Z'),
+        },
+      },
+      updateMask: { fieldPaths: ['majorityAt'] },
+      currentDocument: { exists: true },
+    },
+  ],
+  403,
+);
+
+const rollbackAccount = await createAuthUser('registration-rollback');
+const rollbackFields = userFields({
+  uid: rollbackAccount.uid,
+  name: 'Cadastro Rollback',
+  cpf: '39053344705',
+  role: 'responsible',
+  roles: ['user'],
+  authUid: rollbackAccount.uid,
+  canAuthenticate: true,
+});
+const rollbackResponse = await fetch(`${apiRoot}/documents:commit`, {
+  method: 'POST',
+  headers: {
+    authorization: `Bearer ${rollbackAccount.token}`,
+    'content-type': 'application/json',
   },
-]);
+  body: JSON.stringify({
+    writes: [
+      userCreateWrite(rollbackAccount.uid, rollbackFields),
+      cpfRegistryCreateWrite(guardianCpf, rollbackAccount.uid),
+      authLinkCreateWrite(rollbackAccount.uid),
+    ],
+  }),
+});
+assert(!rollbackResponse.ok, 'Commit inválido do cadastro foi aceito.');
+assert(
+  (await adminRead(`users/${rollbackAccount.uid}`)).status === 404 &&
+    (await adminRead(`auth_links/${rollbackAccount.uid}`)).status === 404,
+  'Rollback Firestore deixou users ou auth_links parcial.',
+);
 
 const dependentId = 'dependent-valid';
 const dependentPath = `users/${dependentId}`;
@@ -247,4 +485,147 @@ const linkedIds = guardianAfter.fields.dependentIds.arrayValue.values.map(
 );
 assert(linkedIds.length === 1 && linkedIds[0] === dependentId, 'Rollback não preservou dependentIds.');
 
-console.log('Firestore Rules: criação atômica, CPF duplicado, rollback e isolamento aprovados.');
+await commit(guardian.token, [lastLoginUpdateWrite(guardian.uid)]);
+
+await registerAccount(
+  otherUser,
+  userFields({
+    uid: otherUser.uid,
+    name: 'Usuário Comum',
+    cpf: '12345678909',
+    role: 'responsible',
+    roles: ['user'],
+    authUid: otherUser.uid,
+    canAuthenticate: true,
+  }),
+  '12345678909',
+);
+
+const professional = await createAuthUser('professional');
+const blockedProfessional = await createAuthUser('professional-blocked');
+const professionalFields = userFields({
+  uid: professional.uid,
+  name: 'Profissional Ativo',
+  cpf: '39053344705',
+  role: 'health_professional',
+  roles: ['health_professional'],
+  authUid: professional.uid,
+  canAuthenticate: true,
+});
+const blockedProfessionalFields = {
+  ...userFields({
+    uid: blockedProfessional.uid,
+    name: 'Profissional Bloqueado',
+    cpf: '98765432100',
+    role: 'health_professional',
+    roles: ['health_professional'],
+    authUid: blockedProfessional.uid,
+    canAuthenticate: true,
+  }),
+  accountStatus: string('blocked'),
+};
+await adminCommit([
+  {
+    update: {
+      name: documentName(`users/${professional.uid}`),
+      fields: professionalFields,
+    },
+    currentDocument: { exists: false },
+  },
+  {
+    update: {
+      name: documentName(`users/${blockedProfessional.uid}`),
+      fields: blockedProfessionalFields,
+    },
+    currentDocument: { exists: false },
+  },
+]);
+
+const recordId = 'vaccination-valid';
+await commit(professional.token, [
+  vaccinationCreateWrite(recordId, {
+    patientId: guardian.uid,
+    professionalUid: professional.uid,
+  }),
+]);
+assert(
+  (await read(guardian.token, `vaccination_records/${recordId}`)).status === 200,
+  'A) Paciente não leu o próprio registro.',
+);
+assert(
+  (await queryVaccinationRecords(guardian.token, guardian.uid)).status === 200,
+  'A) Consulta patientId + appliedAt do mobile foi negada.',
+);
+assert(
+  (await read(otherUser.token, `vaccination_records/${recordId}`)).status === 403,
+  'B) Paciente leu registro de outra pessoa.',
+);
+await commit(
+  guardian.token,
+  [vaccinationCreateWrite('vaccination-by-patient', {
+    patientId: guardian.uid,
+    professionalUid: guardian.uid,
+  })],
+  403,
+);
+await commit(
+  otherUser.token,
+  [vaccinationCreateWrite('vaccination-by-common-user', {
+    patientId: guardian.uid,
+    professionalUid: otherUser.uid,
+  })],
+  403,
+);
+await commit(
+  professional.token,
+  [vaccinationCreateWrite('vaccination-wrong-professional', {
+    patientId: guardian.uid,
+    professionalUid: blockedProfessional.uid,
+  })],
+  403,
+);
+await commit(
+  professional.token,
+  [vaccinationCreateWrite('vaccination-missing-patient', {
+    patientId: 'missing-patient',
+    professionalUid: professional.uid,
+  })],
+  403,
+);
+await commit(
+  professional.token,
+  [{
+    update: {
+      name: documentName(`vaccination_records/${recordId}`),
+      fields: { notes: string('tentativa de edição') },
+    },
+    updateMask: { fieldPaths: ['notes'] },
+    currentDocument: { exists: true },
+  }],
+  403,
+);
+await commit(
+  professional.token,
+  [{ delete: documentName(`vaccination_records/${recordId}`) }],
+  403,
+);
+await commit(
+  blockedProfessional.token,
+  [vaccinationCreateWrite('vaccination-blocked-professional', {
+    patientId: guardian.uid,
+    professionalUid: blockedProfessional.uid,
+  })],
+  403,
+);
+assert(
+  (await read(professional.token, `vaccination_records/${recordId}`)).status === 403,
+  'Profissional conseguiu ler registro do paciente.',
+);
+assert(
+  (await read(professional.token, 'users')).status === 403,
+  'Profissional conseguiu listar users.',
+);
+
+console.log(
+  'Firestore Rules: login legado/novo, cadastro atômico, auth_links, majorityAt, dependentes/CPF e vaccination_records A-J aprovados.',
+);

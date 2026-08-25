@@ -1,4 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
+import 'package:vitta_mobile/features/vaccines/domain/models/patient_vaccine_summary.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 const _pageBackground = Color(0xFFF7F9FB);
@@ -6,19 +16,94 @@ const _secondaryText = Color(0xFF455967);
 const _softBlue = Color(0xFFE2F0F9);
 
 class VaccinesScreen extends StatefulWidget {
-  const VaccinesScreen({super.key});
+  const VaccinesScreen({
+    super.key,
+    this.authRepository,
+    this.vaccinationRepository,
+  });
+
+  final AuthRepository? authRepository;
+  final VaccinationRepository? vaccinationRepository;
 
   @override
   State<VaccinesScreen> createState() => _VaccinesScreenState();
 }
 
 class _VaccinesScreenState extends State<VaccinesScreen> {
+  late final AuthRepository _authRepository =
+      widget.authRepository ?? FirebaseAuthRepository();
+  late final VaccinationRepository _vaccinationRepository =
+      widget.vaccinationRepository ?? FirebaseVaccinationRepository();
   final _searchController = TextEditingController();
+  StreamSubscription<List<VaccinationRecord>>? _recordsSubscription;
   String _category = 'Infantis';
   String _query = '';
+  List<Vaccine> _catalog = const [];
+  List<VaccinationRecord> _records = const [];
+  bool _loading = true;
+  String? _error;
+
+  List<Vaccine> _fallbackCatalog() =>
+      _vaccines.map((item) => item.toVaccine()).toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await _recordsSubscription?.cancel();
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final user = await _authRepository.getCurrentUser();
+      if (user == null) throw StateError('Sessão não encontrada.');
+      List<Vaccine> catalog;
+      try {
+        catalog = await _vaccinationRepository.getVaccines();
+      } catch (_) {
+        catalog = const [];
+      }
+      if (catalog.isEmpty) catalog = _fallbackCatalog();
+      if (!mounted) return;
+      setState(() => _catalog = catalog);
+      _recordsSubscription = _vaccinationRepository
+          .watchPatientRecords(user.effectivePersonId)
+          .listen(
+            (records) {
+              if (mounted) {
+                setState(() {
+                  _records = records;
+                  _loading = false;
+                  _error = null;
+                });
+              }
+            },
+            onError: (_) {
+              if (mounted) {
+                setState(() {
+                  _loading = false;
+                  _error = 'Não foi possível cruzar sua carteira agora.';
+                });
+              }
+            },
+          );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Não foi possível carregar as vacinas agora.';
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _recordsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -26,7 +111,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
   @override
   Widget build(BuildContext context) {
     final normalizedQuery = _query.toLowerCase();
-    final vaccines = _vaccines.where((item) {
+    final summaries = PatientVaccineSummary.combine(_catalog, _records);
+    final vaccines = summaries.where((summary) {
+      final item = _VaccineItem.fromVaccine(summary.vaccine);
       final belongsToCategory = item.category == _category;
       final matchesQuery =
           normalizedQuery.isEmpty ||
@@ -36,13 +123,12 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
     }).toList();
 
     return VittaMobileShell(
-      title: '',
+      title: 'Vacinas',
       currentTab: VittaTab.vaccines,
-      appBarHeight: 0,
       body: ColoredBox(
         color: _pageBackground,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 26, 20, 32),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           children: [
             Center(
               child: ConstrainedBox(
@@ -51,13 +137,14 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _VaccinesHeader(),
-                    const SizedBox(height: 30),
-                    _VaccineSearchField(
+                    const SizedBox(height: 8),
+                    ExpandableSearch(
                       controller: _searchController,
+                      hint: 'Pesquisar vacina',
                       onChanged: (value) =>
                           setState(() => _query = value.trim()),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                     const _SectionHeading('Categorias'),
                     const SizedBox(height: 14),
                     _CategorySelector(
@@ -65,18 +152,29 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                       onSelected: (category) =>
                           setState(() => _category = category),
                     ),
-                    const SizedBox(height: 34),
+                    const SizedBox(height: 20),
                     const _EducationalCard(),
-                    const SizedBox(height: 34),
+                    const SizedBox(height: 20),
                     const _SectionHeading('Vacinas recomendadas'),
                     const SizedBox(height: 16),
-                    if (vaccines.isEmpty)
+                    if (_error != null) ...[
+                      Text(_error!),
+                      TextButton(
+                        onPressed: _load,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ] else if (_loading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (vaccines.isEmpty)
                       const _EmptyVaccines()
                     else
                       ...vaccines.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 18),
-                          child: _VaccineCard(item: item),
+                        (summary) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _VaccineCard(
+                            item: _VaccineItem.fromVaccine(summary.vaccine),
+                            summary: summary,
+                          ),
                         ),
                       ),
                   ],
@@ -104,17 +202,17 @@ class _VaccinesHeader extends StatelessWidget {
             Text(
               'Vacinas',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 23,
                 height: 1.05,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
               ),
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 4),
             Text(
               'Informações para cuidar de você e\nde quem você ama.',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 12,
                 height: 1.4,
                 color: _secondaryText,
               ),
@@ -122,10 +220,10 @@ class _VaccinesHeader extends StatelessWidget {
           ],
         ),
       ),
-      const SizedBox(width: 18),
+      const SizedBox(width: 12),
       Container(
-        width: 60,
-        height: 60,
+        width: 42,
+        height: 42,
         decoration: const BoxDecoration(
           color: _softBlue,
           shape: BoxShape.circle,
@@ -133,63 +231,10 @@ class _VaccinesHeader extends StatelessWidget {
         child: const Icon(
           Icons.vaccines_outlined,
           color: vittaDarkBlue,
-          size: 28,
+          size: 21,
         ),
       ),
     ],
-  );
-}
-
-class _VaccineSearchField extends StatelessWidget {
-  const _VaccineSearchField({
-    required this.controller,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x100C527E),
-          blurRadius: 24,
-          offset: Offset(0, 8),
-        ),
-      ],
-    ),
-    child: TextField(
-      key: const Key('vaccine-search-field'),
-      controller: controller,
-      onChanged: onChanged,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        hintText: 'Pesquisar vacina',
-        hintStyle: const TextStyle(color: Color(0xFF536671), fontSize: 16),
-        prefixIcon: const Padding(
-          padding: EdgeInsets.only(left: 8, right: 2),
-          child: Icon(Icons.search_rounded, color: Color(0xFF536671), size: 26),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 54),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 20,
-          horizontal: 18,
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFFE0E5E9)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: vittaBlue, width: 1.4),
-        ),
-      ),
-    ),
   );
 }
 
@@ -259,17 +304,17 @@ class _EducationalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     decoration: BoxDecoration(
       color: const Color(0xFFDDEDF7),
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 52,
-          height: 52,
+          width: 38,
+          height: 38,
           decoration: const BoxDecoration(
             color: Color(0xFFF8FCFF),
             shape: BoxShape.circle,
@@ -277,10 +322,10 @@ class _EducationalCard extends StatelessWidget {
           child: const Icon(
             Icons.shield_outlined,
             color: vittaDarkBlue,
-            size: 26,
+            size: 20,
           ),
         ),
-        const SizedBox(width: 18),
+        const SizedBox(width: 12),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,17 +334,17 @@ class _EducationalCard extends StatelessWidget {
                 'Vacinar é proteger',
                 style: TextStyle(
                   color: vittaDarkBlue,
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: 7),
+              SizedBox(height: 4),
               Text(
                 'As vacinas ajudam a prevenir doenças e reduzir complicações. '
                 'Consulte sempre informações de fontes oficiais.',
                 style: TextStyle(
                   color: Color(0xFF314B5B),
-                  fontSize: 14,
+                  fontSize: 12,
                   height: 1.4,
                 ),
               ),
@@ -312,14 +357,15 @@ class _EducationalCard extends StatelessWidget {
 }
 
 class _VaccineCard extends StatelessWidget {
-  const _VaccineCard({required this.item});
+  const _VaccineCard({required this.item, required this.summary});
 
   final _VaccineItem item;
+  final PatientVaccineSummary summary;
 
   @override
   Widget build(BuildContext context) => Material(
     color: Colors.white,
-    borderRadius: BorderRadius.circular(28),
+    borderRadius: BorderRadius.circular(16),
     elevation: 0,
     shadowColor: const Color(0x180C527E),
     child: InkWell(
@@ -329,17 +375,17 @@ class _VaccineCard extends StatelessWidget {
           builder: (_) => _VaccineDetailsScreen(item: item),
         ),
       ),
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 24, 20, 22),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFF0F3F5)),
           boxShadow: const [
             BoxShadow(
               color: Color(0x0D0C527E),
-              blurRadius: 24,
-              offset: Offset(0, 9),
+              blurRadius: 12,
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -347,68 +393,89 @@ class _VaccineCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 40,
+              height: 40,
               decoration: const BoxDecoration(
                 color: _softBlue,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.vaccines_outlined,
-                size: 26,
+                size: 20,
                 color: vittaDarkBlue,
               ),
             ),
-            const SizedBox(width: 18),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.25,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.2,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.25,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF87959D),
+                        size: 22,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
-                    item.description,
+                    '${item.categoryLabel} · ${summary.latestRecord?.effectiveDoseLabel.isNotEmpty == true ? summary.latestRecord!.effectiveDoseLabel : 'Esquema vacinal'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 12,
                       height: 1.45,
                       color: _secondaryText,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 9),
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
+                          horizontal: 9,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: _softBlue,
+                          color: _statusColor(summary).withValues(alpha: .12),
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Text(
-                          item.categoryLabel,
-                          style: const TextStyle(
-                            color: vittaDarkBlue,
-                            fontSize: 12,
+                          _statusLabel(summary),
+                          style: TextStyle(
+                            color: _statusColor(summary),
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF87959D),
-                        size: 28,
-                      ),
+                      if (_statusDate(summary) != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            formatBrazilianDate(_statusDate(summary)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: _secondaryText,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -668,6 +735,21 @@ class _VaccineItem {
   final String description;
   final String category;
 
+  factory _VaccineItem.fromVaccine(Vaccine vaccine) => _VaccineItem(
+    title: vaccine.name,
+    description:
+        vaccine.description ?? 'Consulte as orientações oficiais desta vacina.',
+    category: _categoryFor(vaccine),
+  );
+
+  Vaccine toVaccine() => Vaccine(
+    id: title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-'),
+    name: title,
+    description: description,
+    targetGroups: [category],
+    active: true,
+  );
+
   String get categoryLabel => switch (category) {
     'Infantis' => 'Infantil',
     'Juvenis' => 'Juvenil',
@@ -685,6 +767,38 @@ class _VaccineItem {
     _ => 'Consulte uma unidade de saúde para orientação individual.',
   };
 }
+
+String _categoryFor(Vaccine vaccine) {
+  final text = [
+    vaccine.recommendedAge,
+    ...vaccine.targetGroups,
+  ].whereType<String>().join(' ').toLowerCase();
+  if (text.contains('gest')) return 'Gestantes';
+  if (text.contains('idos')) return 'Idosos';
+  if (text.contains('adolesc') || text.contains('juven')) return 'Juvenis';
+  final existing = _vaccines.where(
+    (item) => item.title.toLowerCase() == vaccine.name.toLowerCase(),
+  );
+  return existing.isEmpty ? 'Infantis' : existing.first.category;
+}
+
+String _statusLabel(PatientVaccineSummary summary) =>
+    switch (summary.status()) {
+      PatientVaccineStatus.applied => 'Aplicada',
+      PatientVaccineStatus.upcoming => 'Próxima dose',
+      PatientVaccineStatus.overdue => 'Atrasada',
+      PatientVaccineStatus.notApplied => 'Não aplicada',
+    };
+
+Color _statusColor(PatientVaccineSummary summary) => switch (summary.status()) {
+  PatientVaccineStatus.applied => const Color(0xFF268A5B),
+  PatientVaccineStatus.upcoming => vittaDarkBlue,
+  PatientVaccineStatus.overdue => const Color(0xFFC9474E),
+  PatientVaccineStatus.notApplied => const Color(0xFF687985),
+};
+
+DateTime? _statusDate(PatientVaccineSummary summary) =>
+    summary.nextDoseAt ?? summary.latestRecord?.effectiveAppliedAt;
 
 const _categories = ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'];
 

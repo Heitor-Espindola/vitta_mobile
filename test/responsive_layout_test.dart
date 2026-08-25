@@ -45,22 +45,47 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: VaccinesScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VaccinesScreen(
+          authRepository: _FakeAuthRepository(),
+          vaccinationRepository: _FakeVaccinationRepository(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Vacinas recomendadas'), findsOneWidget);
     expect(find.text('BCG'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -760));
+    final bcgCard = find.byKey(const Key('vaccine-card-BCG'));
+    await tester.ensureVisible(bcgCard);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('vaccine-card-BCG')));
+    await tester.tap(bcgCard);
     await tester.pumpAndSettle();
 
     expect(find.text('Detalhes da vacina'), findsOneWidget);
     expect(find.text('O que ela previne'), findsOneWidget);
     expect(find.text('Esquema de doses'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Home shows the vaccination empty state', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authRepository: _FakeAuthRepository(),
+          peopleRepository: _FakePeopleRepository(),
+          vaccinationRepository: _FakeVaccinationRepository(empty: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Nenhuma vacina registrada ainda.'), findsOne);
   });
 
   testWidgets(
@@ -163,27 +188,34 @@ class _FakeAuthRepository implements AuthRepository {
 }
 
 class _FakeVaccinationRepository implements VaccinationRepository {
+  _FakeVaccinationRepository({this.empty = false});
+
+  final bool empty;
+
   @override
-  Future<List<VaccinationRecord>> getRecordsByResponsible(String id) async => [
-    VaccinationRecord(
-      id: 'next',
-      childId: 'uid',
-      responsibleId: 'uid',
-      vaccineName: 'Influenza',
-      dose: 'Dose anual',
-      status: 'pending',
-      nextDoseDate: DateTime.now().add(const Duration(days: 30)),
-    ),
-    VaccinationRecord(
-      id: 'last',
-      childId: 'uid',
-      responsibleId: 'uid',
-      vaccineName: 'Hepatite B',
-      dose: '3ª dose',
-      status: 'applied',
-      applicationDate: DateTime.now().subtract(const Duration(days: 10)),
-    ),
-  ];
+  Future<List<VaccinationRecord>> getRecordsByResponsible(String id) async {
+    if (empty) return [];
+    return [
+      VaccinationRecord(
+        id: 'next',
+        childId: 'uid',
+        responsibleId: 'uid',
+        vaccineName: 'Influenza',
+        dose: 'Dose anual',
+        status: 'pending',
+        nextDoseDate: DateTime.now().add(const Duration(days: 30)),
+      ),
+      VaccinationRecord(
+        id: 'last',
+        childId: 'uid',
+        responsibleId: 'uid',
+        vaccineName: 'Hepatite B',
+        dose: '3ª dose',
+        status: 'applied',
+        applicationDate: DateTime.now().subtract(const Duration(days: 10)),
+      ),
+    ];
+  }
 
   @override
   Future<List<VaccinationRecord>> getRecordsByChild(String childId) async => [];
@@ -207,4 +239,8 @@ class _FakeVaccinationRepository implements VaccinationRepository {
       responsibleId: responsibleId,
     );
   }
+
+  @override
+  Stream<List<VaccinationRecord>> watchPatientRecords(String patientUid) =>
+      watchRecordsByPerson(personId: patientUid, responsibleId: patientUid);
 }

@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/date_input_formatter.dart';
@@ -12,6 +11,7 @@ import 'package:vitta_mobile/core/validators/password_validator.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
+import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
 import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -75,10 +75,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
-    } on FirebaseAuthException catch (error) {
-      setState(() => _errorMessage = _authErrorMessage(error));
-    } catch (_) {
-      setState(() => _errorMessage = 'Nao foi possivel criar a conta agora.');
+    } catch (error) {
+      setState(() => _errorMessage = mapSignUpError(error));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -342,14 +340,4 @@ class _PasswordStrengthIndicator extends StatelessWidget {
       ),
     );
   }
-}
-
-String _authErrorMessage(FirebaseAuthException error) {
-  return switch (error.code) {
-    'email-already-in-use' => 'Este email ja esta em uso.',
-    'invalid-email' => 'Email invalido.',
-    'weak-password' => 'A senha informada e muito fraca.',
-    'network-request-failed' => 'Falha de conexao. Verifique sua internet.',
-    _ => error.message ?? 'Erro ao criar conta. Tente novamente.',
-  };
 }

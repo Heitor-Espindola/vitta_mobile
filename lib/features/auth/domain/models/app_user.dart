@@ -9,6 +9,7 @@ class AppUser {
     required this.email,
     required this.role,
     this.authUid,
+    this.personId = '',
     this.canAuthenticate = true,
     this.roles = const ['user'],
     this.accountStatus = 'active',
@@ -18,6 +19,7 @@ class AppUser {
     this.relationshipToGuardian,
     this.cpf,
     this.birthDate,
+    this.majorityAt,
     this.phone,
     this.photoUrl,
     this.createdAt,
@@ -30,6 +32,7 @@ class AppUser {
   final String email;
   final String role;
   final String? authUid;
+  final String personId;
   final bool canAuthenticate;
   final List<String> roles;
   final String accountStatus;
@@ -39,6 +42,7 @@ class AppUser {
   final String? relationshipToGuardian;
   final String? cpf;
   final DateTime? birthDate;
+  final DateTime? majorityAt;
   final String? phone;
   final String? photoUrl;
   final DateTime? createdAt;
@@ -52,6 +56,7 @@ class AppUser {
       email: map['email'] as String? ?? '',
       role: map['role'] as String? ?? '',
       authUid: map['authUid'] as String?,
+      personId: map['personId'] as String? ?? map['id'] as String? ?? '',
       canAuthenticate: map['canAuthenticate'] as bool? ?? true,
       roles: _stringList(map['roles'], fallback: const ['user']),
       accountStatus: map['accountStatus'] as String? ?? 'active',
@@ -61,6 +66,7 @@ class AppUser {
       relationshipToGuardian: map['relationshipToGuardian'] as String?,
       cpf: map['cpfFormatted'] as String? ?? map['cpf'] as String?,
       birthDate: dateTimeFromMap(map['birthDate']),
+      majorityAt: dateTimeFromMap(map['majorityAt']),
       phone: map['phone'] as String?,
       photoUrl: map['photoUrl'] as String?,
       createdAt: dateTimeFromMap(map['createdAt']),
@@ -74,9 +80,10 @@ class AppUser {
     final cpfFormatted = formatCpf(cpfDigits);
     final formattedName = formatPersonName(name);
     return {
-      'uid': uid,
-      'id': uid,
-      'authUid': authUid ?? (canAuthenticate ? uid : ''),
+      'uid': effectivePersonId,
+      'id': effectivePersonId,
+      'personId': effectivePersonId,
+      'authUid': authUid ?? (canAuthenticate ? uid : null),
       'canAuthenticate': canAuthenticate,
       'name': formattedName,
       'fullName': formattedName,
@@ -94,6 +101,7 @@ class AppUser {
       if (relationshipToGuardian != null)
         'relationshipToGuardian': relationshipToGuardian,
       'birthDate': birthDate,
+      'majorityAt': effectiveMajorityAt,
       'phone': phone,
       'photoUrl': photoUrl,
       'createdAt': createdAt,
@@ -108,6 +116,7 @@ class AppUser {
     String? email,
     String? role,
     String? authUid,
+    String? personId,
     bool? canAuthenticate,
     List<String>? roles,
     String? accountStatus,
@@ -117,6 +126,7 @@ class AppUser {
     String? relationshipToGuardian,
     String? cpf,
     DateTime? birthDate,
+    DateTime? majorityAt,
     String? phone,
     String? photoUrl,
     DateTime? createdAt,
@@ -129,6 +139,7 @@ class AppUser {
       email: email ?? this.email,
       role: role ?? this.role,
       authUid: authUid ?? this.authUid,
+      personId: personId ?? this.personId,
       canAuthenticate: canAuthenticate ?? this.canAuthenticate,
       roles: roles ?? this.roles,
       accountStatus: accountStatus ?? this.accountStatus,
@@ -139,6 +150,7 @@ class AppUser {
           relationshipToGuardian ?? this.relationshipToGuardian,
       cpf: cpf ?? this.cpf,
       birthDate: birthDate ?? this.birthDate,
+      majorityAt: majorityAt ?? this.majorityAt,
       phone: phone ?? this.phone,
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
@@ -146,6 +158,22 @@ class AppUser {
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
     );
   }
+
+  String get effectivePersonId => personId.isEmpty ? uid : personId;
+
+  DateTime? get effectiveMajorityAt =>
+      majorityAt ?? calculateMajorityAt(birthDate);
+}
+
+DateTime? calculateMajorityAt(DateTime? birthDate) {
+  if (birthDate == null) return null;
+  final targetYear = birthDate.year + 18;
+  final lastDay = DateTime(targetYear, birthDate.month + 1, 0).day;
+  return DateTime(
+    targetYear,
+    birthDate.month,
+    birthDate.day > lastDay ? lastDay : birthDate.day,
+  );
 }
 
 List<String> _stringList(Object? value, {List<String> fallback = const []}) {

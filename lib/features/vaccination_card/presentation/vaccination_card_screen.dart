@@ -14,6 +14,7 @@ import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebas
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
+import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 enum _VaccineFilter { all, late, next, done }
@@ -78,12 +79,10 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       final guardian = await _authRepository.getCurrentUser();
       if (guardian == null) throw StateError('Usuário não autenticado.');
       final person = widget.selectedPerson ?? guardian;
-      final vaccines = await _repository.getVaccines();
       if (!mounted) return;
       setState(() {
         _guardian = guardian;
         _person = person;
-        _vaccines = vaccines;
       });
       _recordsSubscription = _repository
           .watchRecordsByPerson(
@@ -104,16 +103,22 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
               if (mounted) {
                 setState(() {
                   _loading = false;
-                  _error = 'Não foi possível atualizar a carteira.';
+                  _error = 'Não foi possível carregar sua carteira agora.';
                 });
               }
             },
           );
+      try {
+        final vaccines = await _repository.getVaccines();
+        if (mounted) setState(() => _vaccines = vaccines);
+      } catch (_) {
+        // O catálogo educativo é independente do histórico de aplicações.
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Não foi possível carregar a carteira.';
+          _error = 'Não foi possível carregar sua carteira agora.';
         });
       }
     }
@@ -196,7 +201,16 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
             onChanged: (value) => setState(() => _showBooklet = value),
           ),
           const SizedBox(height: 22),
-          if (_error != null) _MessageCard(message: _error!, error: true),
+          if (_error != null) ...[
+            _MessageCard(message: _error!, error: true),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _load,
+                child: const Text('Tentar novamente'),
+              ),
+            ),
+          ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(40),
@@ -210,12 +224,10 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
               onExport: _exportPdf,
             )
           else ...[
-            TextField(
+            ExpandableSearch(
               controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Pesquisar vacina',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
+              hint: 'Pesquisar vacina',
+              onChanged: (_) => _refresh(),
             ),
             const SizedBox(height: 16),
             _Filters(
@@ -224,8 +236,10 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
             ),
             const SizedBox(height: 20),
             if (_visibleRecords.isEmpty)
-              const _MessageCard(
-                message: 'Nenhum registro encontrado para esta carteira.',
+              _MessageCard(
+                message: _records.isEmpty
+                    ? 'Sua carteira ainda não possui aplicações registradas. Quando um profissional registrar uma aplicação, ela aparecerá aqui.'
+                    : 'Nenhum registro encontrado para este filtro.',
               )
             else
               ..._visibleRecords.map(
@@ -328,7 +342,7 @@ class _Filters extends StatelessWidget {
           _VaccineFilter.all: 'Todas',
           _VaccineFilter.late: 'Atrasadas',
           _VaccineFilter.next: 'Próximas',
-          _VaccineFilter.done: 'Concluídas',
+          _VaccineFilter.done: 'Aplicadas',
         };
         return Padding(
           padding: const EdgeInsets.only(right: 8),
@@ -487,7 +501,8 @@ class _DigitalBooklet extends StatelessWidget {
         const SizedBox(height: 20),
         if (records.isEmpty)
           const _MessageCard(
-            message: 'Nenhum registro disponível na caderneta.',
+            message:
+                'Sua carteira ainda não possui aplicações registradas. Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
           )
         else
           ...groups.entries.map(
@@ -574,6 +589,8 @@ class _VaccineDetails extends StatelessWidget {
           'Data de aplicação',
           formatBrazilianDate(record.applicationDate),
         ),
+      if (record.nextDoseDate != null)
+        MapEntry('Próxima dose', formatBrazilianDate(record.nextDoseDate)),
       if ((record.batchNumber ?? '').trim().isNotEmpty)
         MapEntry('Lote', record.batchNumber!),
       if ((record.manufacturer ?? '').trim().isNotEmpty)
@@ -828,33 +845,28 @@ BoxDecoration _cardDecoration(Color color) => BoxDecoration(
 );
 
 bool _isDone(VaccinationRecord record) {
-  final status = record.status.toLowerCase();
-  return status.contains('concl') ||
-      status.contains('aplic') ||
-      status == 'applied';
+  return VaccinationRecordInsights.isApplied(record);
 }
 
 bool _isLate(VaccinationRecord record) {
-  final status = record.status.toLowerCase();
-  final date = record.nextDoseDate;
-  return status.contains('atras') ||
-      status == 'late' ||
-      (!_isDone(record) && date != null && date.isBefore(DateTime.now()));
+  return VaccinationRecordInsights.situation(record) ==
+      VaccinationRecordSituation.overdue;
 }
 
 bool _isPending(VaccinationRecord record) =>
-    !_isDone(record) && !_isLate(record);
+    VaccinationRecordInsights.situation(record) ==
+    VaccinationRecordSituation.upcoming;
 
 Color _statusColor(VaccinationRecord record) {
-  if (_isDone(record)) return const Color(0xFF268A5B);
   if (_isLate(record)) return const Color(0xFFC53D44);
-  return const Color(0xFF287EB5);
+  if (_isPending(record)) return const Color(0xFF287EB5);
+  return const Color(0xFF268A5B);
 }
 
 String _statusLabel(VaccinationRecord record) {
-  if (_isDone(record)) return 'Concluída';
   if (_isLate(record)) return 'Atrasada';
-  return 'Pendente';
+  if (_isPending(record)) return 'Próxima';
+  return 'Aplicada';
 }
 
 String _present(String? value, String fallback) {

@@ -6,8 +6,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasAuthLink() {
+      return signedIn()
+        && exists(
+          /databases/$(database)/documents/auth_links/$(request.auth.uid)
+        );
+    }
+
+    function currentPersonId() {
+      return hasAuthLink()
+        ? get(
+            /databases/$(database)/documents/auth_links/$(request.auth.uid)
+          ).data.personId
+        : request.auth.uid;
+    }
+
     function isOwner(userId) {
-      return signedIn() && request.auth.uid == userId;
+      return signedIn() && currentPersonId() == userId;
+    }
+
+    function currentUserExists() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(currentPersonId()));
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(currentPersonId()));
+    }
+
+    function hasRole(role) {
+      return currentUserExists()
+        && currentUser().data.roles is list
+        && currentUser().data.roles.hasAny([role]);
+    }
+
+    function isHealthProfessional() {
+      return hasRole('health_professional')
+        && currentUser().data.accountStatus == 'active';
     }
 
     function userExistsAfter(userId) {
@@ -28,10 +63,10 @@ service cloud.firestore {
         'managedByUserIds', 'birthDate', 'phone', 'photoUrl', 'createdAt',
         'updatedAt', 'lastLoginAt'
       ]) && request.resource.data.keys().hasOnly([
-        'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
+        'uid', 'id', 'personId', 'authUid', 'canAuthenticate', 'name', 'fullName',
         'normalizedName', 'email', 'role', 'roles', 'accountStatus', 'cpf',
         'cpfDigits', 'cpfFormatted', 'guardianIds', 'dependentIds',
-        'managedByUserIds', 'relationshipToGuardian', 'birthDate', 'phone',
+        'managedByUserIds', 'relationshipToGuardian', 'birthDate', 'majorityAt', 'phone',
         'photoUrl', 'createdAt', 'updatedAt', 'lastLoginAt'
       ]);
     }
@@ -39,7 +74,10 @@ service cloud.firestore {
     function hasValidUserTypes() {
       return request.resource.data.uid is string
         && request.resource.data.id is string
-        && request.resource.data.authUid is string
+        && (request.resource.data.authUid == null
+          || request.resource.data.authUid is string)
+        && (!request.resource.data.keys().hasAny(['personId'])
+          || request.resource.data.personId is string)
         && request.resource.data.canAuthenticate is bool
         && request.resource.data.name is string
         && request.resource.data.fullName is string
@@ -61,6 +99,9 @@ service cloud.firestore {
           || request.resource.data.relationshipToGuardian is string)
         && (request.resource.data.birthDate == null
           || request.resource.data.birthDate is timestamp)
+        && (!request.resource.data.keys().hasAny(['majorityAt'])
+          || request.resource.data.majorityAt == null
+          || request.resource.data.majorityAt is timestamp)
         && (request.resource.data.phone == null
           || request.resource.data.phone is string)
         && (request.resource.data.photoUrl == null
@@ -72,12 +113,18 @@ service cloud.firestore {
     }
 
     function validUserCreation(userId) {
-      return isOwner(userId)
+      return signedIn()
+        && request.auth.uid == userId
         && hasValidUserKeys()
         && hasValidUserTypes()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.id == request.auth.uid
+        && request.resource.data.personId == request.auth.uid
         && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.keys().hasAny(['majorityAt'])
+        && request.resource.data.birthDate is timestamp
+        && request.resource.data.majorityAt is timestamp
+        && request.resource.data.majorityAt > request.resource.data.birthDate
         && request.resource.data.canAuthenticate == true
         && request.resource.data.role == 'responsible'
         && request.resource.data.roles == ['user']
@@ -85,33 +132,48 @@ service cloud.firestore {
         && request.resource.data.cpf.size() == 11
         && request.resource.data.guardianIds.size() == 0
         && request.resource.data.dependentIds.size() == 0
-        && request.resource.data.managedByUserIds.size() == 0;
+        && request.resource.data.managedByUserIds.size() == 0
+        && existsAfter(
+          /databases/$(database)/documents/auth_links/$(request.auth.uid)
+        )
+        && getAfter(
+          /databases/$(database)/documents/auth_links/$(request.auth.uid)
+        ).data.personId == request.auth.uid;
     }
 
     function validDependentCreation(userId) {
+      let personId = currentPersonId();
       return signedIn()
         && hasValidUserKeys()
         && hasValidUserTypes()
         && request.resource.data.uid == userId
         && request.resource.data.id == userId
-        && request.resource.data.authUid == ''
+        && request.resource.data.personId == userId
+        && request.resource.data.keys().hasAny(['majorityAt'])
+        && request.resource.data.birthDate is timestamp
+        && request.resource.data.majorityAt is timestamp
+        && request.resource.data.majorityAt > request.resource.data.birthDate
+        && (request.resource.data.authUid == null
+          || request.resource.data.authUid == '')
         && request.resource.data.canAuthenticate == false
         && request.resource.data.email == ''
         && request.resource.data.role == 'dependent'
         && request.resource.data.roles == ['dependent']
         && request.resource.data.accountStatus == 'active'
-        && request.resource.data.guardianIds == [request.auth.uid]
+        && request.resource.data.guardianIds == [personId]
         && request.resource.data.dependentIds.size() == 0
-        && request.resource.data.managedByUserIds == [request.auth.uid]
+        && request.resource.data.managedByUserIds == [personId]
         && request.resource.data.relationshipToGuardian is string
         && request.resource.data.relationshipToGuardian.size() > 0
-        && userExistsAfter(request.auth.uid)
-        && userAfter(request.auth.uid).data.dependentIds.hasAny([userId]);
+        && userExistsAfter(personId)
+        && userAfter(personId).data.dependentIds.hasAny([userId]);
     }
 
     function immutableUserFields() {
       return request.resource.data.uid == resource.data.uid
         && request.resource.data.id == resource.data.id
+        && request.resource.data.get('personId', '')
+          == resource.data.get('personId', '')
         && request.resource.data.authUid == resource.data.authUid
         && request.resource.data.canAuthenticate == resource.data.canAuthenticate
         && request.resource.data.email == resource.data.email
@@ -121,6 +183,9 @@ service cloud.firestore {
         && request.resource.data.cpf == resource.data.cpf
         && request.resource.data.cpfDigits == resource.data.cpfDigits
         && request.resource.data.cpfFormatted == resource.data.cpfFormatted
+        && request.resource.data.birthDate == resource.data.birthDate
+        && request.resource.data.get('majorityAt', null)
+          == resource.data.get('majorityAt', null)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.guardianIds == resource.data.guardianIds
         && request.resource.data.dependentIds == resource.data.dependentIds
@@ -129,13 +194,15 @@ service cloud.firestore {
 
     function onlyAllowedUserChanges() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'name', 'fullName', 'normalizedName', 'birthDate', 'phone', 'photoUrl',
+        'name', 'fullName', 'normalizedName', 'phone', 'photoUrl',
         'updatedAt', 'lastLoginAt'
       ]);
     }
 
     function validDependentLinkUpdate(userId) {
-      return isOwner(userId)
+      let personId = currentPersonId();
+      return signedIn()
+        && userId == personId
         && hasValidUserKeys()
         && hasValidUserTypes()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -164,25 +231,203 @@ service cloud.firestore {
           request.resource.data.dependentIds[
             request.resource.data.dependentIds.size() - 1
           ]
-        ).data.guardianIds == [request.auth.uid]
+        ).data.guardianIds == [personId]
         && userAfter(
           request.resource.data.dependentIds[
             request.resource.data.dependentIds.size() - 1
           ]
-        ).data.managedByUserIds == [request.auth.uid];
+        ).data.managedByUserIds == [personId];
+    }
+
+    function validCpfRegistryCreation(cpfHash) {
+      let personId = currentPersonId();
+      return signedIn()
+        && cpfHash.size() == 64
+        && request.resource.data.ownerUid is string
+        && request.resource.data.createdAt is timestamp
+        && ((request.resource.data.keys().hasAll(['ownerUid', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
+            && request.resource.data.ownerUid == personId)
+          || (request.resource.data.keys().hasAll([
+                'ownerUid', 'guardianUid', 'createdAt'
+              ])
+            && request.resource.data.keys().hasOnly([
+                'ownerUid', 'guardianUid', 'createdAt'
+            ])
+            && request.resource.data.guardianUid == personId
+            && userExistsAfter(request.resource.data.ownerUid)
+            && userAfter(request.resource.data.ownerUid).data.guardianIds
+              == [personId]
+            && userAfter(request.resource.data.ownerUid).data.managedByUserIds
+              == [personId]));
+    }
+
+    function hasValidVaccinationRecordKeys() {
+      return request.resource.data.keys().hasAll([
+        'patientId', 'vaccineId', 'vaccineName', 'doseLabel', 'appliedAt',
+        'professionalUid', 'source', 'createdAt', 'updatedAt'
+      ]) && request.resource.data.keys().hasOnly([
+        'patientId', 'vaccineId', 'vaccineName', 'doseLabel', 'doseNumber',
+        'appliedAt', 'nextDoseAt', 'lot', 'manufacturer', 'facilityId',
+        'facilityName', 'professionalUid', 'notes', 'source', 'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    function hasValidVaccinationRecordTypes() {
+      return request.resource.data.patientId is string
+        && request.resource.data.patientId.size() > 0
+        && request.resource.data.vaccineId is string
+        && request.resource.data.vaccineId.size() > 0
+        && request.resource.data.vaccineName is string
+        && request.resource.data.vaccineName.size() > 0
+        && request.resource.data.doseLabel is string
+        && request.resource.data.doseLabel.size() > 0
+        && request.resource.data.appliedAt is timestamp
+        && request.resource.data.professionalUid is string
+        && request.resource.data.professionalUid.size() > 0
+        && request.resource.data.source is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (!request.resource.data.keys().hasAny(['doseNumber'])
+          || request.resource.data.doseNumber is int)
+        && (!request.resource.data.keys().hasAny(['nextDoseAt'])
+          || request.resource.data.nextDoseAt is timestamp)
+        && (!request.resource.data.keys().hasAny(['lot'])
+          || request.resource.data.lot is string)
+        && (!request.resource.data.keys().hasAny(['manufacturer'])
+          || request.resource.data.manufacturer is string)
+        && (!request.resource.data.keys().hasAny(['facilityId'])
+          || request.resource.data.facilityId is string)
+        && (!request.resource.data.keys().hasAny(['facilityName'])
+          || request.resource.data.facilityName is string)
+        && (!request.resource.data.keys().hasAny(['notes'])
+          || request.resource.data.notes is string);
+    }
+
+    function validVaccinationRecordCreation() {
+      return isHealthProfessional()
+        && hasValidVaccinationRecordKeys()
+        && hasValidVaccinationRecordTypes()
+        && request.resource.data.professionalUid == request.auth.uid
+        && request.resource.data.source == 'professional_panel'
+        && exists(
+          /databases/$(database)/documents/users/$(request.resource.data.patientId)
+        )
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function relationshipId(fromPersonId, toPersonId) {
+      return fromPersonId + '_' + toPersonId;
+    }
+
+    function hasVerifiedMinorRelationship(subjectPersonId) {
+      let path = /databases/$(database)/documents/relationships/$(relationshipId(currentPersonId(), subjectPersonId));
+      return exists(path)
+        && get(path).data.fromPersonId == currentPersonId()
+        && get(path).data.toPersonId == subjectPersonId
+        && get(path).data.status == 'verified'
+        && get(path).data.permissions.viewVaccination == true
+        && get(path).data.type in [
+          'mother', 'father', 'legal_guardian', 'tutor'
+        ]
+        && exists(/databases/$(database)/documents/users/$(subjectPersonId))
+        && get(
+          /databases/$(database)/documents/users/$(subjectPersonId)
+        ).data.majorityAt is timestamp
+        && request.time < get(
+          /databases/$(database)/documents/users/$(subjectPersonId)
+        ).data.majorityAt;
+    }
+
+    function hasAdultVaccinationGrant(subjectPersonId) {
+      let grantPath = /databases/$(database)/documents/access_grants/$(relationshipId(currentPersonId(), subjectPersonId));
+      return exists(grantPath)
+        && get(grantPath).data.granteePersonId == currentPersonId()
+        && get(grantPath).data.subjectPersonId == subjectPersonId
+        && get(grantPath).data.viewVaccination == true
+        && get(grantPath).data.consentStatus == 'granted'
+        && (get(grantPath).data.validUntil == null
+          || request.time < get(grantPath).data.validUntil);
+    }
+
+    function canReadVaccination(subjectPersonId) {
+      return signedIn()
+        && (subjectPersonId == currentPersonId()
+          || hasVerifiedMinorRelationship(subjectPersonId)
+          || hasAdultVaccinationGrant(subjectPersonId));
+    }
+
+    function validPendingRelationshipCreation(relationshipId) {
+      return signedIn()
+        && request.resource.data.keys().hasAll([
+          'fromPersonId', 'toPersonId', 'type', 'status', 'permissions',
+          'consentStatus', 'verificationSource', 'verifiedAt', 'validUntil',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'fromPersonId', 'toPersonId', 'type', 'status', 'permissions',
+          'consentStatus', 'verificationSource', 'verifiedAt', 'validUntil',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.fromPersonId == currentPersonId()
+        && request.resource.data.toPersonId is string
+        && request.resource.data.toPersonId != currentPersonId()
+        && relationshipId == request.resource.data.fromPersonId
+          + '_' + request.resource.data.toPersonId
+        && request.resource.data.type in [
+          'mother', 'father', 'legal_guardian', 'tutor', 'caregiver'
+        ]
+        && request.resource.data.status == 'pending'
+        && request.resource.data.permissions is map
+        && request.resource.data.permissions.viewVaccination == false
+        && request.resource.data.permissions.receiveNotifications == false
+        && request.resource.data.consentStatus in [
+          'not_required_minor', 'pending'
+        ]
+        && request.resource.data.verificationSource == 'manual_pending'
+        && request.resource.data.verifiedAt == null
+        && request.resource.data.validUntil == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && userExistsAfter(request.resource.data.toPersonId);
+    }
+
+    match /auth_links/{authUid} {
+      allow get: if signedIn() && request.auth.uid == authUid;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.auth.uid == authUid
+        && request.resource.data.keys().hasAll(['personId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['personId', 'createdAt'])
+        && request.resource.data.personId == authUid
+        && request.resource.data.createdAt == request.time
+        && userExistsAfter(authUid)
+        && userAfter(authUid).data.personId == authUid
+        && userAfter(authUid).data.authUid == authUid
+        && userAfter(authUid).data.canAuthenticate == true;
+      allow update, delete: if false;
     }
 
     match /users/{userId} {
-      allow create: if validUserCreation(userId) || validDependentCreation(userId);
+      allow create: if (userId == request.auth.uid
+          && validUserCreation(userId))
+        || (userId != request.auth.uid && validDependentCreation(userId));
       allow get: if isOwner(userId)
-        || (signedIn() && resource.data.managedByUserIds.hasAny([request.auth.uid]));
+        || (signedIn()
+          && resource.data.managedByUserIds.hasAny([currentPersonId()]));
       allow list: if false;
-      allow update: if (isOwner(userId)
+      allow update: if (request.resource.data.diff(resource.data)
+          .affectedKeys().hasAny(['dependentIds'])
+          && validDependentLinkUpdate(userId))
+        || (!request.resource.data.diff(resource.data)
+            .affectedKeys().hasAny(['dependentIds'])
+          && isOwner(userId)
           && hasValidUserKeys()
           && hasValidUserTypes()
           && immutableUserFields()
-          && onlyAllowedUserChanges())
-        || validDependentLinkUpdate(userId);
+          && onlyAllowedUserChanges());
       allow delete: if false;
 
       match /devices/{deviceId} {
@@ -193,25 +438,7 @@ service cloud.firestore {
     match /cpf_registry/{cpfHash} {
       allow get: if signedIn();
       allow list: if false;
-      allow create: if signedIn()
-        && cpfHash.size() == 64
-        && request.resource.data.ownerUid is string
-        && request.resource.data.createdAt is timestamp
-        && ((request.resource.data.keys().hasAll(['ownerUid', 'createdAt'])
-            && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
-            && request.resource.data.ownerUid == request.auth.uid)
-          || (request.resource.data.keys().hasAll([
-                'ownerUid', 'guardianUid', 'createdAt'
-              ])
-            && request.resource.data.keys().hasOnly([
-                'ownerUid', 'guardianUid', 'createdAt'
-            ])
-            && request.resource.data.guardianUid == request.auth.uid
-            && userExistsAfter(request.resource.data.ownerUid)
-            && userAfter(request.resource.data.ownerUid).data.guardianIds
-              == [request.auth.uid]
-            && userAfter(request.resource.data.ownerUid).data.managedByUserIds
-              == [request.auth.uid]));
+      allow create: if validCpfRegistryCreation(cpfHash);
       allow update, delete: if false;
     }
 
@@ -223,10 +450,32 @@ service cloud.firestore {
         && resource.data.responsibleId == request.auth.uid;
     }
 
+    match /relationships/{relationshipDocumentId} {
+      allow get: if signedIn()
+        && (resource.data.fromPersonId == currentPersonId()
+          || resource.data.toPersonId == currentPersonId());
+      allow list: if false;
+      allow create: if validPendingRelationshipCreation(
+        relationshipDocumentId
+      );
+      allow update, delete: if false;
+    }
+
+    match /access_grants/{grantId} {
+      allow get: if signedIn()
+        && (resource.data.granteePersonId == currentPersonId()
+          || resource.data.subjectPersonId == currentPersonId());
+      allow list, create, update, delete: if false;
+    }
+
     match /vaccination_records/{recordId} {
       allow read: if signedIn()
-        && resource.data.responsibleId == request.auth.uid;
-      allow write: if false;
+        && ((resource.data.keys().hasAny(['patientId'])
+            && canReadVaccination(resource.data.patientId))
+          || (resource.data.keys().hasAny(['patientUid'])
+            && resource.data.patientUid == request.auth.uid));
+      allow create: if validVaccinationRecordCreation();
+      allow update, delete: if false;
     }
 
     match /vaccines/{vaccineId} {

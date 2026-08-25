@@ -8,23 +8,33 @@ import 'package:vitta_mobile/features/auth/data/cpf_registry_key.dart'
     as cpf_registry;
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
+import 'package:vitta_mobile/features/people/data/repositories/firebase_person_identity_repository.dart';
+import 'package:vitta_mobile/features/people/domain/models/relationship.dart';
+import 'package:vitta_mobile/features/people/domain/repositories/person_identity_repository.dart';
 
 class FirebasePeopleRepository implements PeopleRepository {
   FirebasePeopleRepository({
     FirebaseFirestore? firestore,
     FirebaseAuth? firebaseAuth,
+    PersonIdentityRepository? identityRepository,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
+       _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
+       _identityRepository =
+           identityRepository ??
+           FirebasePersonIdentityRepository(
+             firestore: firestore ?? FirebaseFirestore.instance,
+           );
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _firebaseAuth;
+  final PersonIdentityRepository _identityRepository;
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
   @override
   Future<List<AppUser>> getAvailablePeople(String guardianId) async {
-    _assertGuardian(guardianId);
+    await _assertGuardian(guardianId);
     final guardianSnapshot = await _users.doc(guardianId).get();
     final guardianData = guardianSnapshot.data();
     if (!guardianSnapshot.exists || guardianData == null) return const [];
@@ -53,7 +63,7 @@ class FirebasePeopleRepository implements PeopleRepository {
     required String relationship,
     required String cpf,
   }) async {
-    _assertGuardian(guardianId);
+    await _assertGuardian(guardianId);
     final formattedName = formatPersonName(name);
     final nameError = validateFullName(formattedName);
     if (nameError != null) throw StateError(nameError);
@@ -69,7 +79,8 @@ class FirebasePeopleRepository implements PeopleRepository {
     final now = DateTime.now();
     final dependent = AppUser(
       uid: dependentDocument.id,
-      authUid: '',
+      personId: dependentDocument.id,
+      authUid: null,
       canAuthenticate: false,
       name: formattedName,
       email: '',
@@ -78,6 +89,7 @@ class FirebasePeopleRepository implements PeopleRepository {
       accountStatus: 'active',
       cpf: cpfDigits,
       birthDate: birthDate,
+      majorityAt: calculateMajorityAt(birthDate),
       guardianIds: [guardianId],
       managedByUserIds: [guardianId],
       relationshipToGuardian: relationship.trim(),
@@ -117,13 +129,51 @@ class FirebasePeopleRepository implements PeopleRepository {
         'guardianUid': guardianId,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      final relationshipId = PersonRelationship.deterministicId(
+        guardianId,
+        dependent.uid,
+      );
+      transaction.set(
+        _firestore.collection('relationships').doc(relationshipId),
+        {
+          'fromPersonId': guardianId,
+          'toPersonId': dependent.uid,
+          'type': _relationshipType(relationship),
+          'status': 'pending',
+          'permissions': {
+            'viewVaccination': false,
+            'receiveNotifications': false,
+          },
+          'consentStatus': 'not_required_minor',
+          'verificationSource': 'manual_pending',
+          'verifiedAt': null,
+          'validUntil': null,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
     });
     return dependent;
   }
 
-  void _assertGuardian(String guardianId) {
-    if (_firebaseAuth.currentUser?.uid != guardianId) {
+  Future<void> _assertGuardian(String guardianId) async {
+    final authUid = _firebaseAuth.currentUser?.uid;
+    final currentPersonId = authUid == null
+        ? null
+        : await _identityRepository.resolvePersonId(authUid);
+    if (currentPersonId != guardianId) {
       throw StateError('Sessão inválida para gerenciar dependentes.');
     }
   }
+}
+
+String _relationshipType(String value) {
+  final normalized = value.toLowerCase();
+  if (normalized.contains('mãe') || normalized.contains('mae')) return 'mother';
+  if (normalized.contains('pai')) return 'father';
+  if (normalized.contains('tutor')) return 'tutor';
+  if (normalized.contains('respons') || normalized.contains('guard')) {
+    return 'legal_guardian';
+  }
+  return 'caregiver';
 }

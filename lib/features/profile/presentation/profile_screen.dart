@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
-import 'package:vitta_mobile/core/input_formatters/date_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
-import 'package:vitta_mobile/core/validators/birth_date_validator.dart';
 import 'package:vitta_mobile/core/validators/full_name_validator.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
@@ -126,77 +125,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.only(bottom: AppSpacing.xl),
                 children: [
-                  Container(
-                    height: 124,
-                    color: vittaBlue,
-                    padding: const EdgeInsets.fromLTRB(10, 12, 18, 16),
+                  AppPageHeader(
+                    title: 'Perfil',
+                    showBack: true,
+                    action: TextButton(
+                      onPressed: _editProfile,
+                      child: const Text('Editar'),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.normal,
+                    ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => Navigator.of(context).maybePop(),
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                              ),
-                              tooltip: 'Voltar',
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: _editProfile,
-                              icon: const Icon(
-                                Icons.edit_outlined,
-                                color: Colors.white,
-                              ),
-                              tooltip: 'Editar dados',
-                            ),
-                          ],
-                        ),
-                        Expanded(
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.normal),
+                          decoration: AppCardStyle.decoration(),
                           child: Row(
                             children: [
-                              const SizedBox(width: 8),
                               CircleAvatar(
-                                radius: 26,
-                                backgroundColor: vittaDarkBlue,
+                                radius: 24,
+                                backgroundColor: AppColors.primarySoft,
+                                foregroundColor: AppColors.primaryDark,
                                 child: Text(
                                   _initials(name),
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 14),
+                              const SizedBox(width: AppSpacing.md),
                               Expanded(
-                                child: Text(
-                                  '$name\nCPF $cpf\n$email',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(email, style: AppTypography.caption),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'CPF $cpf  •  Nascimento $birthDate',
+                                      style: AppTypography.caption,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(36, 20, 36, 28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _AccessLevel(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.lg),
                         const _Label('Conta'),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         _SettingsGroup(
                           children: [
                             _SettingsRow(
                               icon: Icons.person_outline,
-                              title: 'Dados Pessoais',
+                              title: 'Dados pessoais',
                               subtitle: 'Nascimento: $birthDate',
                               onTap: _editProfile,
                             ),
@@ -206,37 +200,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitle: _filled(user?.phone, email),
                               onTap: _editProfile,
                             ),
-                            const _SettingsRow(
-                              icon: Icons.fingerprint,
-                              title: 'Biometria',
-                              trailing: _ToggleOff(),
-                            ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        const _Label('Preferencias'),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _Label('Preferências'),
+                        const SizedBox(height: AppSpacing.sm),
                         const _SettingsGroup(
                           children: [
                             _SettingsRow(
                               icon: Icons.dark_mode_outlined,
-                              title: 'Tema Escuro',
+                              title: 'Tema escuro',
                               trailing: _ToggleOff(),
                             ),
                             _SettingsRow(
                               icon: Icons.settings_outlined,
-                              title: 'Configuracoes Avancadas',
+                              title: 'Configurações',
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.lg),
                         const _Label('Suporte'),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         const _SettingsGroup(
                           children: [
                             _SettingsRow(
                               icon: Icons.help_outline,
-                              title: 'Central de Ajuda',
+                              title: 'Central de ajuda',
                             ),
                             _SettingsRow(
                               icon: Icons.security_outlined,
@@ -244,15 +233,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.lg),
                         OutlinedButton.icon(
                           onPressed: _signOut,
-                          icon: const Icon(Icons.logout, size: 16),
+                          icon: const Icon(Icons.logout, size: 17),
                           label: const Text('Sair da conta'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            minimumSize: const Size.fromHeight(36),
-                            side: const BorderSide(color: Color(0xFFE4E8EC)),
+                            foregroundColor: AppColors.danger,
+                            minimumSize: const Size.fromHeight(42),
+                            side: const BorderSide(color: AppColors.border),
                           ),
                         ),
                       ],
@@ -288,22 +277,6 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   late final _phoneController = TextEditingController(
     text: widget.user.phone ?? '',
   );
-
-  Future<void> _pickBirthDate() async {
-    final today = DateTime.now();
-    final current = parseBirthDate(_birthDateController.text);
-    final selected = await showDatePicker(
-      context: context,
-      locale: const Locale('pt', 'BR'),
-      initialDate:
-          current ?? widget.user.birthDate ?? DateTime(today.year - 18),
-      firstDate: DateTime(1900),
-      lastDate: DateTime(today.year, today.month, today.day),
-    );
-    if (selected != null) {
-      _birthDateController.text = formatBrazilianDate(selected);
-    }
-  }
 
   @override
   void dispose() {
@@ -353,18 +326,12 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _birthDateController,
-                decoration: InputDecoration(
+                enabled: false,
+                decoration: const InputDecoration(
                   labelText: 'Data de nascimento',
-                  hintText: 'DD/MM/AAAA',
-                  suffixIcon: IconButton(
-                    tooltip: 'Selecionar data',
-                    onPressed: _pickBirthDate,
-                    icon: const Icon(Icons.calendar_month),
-                  ),
+                  helperText:
+                      'A data é protegida para preservar a maioridade calculada.',
                 ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [DateInputFormatter()],
-                validator: validateBirthDate,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -394,28 +361,6 @@ class _ProfileEditorState extends State<_ProfileEditor> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AccessLevel extends StatelessWidget {
-  const _AccessLevel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD6DDE4)),
-      ),
-      child: const Text(
-        'nivel ouro - Acesso Completo',
-        style: TextStyle(fontSize: 9),
       ),
     );
   }
@@ -477,8 +422,8 @@ class _SettingsRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 42),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Color(0xFFE9EDF1))),
         ),
@@ -491,7 +436,7 @@ class _SettingsRow extends StatelessWidget {
                 TextSpan(
                   text: title,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
                   children: [
@@ -499,7 +444,7 @@ class _SettingsRow extends StatelessWidget {
                       TextSpan(
                         text: '\n$subtitle',
                         style: const TextStyle(
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: FontWeight.w400,
                           color: Colors.black54,
                         ),

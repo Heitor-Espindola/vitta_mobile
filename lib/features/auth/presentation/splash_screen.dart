@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
 import 'package:vitta_mobile/features/auth/presentation/login_screen.dart';
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
 
@@ -22,6 +23,12 @@ class _SplashScreenState extends State<SplashScreen> {
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (snapshot.hasError) {
+        return LoginScreen(
+          authRepository: _repository,
+          initialErrorMessage: mapSignInError(snapshot.error!),
+        );
       }
       final user = snapshot.data;
       if (user == null) return LoginScreen(authRepository: _repository);

@@ -10,6 +10,8 @@ import 'package:vitta_mobile/features/information/data/news_api_service.dart';
 import 'package:vitta_mobile/features/information/data/news_repository.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
+import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
+import 'package:vitta_mobile/features/information/domain/services/news_relevance_filter.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
@@ -66,6 +68,35 @@ void main() {
   });
 
   group('NewsApiService', () {
+    test('accepts vaccine news and rejects unrelated politics', () {
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Campanha de vacinação começa hoje',
+            url: 'https://example.com/vacina',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Congresso debate nova proposta política',
+            description: 'Votação acontece nesta semana.',
+            url: 'https://example.com/politica',
+          ),
+        ),
+        isFalse,
+      );
+    });
+
+    test('categories use vaccine-specific queries', () {
+      expect(NewsCategory.hpv.query, contains('HPV'));
+      expect(NewsCategory.influenza.query, contains('influenza'));
+    });
+
     test('parses a valid response and encodes query parameters', () async {
       late Uri requestedUri;
       final client = MockClient((request) async {
@@ -260,7 +291,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Notícias externas'), findsOneWidget);
+    expect(find.text('Notícias recentes'), findsOneWidget);
     expect(find.text('Agência Saúde · Data não informada'), findsOneWidget);
     expect(find.text('Campanha nacional de vacinação'), findsOneWidget);
     expect(find.text('Ler notícia'), findsOneWidget);

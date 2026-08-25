@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
@@ -10,9 +9,10 @@ import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.
 import 'package:vitta_mobile/features/auth/presentation/widgets/password_reset_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.authRepository});
+  const LoginScreen({super.key, this.authRepository, this.initialErrorMessage});
 
   final AuthRepository? authRepository;
+  final String? initialErrorMessage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -29,6 +29,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   AuthRepository get _authRepository =>
       widget.authRepository ?? FirebaseAuthRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _errorMessage = widget.initialErrorMessage;
+  }
 
   @override
   void dispose() {
@@ -58,12 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
-    } on FirebaseAuthException catch (error) {
+    } catch (error) {
       setState(() => _errorMessage = mapSignInError(error));
-    } catch (_) {
-      setState(
-        () => _errorMessage = 'Nao foi possivel entrar. Tente novamente.',
-      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

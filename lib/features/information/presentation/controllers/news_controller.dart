@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/core/errors/news_exception.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
+import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 
 enum NewsState { initial, loading, success, empty, error, loadingMore }
@@ -16,6 +17,7 @@ class NewsController extends ChangeNotifier {
   bool hasMore = true;
   int currentPage = 0;
   String currentQuery = '';
+  NewsCategory selectedCategory = NewsCategory.forYou;
 
   bool get isLoading => state == NewsState.loading;
   bool get isLoadingMore => state == NewsState.loadingMore;
@@ -29,7 +31,15 @@ class NewsController extends ChangeNotifier {
     await _load(reset: true);
   }
 
+  Future<void> selectCategory(NewsCategory category) async {
+    if (selectedCategory == category && state != NewsState.initial) return;
+    selectedCategory = category;
+    currentQuery = category.query;
+    await _load(reset: true);
+  }
+
   Future<void> clearSearch() async {
+    selectedCategory = NewsCategory.forYou;
     currentQuery = '';
     await _load(reset: true);
   }

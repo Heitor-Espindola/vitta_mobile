@@ -50,7 +50,7 @@ void main() {
     expect(record.childId, 'person-id');
     expect(record.personId, 'person-id');
     expect(record.batchNumber, 'LOT-1');
-    expect(record.toMap()['professionalId'], 'professional-id');
+    expect(record.toMap()['professionalUid'], 'professional-id');
   });
 
   test('vaccine supports sourced educational content', () {

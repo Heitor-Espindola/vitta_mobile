@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitta_mobile/core/constants/app_roles.dart';
@@ -27,6 +28,29 @@ void main() {
     await tester.pump();
     expect(find.byType(HomeScreen), findsOneWidget);
   });
+
+  testWidgets(
+    'AuthGate exposes Firestore permission-denied instead of hiding it',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SplashScreen(
+            authRepository: FakeAuthRepository(
+              null,
+              streamError: FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'permission-denied',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.textContaining('permission-denied'), findsOneWidget);
+    },
+  );
 }
 
 final testUser = AppUser(
@@ -37,12 +61,15 @@ final testUser = AppUser(
 );
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository(this.user);
+  FakeAuthRepository(this.user, {this.streamError});
 
   final AppUser? user;
+  final Object? streamError;
 
   @override
-  Stream<AppUser?> authStateChanges() => Stream.value(user);
+  Stream<AppUser?> authStateChanges() => streamError == null
+      ? Stream.value(user)
+      : Stream<AppUser?>.error(streamError!);
 
   @override
   Future<AppUser?> getCurrentUser() async => user;
