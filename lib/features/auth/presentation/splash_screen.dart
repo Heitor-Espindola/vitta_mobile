@@ -1,47 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
+import 'package:vitta_mobile/features/auth/presentation/login_screen.dart';
+import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, this.authRepository});
-
   final AuthRepository? authRepository;
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  AuthRepository get _authRepository =>
+  late final AuthRepository _repository =
       widget.authRepository ?? FirebaseAuthRepository();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _redirect());
-  }
-
-  Future<void> _redirect() async {
-    final navigator = Navigator.of(context);
-    try {
-      final user = await _authRepository.getCurrentUser();
-      if (!mounted) {
-        return;
+  Widget build(BuildContext context) => StreamBuilder<AppUser?>(
+    stream: _repository.authStateChanges(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
-      navigator.pushReplacementNamed(
-        user == null ? AppRoutes.login : AppRoutes.home,
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
+      if (snapshot.hasError) {
+        return LoginScreen(
+          authRepository: _repository,
+          initialErrorMessage: mapSignInError(snapshot.error!),
+        );
       }
-      navigator.pushReplacementNamed(AppRoutes.login);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
+      final user = snapshot.data;
+      if (user == null) return LoginScreen(authRepository: _repository);
+      return HomeScreen(authRepository: _repository);
+    },
+  );
 }

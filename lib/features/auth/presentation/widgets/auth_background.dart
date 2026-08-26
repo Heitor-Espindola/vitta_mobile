@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AuthBackground extends StatelessWidget {
   const AuthBackground({required this.child, this.showBadge = true, super.key});
@@ -96,6 +97,10 @@ class AuthTextField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.validator,
+    this.inputFormatters,
+    this.suffixIcon,
+    this.onTap,
+    this.onChanged,
     super.key,
   });
 
@@ -105,6 +110,10 @@ class AuthTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final FormFieldValidator<String>? validator;
+  final List<TextInputFormatter>? inputFormatters;
+  final Widget? suffixIcon;
+  final VoidCallback? onTap;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -113,11 +122,15 @@ class AuthTextField extends StatelessWidget {
       keyboardType: keyboardType,
       obscureText: obscureText,
       validator: validator,
+      inputFormatters: inputFormatters,
+      onTap: onTap,
+      onChanged: onChanged,
       style: const TextStyle(color: Colors.white),
       cursorColor: Colors.white,
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
+        suffixIcon: suffixIcon,
         labelStyle: const TextStyle(color: Color(0xFFDCE8F3)),
         hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36)),
         filled: true,

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
 
-const vittaDarkBlue = Color(0xFF2B6D9D);
-const vittaBlue = Color(0xFF3A92D3);
+const vittaDarkBlue = AppColors.primaryDark;
+const vittaBlue = AppColors.primary;
 const vittaSoftBlue = Color(0xFF78B5D4);
 const vittaLineBlue = Color(0xFF83ACD4);
 const vittaPink = Color(0xFFFF3DAD);
-const vittaSurface = Color(0xFFF8FAFC);
+const vittaSurface = AppColors.background;
 
-enum VittaTab { home, card, content, vaccines }
+enum VittaTab { home, card, content, vaccines, profile }
 
 class VittaMobileShell extends StatelessWidget {
   const VittaMobileShell({
@@ -17,13 +18,15 @@ class VittaMobileShell extends StatelessWidget {
     required this.currentTab,
     required this.body,
     this.showGreetingHeader = false,
-    this.appBarHeight = 78,
+    this.showTopBar = true,
+    this.appBarHeight = 58,
   });
 
   final String title;
   final VittaTab currentTab;
   final Widget body;
   final bool showGreetingHeader;
+  final bool showTopBar;
   final double appBarHeight;
 
   @override
@@ -36,7 +39,7 @@ class VittaMobileShell extends StatelessWidget {
           children: [
             if (showGreetingHeader)
               const SizedBox(height: 12)
-            else
+            else if (showTopBar)
               VittaTopBar(title: title, height: appBarHeight),
             Expanded(child: body),
           ],
@@ -59,47 +62,23 @@ class VittaTopBar extends StatelessWidget {
       height: height,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [vittaDarkBlue, vittaBlue],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
+          colors: [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        border: Border(bottom: BorderSide(color: Color(0xFF1599F5), width: 3)),
+        border: Border(bottom: BorderSide(color: Color(0xFFE8F0F5))),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            left: 54,
-            right: 88,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                ),
-              ),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.pageTitle,
           ),
-          Positioned(
-            right: 20,
-            top: 12,
-            child: IconButton.filledTonal(
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.profile),
-              icon: const Icon(Icons.person_outline, color: Colors.white),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.white, width: 1.2),
-                fixedSize: const Size(54, 54),
-              ),
-              tooltip: 'Perfil',
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -112,47 +91,64 @@ class VittaBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-
-    return Container(
-      height: 54 + bottomPadding,
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      decoration: const BoxDecoration(
-        color: vittaSoftBlue,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          _NavItem(
-            icon: Icons.home_outlined,
-            label: 'Inicio',
-            tab: VittaTab.home,
-            currentTab: currentTab,
-            routeName: AppRoutes.home,
-          ),
-          _NavItem(
-            icon: Icons.article_outlined,
-            label: 'Carteira',
-            tab: VittaTab.card,
-            currentTab: currentTab,
-            routeName: AppRoutes.vaccinationCard,
-          ),
-          _NavItem(
-            icon: Icons.menu_book_outlined,
-            label: 'Conteudo',
-            tab: VittaTab.content,
-            currentTab: currentTab,
-            routeName: AppRoutes.information,
-          ),
-          _NavItem(
-            icon: Icons.vaccines_outlined,
-            label: 'Vacinas',
-            tab: VittaTab.vaccines,
-            currentTab: currentTab,
-            routeName: AppRoutes.vaccines,
-          ),
-        ],
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottomInset),
+      child: Container(
+        height: 62,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.large),
+          border: Border.all(color: const Color(0xFFE8EDF0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x180C527E),
+              blurRadius: 14,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _NavItem(
+              icon: Icons.home_outlined,
+              label: 'Início',
+              tab: VittaTab.home,
+              currentTab: currentTab,
+              routeName: AppRoutes.home,
+            ),
+            _NavItem(
+              icon: Icons.article_outlined,
+              label: 'Carteira',
+              tab: VittaTab.card,
+              currentTab: currentTab,
+              routeName: AppRoutes.vaccinationCard,
+            ),
+            _NavItem(
+              icon: Icons.menu_book_outlined,
+              label: 'Conteúdo',
+              tab: VittaTab.content,
+              currentTab: currentTab,
+              routeName: AppRoutes.information,
+            ),
+            _NavItem(
+              icon: Icons.vaccines_outlined,
+              label: 'Vacinas',
+              tab: VittaTab.vaccines,
+              currentTab: currentTab,
+              routeName: AppRoutes.vaccines,
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Perfil',
+              tab: VittaTab.profile,
+              currentTab: currentTab,
+              routeName: AppRoutes.profile,
+              replaceCurrentRoute: false,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -165,6 +161,7 @@ class _NavItem extends StatelessWidget {
     required this.tab,
     required this.currentTab,
     required this.routeName,
+    this.replaceCurrentRoute = true,
   });
 
   final IconData icon;
@@ -172,31 +169,60 @@ class _NavItem extends StatelessWidget {
   final VittaTab tab;
   final VittaTab currentTab;
   final String routeName;
+  final bool replaceCurrentRoute;
 
   @override
   Widget build(BuildContext context) {
     final selected = currentTab == tab;
-    final color = selected ? Colors.white : vittaDarkBlue;
+    final color = selected ? vittaDarkBlue : const Color(0xFF849199);
 
     return Expanded(
       child: InkWell(
         onTap: selected
             ? null
-            : () => Navigator.of(context).pushReplacementNamed(routeName),
-        child: Container(
+            : () {
+                if (replaceCurrentRoute) {
+                  Navigator.of(context).pushReplacementNamed(routeName);
+                } else {
+                  Navigator.of(context).pushNamed(routeName);
+                }
+              },
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           height: double.infinity,
-          color: selected ? const Color(0xFF3E82B3) : Colors.transparent,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          decoration: const BoxDecoration(color: Colors.transparent),
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Icon(icon, color: color, size: 27),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color, size: selected ? 22 : 21),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 9,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                bottom: 1,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: selected ? 5 : 0,
+                  height: selected ? 5 : 0,
+                  decoration: const BoxDecoration(
+                    color: vittaDarkBlue,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
             ],
@@ -207,17 +233,155 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+class AppPageHeader extends StatelessWidget {
+  const AppPageHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.showBack = false,
+    this.action,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool showBack;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.normal,
+      AppSpacing.sm,
+      AppSpacing.normal,
+      AppSpacing.md,
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showBack) ...[
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Voltar',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.pageTitle),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle!, style: AppTypography.caption),
+              ],
+            ],
+          ),
+        ),
+        ?action,
+      ],
+    ),
+  );
+}
+
+class ExpandableSearch extends StatefulWidget {
+  const ExpandableSearch({
+    super.key,
+    required this.controller,
+    this.hint = 'Pesquisar',
+    this.onChanged,
+    this.onSubmitted,
+    this.onClosed,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onClosed;
+
+  @override
+  State<ExpandableSearch> createState() => _ExpandableSearchState();
+}
+
+class _ExpandableSearchState extends State<ExpandableSearch> {
+  final _focusNode = FocusNode();
+  bool _expanded = false;
+
+  void _open() {
+    setState(() => _expanded = true);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
+  }
+
+  void _close() {
+    widget.controller.clear();
+    widget.onChanged?.call('');
+    widget.onClosed?.call();
+    _focusNode.unfocus();
+    setState(() => _expanded = false);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    child: _expanded
+        ? SizedBox(
+            key: const ValueKey('expanded-search'),
+            height: 44,
+            child: TextField(
+              key: const Key('expandable-search-field'),
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                suffixIcon: IconButton(
+                  tooltip: 'Fechar pesquisa',
+                  onPressed: _close,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
+              ),
+            ),
+          )
+        : Align(
+            key: const ValueKey('collapsed-search'),
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              tooltip: 'Pesquisar',
+              onPressed: _open,
+              icon: const Icon(Icons.search_rounded),
+            ),
+          ),
+  );
+}
+
 class VittaSearchField extends StatelessWidget {
   const VittaSearchField({
     super.key,
     this.hint = 'Pesquise',
     this.controller,
     this.onChanged,
+    this.onSubmitted,
+    this.onSearchTap,
   });
 
   final String hint;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onSearchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -226,10 +390,15 @@ class VittaSearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(fontSize: 12),
-          suffixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: IconButton(
+            tooltip: 'Pesquisar',
+            onPressed: onSearchTap,
+            icon: const Icon(Icons.search, size: 18),
+          ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           filled: true,
           fillColor: const Color(0xFFF4F8FB),
@@ -365,12 +534,12 @@ class StatusChip extends StatelessWidget {
 String statusLabel(String status) {
   switch (status.toLowerCase()) {
     case 'applied':
-      return 'Concluida';
+      return 'Aplicada';
     case 'pending':
       return 'Pendente';
     case 'late':
       return 'Atrasada';
     default:
-      return status.isEmpty ? 'Concluida' : status;
+      return status.isEmpty ? 'Aplicada' : status;
   }
 }

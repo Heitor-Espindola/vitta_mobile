@@ -1,14 +1,18 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
+import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
+import 'package:vitta_mobile/features/auth/presentation/controllers/password_reset_controller.dart';
 import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.dart';
+import 'package:vitta_mobile/features/auth/presentation/widgets/password_reset_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.authRepository});
+  const LoginScreen({super.key, this.authRepository, this.initialErrorMessage});
 
   final AuthRepository? authRepository;
+  final String? initialErrorMessage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,10 +24,17 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
 
   AuthRepository get _authRepository =>
       widget.authRepository ?? FirebaseAuthRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _errorMessage = widget.initialErrorMessage;
+  }
 
   @override
   void dispose() {
@@ -50,17 +61,30 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-    } on FirebaseAuthException catch (error) {
-      setState(() => _errorMessage = _authErrorMessage(error));
-    } catch (_) {
-      setState(
-        () => _errorMessage = 'Nao foi possivel entrar. Tente novamente.',
-      );
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
+    } catch (error) {
+      setState(() => _errorMessage = mapSignInError(error));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final controller = PasswordResetController(_authRepository);
+    final sent = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PasswordResetDialog(controller: controller),
+    );
+    controller.dispose();
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(passwordResetNeutralMessage)),
+      );
     }
   }
 
@@ -75,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const AuthBadge(),
             const SizedBox(height: 18),
             const Text(
-              'Suas vacinas,\nnum so lugar.',
+              'Suas vacinas,\nnum só lugar.',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 34,
@@ -99,18 +123,39 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   AuthTextField(
                     controller: _emailController,
-                    label: 'Email',
+                    label: 'E-mail',
                     hintText: 'userexample@gmail.com',
                     keyboardType: TextInputType.emailAddress,
-                    validator: _validateEmail,
+                    validator: validateGmail,
                   ),
                   const SizedBox(height: 32),
                   AuthTextField(
                     controller: _passwordController,
                     label: 'Senha',
-                    hintText: 'Minimo 6 caracteres',
-                    obscureText: true,
+                    hintText: 'Digite sua senha',
+                    obscureText: _obscurePassword,
                     validator: _validatePassword,
+                    suffixIcon: IconButton(
+                      key: const Key('login-password-visibility'),
+                      tooltip: _obscurePassword
+                          ? 'Mostrar senha'
+                          : 'Ocultar senha',
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: const Color(0xFFDCE8F3),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _resetPassword,
+                      child: const Text('Esqueci minha senha'),
+                    ),
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
@@ -123,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 18),
                   AuthPrimaryButton(
                     onPressed: _isLoading ? null : _signIn,
-                    icon: Icons.fingerprint,
+                    icon: Icons.login_rounded,
                     label: _isLoading ? 'Entrando...' : 'Entrar',
                   ),
                 ],
@@ -179,17 +224,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-String? _validateEmail(String? value) {
-  final email = value?.trim() ?? '';
-  if (email.isEmpty) {
-    return 'Informe o email.';
-  }
-  if (!email.contains('@') || !email.contains('.')) {
-    return 'Informe um email valido.';
-  }
-  return null;
-}
-
 String? _validatePassword(String? value) {
   if ((value ?? '').isEmpty) {
     return 'Informe a senha.';
@@ -198,15 +232,4 @@ String? _validatePassword(String? value) {
     return 'A senha deve ter pelo menos 6 caracteres.';
   }
   return null;
-}
-
-String _authErrorMessage(FirebaseAuthException error) {
-  return switch (error.code) {
-    'invalid-email' => 'Email invalido.',
-    'user-not-found' ||
-    'wrong-password' ||
-    'invalid-credential' => 'Email ou senha invalidos.',
-    'network-request-failed' => 'Falha de conexao. Verifique sua internet.',
-    _ => error.message ?? 'Erro de autenticacao. Tente novamente.',
-  };
 }

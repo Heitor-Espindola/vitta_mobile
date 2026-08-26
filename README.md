@@ -1,10 +1,16 @@
 # vitta_mobile
 
-A new Flutter project.
+Para executar com notícias no ambiente de desenvolvimento:
+
+```bash
+flutter run -d edge --dart-define-from-file=config/news_api.json
+```
+
+No Flutter Web, valores de `--dart-define` podem ser inspecionados no código
+compilado. O acesso direto à NewsAPI é destinado somente a desenvolvimento e
+demonstração local. Uma versão de produção deve usar um backend ou proxy seguro.
 
 ## Getting Started
-
-This project is a starting point for a Flutter application.
 
 A few resources to get you started if this is your first Flutter project:
 
