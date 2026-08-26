@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
@@ -93,7 +94,7 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
             (records) {
               if (mounted) {
                 setState(() {
-                  _records = records;
+                  _records = DemoPresentation.recordsForPresentation(records);
                   _loading = false;
                   _error = null;
                 });
@@ -103,7 +104,12 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
               if (mounted) {
                 setState(() {
                   _loading = false;
-                  _error = 'Não foi possível carregar sua carteira agora.';
+                  if (DemoPresentation.isEnabled) {
+                    _records = DemoPresentation.demoRecords;
+                    _error = null;
+                  } else {
+                    _error = 'Não foi possível carregar sua carteira agora.';
+                  }
                 });
               }
             },
@@ -118,7 +124,12 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Não foi possível carregar sua carteira agora.';
+          if (DemoPresentation.isEnabled) {
+            _records = DemoPresentation.demoRecords;
+            _error = null;
+          } else {
+            _error = 'Não foi possível carregar sua carteira agora.';
+          }
         });
       }
     }
@@ -263,9 +274,8 @@ class _PersonHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = _present(person?.name, 'Usuário');
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: _cardDecoration(const Color(0xFFEAF5FC)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       child: Row(
         children: [
           CircleAvatar(
@@ -309,22 +319,93 @@ class _ModeSelector extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => SegmentedButton<bool>(
-    segments: const [
-      ButtonSegment(
-        value: false,
-        label: Text('Vacinas'),
-        icon: Icon(Icons.vaccines_outlined),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F6F9),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _ModeOption(
+            label: 'Vacinas',
+            icon: Icons.vaccines_outlined,
+            selected: !showBooklet,
+            onTap: () => onChanged(false),
+          ),
+        ),
+        Expanded(
+          child: _ModeOption(
+            label: 'Caderneta',
+            icon: Icons.auto_stories_outlined,
+            selected: showBooklet,
+            onTap: () => onChanged(true),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ModeOption extends StatelessWidget {
+  const _ModeOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: label,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x140A3858),
+                    blurRadius: 5,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? vittaBlue : const Color(0xFF638096),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? vittaDarkBlue : const Color(0xFF638096),
+              ),
+            ),
+          ],
+        ),
       ),
-      ButtonSegment(
-        value: true,
-        label: Text('Caderneta'),
-        icon: Icon(Icons.auto_stories_outlined),
-      ),
-    ],
-    selected: {showBooklet},
-    onSelectionChanged: (values) => onChanged(values.first),
-    showSelectedIcon: false,
+    ),
   );
 }
 

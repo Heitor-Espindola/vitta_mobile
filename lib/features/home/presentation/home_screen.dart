@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
@@ -48,6 +49,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _data = _loadData();
   });
 
+  Future<void> _showDependentsInfo() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.family_restroom_outlined, color: vittaBlue),
+        title: const Text('Vincular dependente'),
+        content: const Text(
+          'O vínculo familiar com acesso à carteira será disponibilizado '
+          'quando houver validação segura. Esta área já está preparada para '
+          'acompanhar suas carteiras.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Stream<List<VaccinationRecord>> _recordsFor(_HomeData data) {
     final user = data.user;
     if (user == null) return const Stream.empty();
@@ -77,15 +99,21 @@ class _HomeScreenState extends State<HomeScreen> {
         return StreamBuilder<List<VaccinationRecord>>(
           stream: _recordsFor(baseData),
           builder: (context, recordsSnapshot) {
+            final realRecords =
+                recordsSnapshot.data ?? const <VaccinationRecord>[];
+            final usingDemoRecords =
+                DemoPresentation.isEnabled && realRecords.isEmpty;
             final data = _HomeData(
               user: baseData.user,
-              records: recordsSnapshot.data ?? const [],
+              records: DemoPresentation.recordsForPresentation(realRecords),
             );
             return _buildContent(
               data,
               loading:
-                  recordsSnapshot.connectionState == ConnectionState.waiting,
-              hasError: recordsSnapshot.hasError,
+                  recordsSnapshot.connectionState == ConnectionState.waiting &&
+                  !usingDemoRecords,
+              hasError: recordsSnapshot.hasError && !usingDemoRecords,
+              showDemoDependent: usingDemoRecords,
             );
           },
         );
@@ -97,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _HomeData data, {
     required bool loading,
     required bool hasError,
+    required bool showDemoDependent,
   }) {
     final upcoming = data.upcoming;
     final recent = data.recent;
@@ -110,6 +139,13 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               _SummaryCard(appliedCount: data.appliedCount),
               const SizedBox(height: 20),
+              _WalletsSection(
+                user: data.user!,
+                appliedCount: data.appliedCount,
+                showDemoDependent: showDemoDependent,
+                onAddDependent: _showDependentsInfo,
+              ),
+              const SizedBox(height: 22),
               const _SectionHeader(title: 'Próximas doses'),
               const SizedBox(height: 14),
               if (loading)
@@ -287,6 +323,173 @@ class _SummaryCard extends StatelessWidget {
           child: const Icon(Icons.check_rounded, color: Colors.white, size: 34),
         ),
       ],
+    ),
+  );
+}
+
+class _WalletsSection extends StatelessWidget {
+  const _WalletsSection({
+    required this.user,
+    required this.appliedCount,
+    required this.showDemoDependent,
+    required this.onAddDependent,
+  });
+
+  final AppUser user;
+  final int appliedCount;
+  final bool showDemoDependent;
+  final VoidCallback onAddDependent;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const _SectionHeader(title: 'Carteiras'),
+      const SizedBox(height: 12),
+      SizedBox(
+        height: 116,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _WalletPersonCard(
+              name: user.name,
+              subtitle: 'Minha carteira',
+              detail: '$appliedCount aplicações',
+              color: const Color(0xFFEAF5FC),
+              icon: Icons.person_outline_rounded,
+            ),
+            if (showDemoDependent) ...[
+              const SizedBox(width: 10),
+              const _WalletPersonCard(
+                name: DemoPresentation.dependentName,
+                subtitle: 'Dependente',
+                detail: DemoPresentation.dependentDescription,
+                color: Color(0xFFFFF4E6),
+                icon: Icons.child_care_outlined,
+              ),
+            ],
+            const SizedBox(width: 10),
+            _AddDependentCard(onTap: onAddDependent),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _WalletPersonCard extends StatelessWidget {
+  const _WalletPersonCard({
+    required this.name,
+    required this.subtitle,
+    required this.detail,
+    required this.color,
+    required this.icon,
+  });
+
+  final String name;
+  final String subtitle;
+  final String detail;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 194,
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: Colors.white),
+    ),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.white.withValues(alpha: .88),
+          foregroundColor: vittaDarkBlue,
+          child: Icon(icon, size: 22),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                name.trim().isEmpty ? 'Usuário' : name.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF426B86)),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: vittaDarkBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AddDependentCard extends StatelessWidget {
+  const _AddDependentCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Adicionar dependente',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 126,
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF9AC8E4),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 15,
+              backgroundColor: Color(0xFFEAF5FC),
+              foregroundColor: vittaBlue,
+              child: Icon(Icons.add_rounded),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Adicionar\ndependente',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }

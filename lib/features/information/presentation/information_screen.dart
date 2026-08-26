@@ -74,12 +74,15 @@ class _InformationScreenState extends State<InformationScreen> {
   Widget build(BuildContext context) => VittaMobileShell(
     title: 'Conteúdo',
     currentTab: VittaTab.content,
+    showTopBar: false,
     body: RefreshIndicator(
       onRefresh: _controller.refreshNews,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
+          const _InformationHero(),
+          const SizedBox(height: 14),
           ExpandableSearch(
             hint: 'Pesquisar notícias',
             controller: _searchController,
@@ -236,6 +239,56 @@ class _InformationScreenState extends State<InformationScreen> {
       ),
     );
   }
+}
+
+class _InformationHero extends StatelessWidget {
+  const _InformationHero();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(18, 17, 16, 16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: const Color(0xFFDCEBF4)),
+    ),
+    child: const Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Conteúdo',
+                style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Informações confiáveis para cuidar da sua vacinação.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: Color(0xFF496273),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 12),
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: Color(0xFFDDEFFC),
+          foregroundColor: AppColors.primaryDark,
+          child: Icon(Icons.menu_book_outlined, size: 22),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ContentCard extends StatelessWidget {

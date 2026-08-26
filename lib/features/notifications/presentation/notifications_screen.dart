@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/design_system.dart';
+import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -90,15 +91,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError) {
+        if (snapshot.hasError && !DemoPresentation.isEnabled) {
           return _NotificationMessage(
             message: 'Não foi possível carregar as notificações agora.',
             onRetry: _load,
           );
         }
-        final items = VaccinationNotificationService.derive(
-          snapshot.data ?? const [],
-        );
+        final records = snapshot.data ?? const <VaccinationRecord>[];
+        final items = DemoPresentation.isEnabled && records.isEmpty
+            ? DemoPresentation.notificationsForPresentation(records)
+            : VaccinationNotificationService.derive(records);
         if (items.isEmpty) {
           return const _NotificationMessage(
             message: 'Nenhuma notificação no momento.',

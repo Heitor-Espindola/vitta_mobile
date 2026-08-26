@@ -18,6 +18,7 @@ class VittaMobileShell extends StatelessWidget {
     required this.currentTab,
     required this.body,
     this.showGreetingHeader = false,
+    this.showTopBar = true,
     this.appBarHeight = 58,
   });
 
@@ -25,6 +26,7 @@ class VittaMobileShell extends StatelessWidget {
   final VittaTab currentTab;
   final Widget body;
   final bool showGreetingHeader;
+  final bool showTopBar;
   final double appBarHeight;
 
   @override
@@ -37,7 +39,7 @@ class VittaMobileShell extends StatelessWidget {
           children: [
             if (showGreetingHeader)
               const SizedBox(height: 12)
-            else
+            else if (showTopBar)
               VittaTopBar(title: title, height: appBarHeight),
             Expanded(child: body),
           ],
@@ -56,8 +58,16 @@ class VittaTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       height: height,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE8F0F5))),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         child: Align(
@@ -81,11 +91,11 @@ class VittaBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottomInset),
       child: Container(
-        height: 60,
+        height: 62,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: Colors.white,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -76,7 +77,7 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
             (records) {
               if (mounted) {
                 setState(() {
-                  _records = records;
+                  _records = DemoPresentation.recordsForPresentation(records);
                   _loading = false;
                   _error = null;
                 });
@@ -86,7 +87,12 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
               if (mounted) {
                 setState(() {
                   _loading = false;
-                  _error = 'Não foi possível cruzar sua carteira agora.';
+                  if (DemoPresentation.isEnabled) {
+                    _records = DemoPresentation.demoRecords;
+                    _error = null;
+                  } else {
+                    _error = 'Não foi possível cruzar sua carteira agora.';
+                  }
                 });
               }
             },
@@ -95,7 +101,12 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Não foi possível carregar as vacinas agora.';
+          if (DemoPresentation.isEnabled) {
+            _records = DemoPresentation.demoRecords;
+            _error = null;
+          } else {
+            _error = 'Não foi possível carregar as vacinas agora.';
+          }
         });
       }
     }
@@ -125,6 +136,7 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
     return VittaMobileShell(
       title: 'Vacinas',
       currentTab: VittaTab.vaccines,
+      showTopBar: false,
       body: ColoredBox(
         color: _pageBackground,
         child: ListView(
@@ -192,49 +204,62 @@ class _VaccinesHeader extends StatelessWidget {
   const _VaccinesHeader();
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Vacinas',
-              style: TextStyle(
-                fontSize: 23,
-                height: 1.05,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.8,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Informações para cuidar de você e\nde quem você ama.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: _secondaryText,
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      const SizedBox(width: 12),
-      Container(
-        width: 42,
-        height: 42,
-        decoration: const BoxDecoration(
-          color: _softBlue,
-          shape: BoxShape.circle,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: const Color(0xFFDCEBF4)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vacinas',
+                style: TextStyle(
+                  fontSize: 23,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Informações para cuidar de você e\nde quem você ama.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: _secondaryText,
+                ),
+              ),
+            ],
+          ),
         ),
-        child: const Icon(
-          Icons.vaccines_outlined,
-          color: vittaDarkBlue,
-          size: 21,
+        const SizedBox(width: 12),
+        Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: _softBlue,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.vaccines_outlined,
+            color: vittaDarkBlue,
+            size: 22,
+          ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 }
 
