@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const AuthBadge(),
             const SizedBox(height: 18),
             const Text(
-              'Suas vacinas,\nnum so lugar.',
+              'Suas vacinas,\nnum só lugar.',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 34,
@@ -168,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 18),
                   AuthPrimaryButton(
                     onPressed: _isLoading ? null : _signIn,
-                    icon: Icons.fingerprint,
+                    icon: Icons.login_rounded,
                     label: _isLoading ? 'Entrando...' : 'Entrar',
                   ),
                 ],

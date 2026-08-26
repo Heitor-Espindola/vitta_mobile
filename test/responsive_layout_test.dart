@@ -4,8 +4,11 @@ import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/constants/app_roles.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/auth/presentation/login_screen.dart';
+import 'package:vitta_mobile/features/auth/presentation/register_screen.dart';
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
+import 'package:vitta_mobile/features/profile/presentation/profile_screen.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
@@ -13,27 +16,58 @@ import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 void main() {
-  testWidgets('Home fits a narrow mobile viewport', (tester) async {
+  const homeViewports = <String, Size>{
+    'small': Size(320, 568),
+    'medium': Size(768, 1024),
+    'common Android': Size(412, 915),
+    'Edge/Web': Size(1280, 720),
+  };
+
+  for (final viewport in homeViewports.entries) {
+    testWidgets('Home fits the ${viewport.key} viewport', (tester) async {
+      tester.view.physicalSize = viewport.value;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            authRepository: _FakeAuthRepository(),
+            peopleRepository: _FakePeopleRepository(),
+            vaccinationRepository: _FakeVaccinationRepository(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Minha Carteira'), findsOneWidget);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -420));
+      await tester.pumpAndSettle();
+      expect(find.text('Próximas doses'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Login, registration and profile fit a small viewport', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const MaterialApp(home: RegisterScreen()));
+    expect(tester.takeException(), isNull);
+
     await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(
-          authRepository: _FakeAuthRepository(),
-          peopleRepository: _FakePeopleRepository(),
-          vaccinationRepository: _FakeVaccinationRepository(),
-        ),
-      ),
+      MaterialApp(home: ProfileScreen(authRepository: _FakeAuthRepository())),
     );
     await tester.pumpAndSettle();
-
-    expect(find.text('Minha Carteira'), findsOneWidget);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -420));
-    await tester.pumpAndSettle();
-    expect(find.text('Próximas doses'), findsOneWidget);
+    expect(find.text('Perfil'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

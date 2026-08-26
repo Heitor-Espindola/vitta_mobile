@@ -29,14 +29,17 @@ void main() {
       );
     });
 
-    test('permission-denied remains distinguishable from a missing link', () {
+    test('permission-denied is translated without technical details', () {
       final error = FirebaseException(
         plugin: 'cloud_firestore',
         code: 'permission-denied',
       );
 
-      expect(mapSignInError(error), contains('permission-denied'));
-      expect(mapSignInError(error), contains('regras publicadas'));
+      expect(
+        mapSignInError(error),
+        'Não foi possível acessar seu perfil agora. Tente novamente.',
+      );
+      expect(mapSignInError(error), isNot(contains('permission-denied')));
     });
   });
 

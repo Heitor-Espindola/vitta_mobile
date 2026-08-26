@@ -32,27 +32,21 @@ String mapSignInError(Object error) {
       'network-request-failed' => 'Falha de conexão. Verifique sua internet.',
       'profile-not-found' =>
         'A autenticação foi concluída, mas o perfil não foi encontrado.',
-      _ => error.message ?? 'Erro de autenticação (${error.code}).',
+      _ => 'Não foi possível entrar agora. Tente novamente.',
     };
   }
   if (error is FirebaseException) {
     return switch (error.code) {
       'permission-denied' =>
-        'O login foi autenticado, mas o Firestore recusou o acesso ao perfil '
-            '(permission-denied). As regras publicadas estão incompatíveis com '
-            'esta versão do aplicativo.',
+        'Não foi possível acessar seu perfil agora. Tente novamente.',
       'invalid-auth-link' =>
-        'O vínculo entre a autenticação e o perfil está inválido '
-            '(invalid-auth-link).',
+        'Não foi possível localizar seu perfil. Tente entrar novamente.',
       'unavailable' =>
-        'O perfil está temporariamente indisponível no Firestore '
-            '(unavailable).',
-      _ =>
-        'Falha ao carregar o perfil no Firestore (${error.code}). '
-            '${error.message ?? ''}',
+        'Seu perfil está temporariamente indisponível. Tente novamente.',
+      _ => 'Não foi possível carregar seu perfil agora. Tente novamente.',
     };
   }
-  return 'Não foi possível entrar: ${error.runtimeType}.';
+  return 'Não foi possível entrar agora. Tente novamente.';
 }
 
 String mapSignUpError(Object error) {
@@ -68,21 +62,16 @@ String mapSignUpError(Object error) {
       'weak-password' => 'A senha informada é muito fraca.',
       'cpf-already-in-use' => 'Este CPF já está cadastrado.',
       'network-request-failed' => 'Falha de conexão. Verifique sua internet.',
-      _ => authError.message ?? 'Erro no Firebase Auth (${authError.code}).',
+      _ => 'Não foi possível criar a conta agora. Tente novamente.',
     },
     FirebaseException firestoreError => switch (firestoreError.code) {
       'permission-denied' =>
-        'O Firebase Auth iniciou o cadastro, mas o Firestore recusou os '
-            'dados (permission-denied). A conta temporária foi removida. As '
-            'regras publicadas estão incompatíveis com esta versão do aplicativo.',
-      _ =>
-        'Falha ao gravar o cadastro no Firestore '
-            '(${firestoreError.code}). ${firestoreError.message ?? ''}',
+        'Não foi possível concluir o cadastro. Tente novamente.',
+      _ => 'Não foi possível salvar o cadastro agora. Tente novamente.',
     },
-    _ => 'Não foi possível criar a conta: ${original.runtimeType}.',
+    _ => 'Não foi possível criar a conta agora. Tente novamente.',
   };
 
   if (!compensationFailed) return message;
-  return '$message A remoção compensatória da conta Auth também falhou; '
-      'é necessária revisão administrativa.';
+  return '$message Se o problema persistir, procure o suporte.';
 }

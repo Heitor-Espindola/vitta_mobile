@@ -30,7 +30,7 @@ void main() {
   });
 
   testWidgets(
-    'AuthGate exposes Firestore permission-denied instead of hiding it',
+    'AuthGate shows a friendly message when the profile cannot be loaded',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -48,7 +48,13 @@ void main() {
       await tester.pump();
 
       expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.textContaining('permission-denied'), findsOneWidget);
+      expect(
+        find.text(
+          'Não foi possível acessar seu perfil agora. Tente novamente.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('permission-denied'), findsNothing);
     },
   );
 }

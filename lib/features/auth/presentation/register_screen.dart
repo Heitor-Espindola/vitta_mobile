@@ -136,7 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'E rapido e seguro',
+              'É rápido e seguro',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.78),
                 fontSize: 16,
@@ -266,7 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Ao continuar voce concorda com nossos Termos e Politica de Privacidade.',
+                    'Ao continuar você concorda com nossos Termos e Política de Privacidade.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.45),

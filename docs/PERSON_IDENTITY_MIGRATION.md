@@ -29,6 +29,11 @@ verificação oficial. A criação de dependente gera um vínculo
 `manual_pending`, sem permissões, que precisa de um processo confiável para
 chegar a `verified`.
 
+No MVP, as rotas legadas de filhos/dependentes e o atalho de vínculo familiar
+não fazem parte da navegação normal. O código e os dados foram preservados para
+uma etapa futura, mas nenhum fluxo cliente incompleto concede acesso a carteiras
+de terceiros.
+
 ## Relacionamentos e acesso
 
 `relationships/{fromPersonId}_{toPersonId}` representa somente uma aresta

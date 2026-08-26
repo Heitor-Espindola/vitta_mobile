@@ -7,7 +7,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
     expect(find.text('Carteira Digital'), findsOneWidget);
-    expect(find.text('Suas vacinas,\nnum so lugar.'), findsOneWidget);
+    expect(find.text('Suas vacinas,\nnum só lugar.'), findsOneWidget);
     expect(find.text('Entrar'), findsWidgets);
     expect(find.text('Criar conta'), findsOneWidget);
   });

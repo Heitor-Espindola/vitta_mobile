@@ -4,15 +4,11 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
-import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
-import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
-import 'package:vitta_mobile/features/people/domain/services/majority_transition_service.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
-import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_card_screen.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,67 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final VaccinationRepository _vaccinationRepository =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
-  late final PeopleRepository _peopleRepository =
-      widget.peopleRepository ?? FirebasePeopleRepository();
   late Future<_HomeData> _data = _loadData();
-  String? _selectedPersonId;
   String? _recordsStreamPersonId;
   Stream<List<VaccinationRecord>>? _recordsStream;
 
   Future<_HomeData> _loadData() async {
     final user = await _authRepository.getCurrentUser();
     if (user == null) return const _HomeData();
-    var people = <AppUser>[user];
-    try {
-      people = await _peopleRepository.getAvailablePeople(user.uid);
-    } catch (_) {
-      // A carteira principal continua disponível durante falhas de dependentes.
-    }
-    final selected = people.firstWhere(
-      (person) => person.uid == _selectedPersonId,
-      orElse: () => user,
-    );
-    return _HomeData(user: user, selectedPerson: selected, people: people);
-  }
-
-  void _selectPerson(AppUser person) {
-    setState(() {
-      _selectedPersonId = person.uid;
-      _recordsStreamPersonId = null;
-      _recordsStream = null;
-      _data = _loadData();
-    });
-  }
-
-  Future<void> _addDependent() async {
-    final created = await Navigator.of(context).push<AppUser>(
-      MaterialPageRoute(
-        builder: (_) => DependentsScreen(
-          authRepository: _authRepository,
-          peopleRepository: _peopleRepository,
-        ),
-      ),
-    );
-    if (created != null && mounted) {
-      setState(() {
-        _selectedPersonId = created.uid;
-        _recordsStreamPersonId = null;
-        _recordsStream = null;
-        _data = _loadData();
-      });
-    }
-  }
-
-  void _openCard(AppUser person) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VaccinationCardScreen(
-          authRepository: _authRepository,
-          vaccinationRepository: _vaccinationRepository,
-          selectedPerson: person,
-        ),
-      ),
-    );
+    return _HomeData(user: user);
   }
 
   void _retry() => setState(() {
@@ -107,18 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Stream<List<VaccinationRecord>> _recordsFor(_HomeData data) {
     final user = data.user;
-    final person = data.selectedPerson;
-    if (user == null || person == null) return const Stream.empty();
-    if (_recordsStreamPersonId == person.uid && _recordsStream != null) {
+    if (user == null) return const Stream.empty();
+    if (_recordsStreamPersonId == user.uid && _recordsStream != null) {
       return _recordsStream!;
     }
-    _recordsStreamPersonId = person.uid;
-    _recordsStream = person.uid == user.uid
-        ? _vaccinationRepository.watchPatientRecords(user.uid)
-        : _vaccinationRepository.watchRecordsByPerson(
-            personId: person.uid,
-            responsibleId: user.uid,
-          );
+    _recordsStreamPersonId = user.uid;
+    _recordsStream = _vaccinationRepository.watchPatientRecords(user.uid);
     return _recordsStream!;
   }
 
@@ -142,8 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, recordsSnapshot) {
             final data = _HomeData(
               user: baseData.user,
-              selectedPerson: baseData.selectedPerson,
-              people: baseData.people,
               records: recordsSnapshot.data ?? const [],
             );
             return _buildContent(
@@ -175,30 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               _SummaryCard(appliedCount: data.appliedCount),
               const SizedBox(height: 20),
-              _SectionHeader(
-                title: 'Minha família',
-                actionLabel: '+ Vincular familiar',
-                onAction: _addDependent,
-              ),
-              const SizedBox(height: 14),
-              _PeopleSelector(
-                people: data.people,
-                ownerId: data.user?.uid ?? '',
-                selectedId: data.selectedPerson?.uid,
-                records: data.records,
-                onSelected: _selectPerson,
-                onOpen: _openCard,
-              ),
-              if (data.selectedPerson != null &&
-                  MajorityTransitionService.state(data.selectedPerson!) ==
-                      MajorityTransitionState.newlyIndependent) ...[
-                const SizedBox(height: 10),
-                _MajorityNotice(
-                  person: data.selectedPerson!,
-                  isOwner: data.selectedPerson!.uid == data.user?.uid,
-                ),
-              ],
-              const SizedBox(height: 20),
               const _SectionHeader(title: 'Próximas doses'),
               const SizedBox(height: 14),
               if (loading)
@@ -222,8 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
               else if (recent.isEmpty)
                 const _EmptyCard(
                   icon: Icons.vaccines_outlined,
-                  text:
-                      'Nenhuma vacina registrada ainda. Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
+                  text: 'Nenhuma vacina registrada ainda.',
                 )
               else
                 ...recent.map(_RecentVaccineCard.new),
@@ -382,205 +292,15 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
+  const _SectionHeader({required this.title});
 
   final String title;
-  final String? actionLabel;
-  final VoidCallback? onAction;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-          ),
-        ),
-        if (actionLabel != null)
-          TextButton(
-            onPressed: onAction,
-            child: Text(
-              constraints.maxWidth < 380 ? '+ Familiar' : actionLabel!,
-              maxLines: 1,
-            ),
-          ),
-      ],
-    ),
+  Widget build(BuildContext context) => Text(
+    title,
+    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
   );
-}
-
-class _PeopleSelector extends StatelessWidget {
-  const _PeopleSelector({
-    required this.people,
-    required this.ownerId,
-    required this.selectedId,
-    required this.records,
-    required this.onSelected,
-    required this.onOpen,
-  });
-
-  final List<AppUser> people;
-  final String ownerId;
-  final String? selectedId;
-  final List<VaccinationRecord> records;
-  final ValueChanged<AppUser> onSelected;
-  final ValueChanged<AppUser> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    if (people.isEmpty) {
-      return const _EmptyCard(
-        icon: Icons.person_outline_rounded,
-        text: 'Não foi possível carregar as carteiras.',
-      );
-    }
-    return SizedBox(
-      height: 134,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: people.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final person = people[index];
-          final selected = person.uid == selectedId;
-          final isOwner = person.uid == ownerId;
-          return Semantics(
-            button: true,
-            label: 'Abrir carteira de ${person.name}',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                if (!selected) {
-                  onSelected(person);
-                }
-                onOpen(person);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 205,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: selected ? const Color(0xFFEAF5FC) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: selected
-                        ? const Color(0xFFB8DDF4)
-                        : const Color(0xFFEDF1F4),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0C000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: selected
-                          ? vittaBlue
-                          : const Color(0xFFDDEFFC),
-                      foregroundColor: selected ? Colors.white : vittaDarkBlue,
-                      child: Text(_initials(person.name)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _filledName(person.name),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            isOwner
-                                ? 'Minha carteira'
-                                : (person.relationshipToGuardian ??
-                                      'Dependente'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF718096),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            selected
-                                ? '${VaccinationRecordInsights.appliedCount(records)} vacinas registradas • toque para abrir'
-                                : 'Toque para abrir',
-                            maxLines: 2,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: vittaDarkBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MajorityNotice extends StatelessWidget {
-  const _MajorityNotice({required this.person, required this.isOwner});
-
-  final AppUser person;
-  final bool isOwner;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstName = _firstName(person.name);
-    return Semantics(
-      label: isOwner
-          ? 'Sua conta agora é independente.'
-          : '$firstName agora controla os próprios dados.',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E6),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFF2D795)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.verified_user_outlined,
-              color: Color(0xFF8A6411),
-              size: 21,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                isOwner
-                    ? 'Sua conta agora é independente. O acesso de familiares depende da sua autorização.'
-                    : '$firstName atingiu a maioridade. O vínculo familiar permanece, mas o acesso automático foi encerrado.',
-                style: const TextStyle(
-                  color: Color(0xFF634B17),
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _DoseTimeline extends StatelessWidget {
@@ -826,16 +546,9 @@ class _HomeError extends StatelessWidget {
 }
 
 class _HomeData {
-  const _HomeData({
-    this.user,
-    this.selectedPerson,
-    this.people = const [],
-    this.records = const [],
-  });
+  const _HomeData({this.user, this.records = const []});
 
   final AppUser? user;
-  final AppUser? selectedPerson;
-  final List<AppUser> people;
   final List<VaccinationRecord> records;
 
   int get appliedCount => VaccinationRecordInsights.appliedCount(records);
@@ -850,18 +563,6 @@ class _HomeData {
     return VaccinationRecordInsights.recentApplied(records, limit: 3);
   }
 }
-
-String _initials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty);
-  final value = parts.take(2).map((part) => part[0]).join().toUpperCase();
-  return value.isEmpty ? 'U' : value;
-}
-
-String _filledName(String name) =>
-    name.trim().isEmpty ? 'Usuário' : name.trim();
 
 String _firstName(String? name) {
   final value = name?.trim();

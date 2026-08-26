@@ -102,11 +102,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final saved = await _authRepository.updateProfile(updated);
-    if (!mounted) {
-      return;
+    setState(() => _isLoading = true);
+    try {
+      final saved = await _authRepository.updateProfile(updated);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _user = saved;
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dados atualizados com sucesso.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível salvar. Tente novamente.'),
+        ),
+      );
     }
-    setState(() => _user = saved);
   }
 
   @override
@@ -199,37 +218,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               title: 'Contato',
                               subtitle: _filled(user?.phone, email),
                               onTap: _editProfile,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Preferências'),
-                        const SizedBox(height: AppSpacing.sm),
-                        const _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.dark_mode_outlined,
-                              title: 'Tema escuro',
-                              trailing: _ToggleOff(),
-                            ),
-                            _SettingsRow(
-                              icon: Icons.settings_outlined,
-                              title: 'Configurações',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Suporte'),
-                        const SizedBox(height: AppSpacing.sm),
-                        const _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.help_outline,
-                              title: 'Central de ajuda',
-                            ),
-                            _SettingsRow(
-                              icon: Icons.security_outlined,
-                              title: 'Termos e privacidade',
                             ),
                           ],
                         ),
@@ -407,14 +395,12 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.title,
     this.subtitle,
-    this.trailing,
     this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String? subtitle;
-  final Widget? trailing;
   final VoidCallback? onTap;
 
   @override
@@ -453,31 +439,9 @@ class _SettingsRow extends StatelessWidget {
                 ),
               ),
             ),
-            trailing ??
-                const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ToggleOff extends StatelessWidget {
-  const _ToggleOff();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 18,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD1D1D1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Align(
-        alignment: Alignment.centerRight,
-        child: CircleAvatar(radius: 7, backgroundColor: Colors.white),
       ),
     );
   }

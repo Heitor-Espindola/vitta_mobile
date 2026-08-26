@@ -145,10 +145,11 @@ continuam presentes para compatibilidade, mas não são a nova fonte de
 autorização. Novos vínculos são representados também em `relationships`.
 Consulte `PERSON_IDENTITY_MIGRATION.md` antes de migrar dados existentes.
 
-## Deploy manual (não executado)
+## Publicação das regras e índices
 
-Após revisão do responsável pelo Firebase:
+Publique cada alvo separadamente para evitar deploy de outros serviços:
 
 ```powershell
-firebase deploy --only firestore:rules,firestore:indexes --project vitta-5ec1e
+firebase deploy --only firestore:rules --project vitta-5ec1e
+firebase deploy --only firestore:indexes --project vitta-5ec1e
 ```

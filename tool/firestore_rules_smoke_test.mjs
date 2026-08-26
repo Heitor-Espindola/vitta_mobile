@@ -107,7 +107,7 @@ async function read(token, path) {
   });
 }
 
-async function queryVaccinationRecords(token, patientId) {
+async function queryVaccinationRecords(token, patientId, field = 'patientId') {
   return fetch(`${apiRoot}/documents:runQuery`, {
     method: 'POST',
     headers: {
@@ -119,7 +119,7 @@ async function queryVaccinationRecords(token, patientId) {
         from: [{ collectionId: 'vaccination_records' }],
         where: {
           fieldFilter: {
-            field: { fieldPath: 'patientId' },
+            field: { fieldPath: field },
             op: 'EQUAL',
             value: string(patientId),
           },
@@ -219,6 +219,87 @@ function vaccinationCreateWrite(
       { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
       { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
     ],
+    currentDocument: { exists: false },
+  };
+}
+
+function legacyVaccinationCreateWrite(recordId, patientUid) {
+  return {
+    update: {
+      name: documentName(`vaccination_records/${recordId}`),
+      fields: {
+        patientUid: string(patientUid),
+        vaccineName: string('Vacina legada'),
+        dose: string('Dose única'),
+        appliedAt: timestamp(),
+        createdAt: timestamp(),
+      },
+    },
+    currentDocument: { exists: false },
+  };
+}
+
+function relationshipCreateWrite(
+  fromPersonId,
+  toPersonId,
+  {
+    status = 'pending',
+    type = 'legal_guardian',
+    viewVaccination = false,
+    receiveNotifications = false,
+    consentStatus = 'pending',
+    verificationSource = 'manual_pending',
+    verifiedAt = null,
+  } = {},
+) {
+  return {
+    update: {
+      name: documentName(
+        `relationships/${fromPersonId}_${toPersonId}`,
+      ),
+      fields: {
+        fromPersonId: string(fromPersonId),
+        toPersonId: string(toPersonId),
+        type: string(type),
+        status: string(status),
+        permissions: {
+          mapValue: {
+            fields: {
+              viewVaccination: boolean(viewVaccination),
+              receiveNotifications: boolean(receiveNotifications),
+            },
+          },
+        },
+        consentStatus: string(consentStatus),
+        verificationSource: string(verificationSource),
+        verifiedAt: verifiedAt == null ? { nullValue: null } : timestamp(),
+        validUntil: { nullValue: null },
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists: false },
+  };
+}
+
+function accessGrantCreateWrite(granteePersonId, subjectPersonId) {
+  return {
+    update: {
+      name: documentName(
+        `access_grants/${granteePersonId}_${subjectPersonId}`,
+      ),
+      fields: {
+        granteePersonId: string(granteePersonId),
+        subjectPersonId: string(subjectPersonId),
+        viewVaccination: boolean(true),
+        consentStatus: string('granted'),
+        validUntil: { nullValue: null },
+        createdAt: timestamp(),
+        updatedAt: timestamp(),
+      },
+    },
     currentDocument: { exists: false },
   };
 }
@@ -560,6 +641,31 @@ assert(
   (await read(otherUser.token, `vaccination_records/${recordId}`)).status === 403,
   'B) Paciente leu registro de outra pessoa.',
 );
+
+const legacyRecordId = 'vaccination-legacy';
+await adminCommit([
+  legacyVaccinationCreateWrite(legacyRecordId, guardian.uid),
+]);
+assert(
+  (await read(guardian.token, `vaccination_records/${legacyRecordId}`)).status ===
+    200,
+  'Compatibilidade patientUid: titular não leu o próprio registro legado.',
+);
+assert(
+  (
+    await queryVaccinationRecords(
+      guardian.token,
+      guardian.uid,
+      'patientUid',
+    )
+  ).status === 200,
+  'Compatibilidade patientUid + appliedAt foi negada.',
+);
+assert(
+  (await read(otherUser.token, `vaccination_records/${legacyRecordId}`)).status ===
+    403,
+  'Compatibilidade patientUid permitiu leitura por terceiro.',
+);
 await commit(
   guardian.token,
   [vaccinationCreateWrite('vaccination-by-patient', {
@@ -626,6 +732,107 @@ assert(
   'Profissional conseguiu listar users.',
 );
 
+await commit(guardian.token, [
+  relationshipCreateWrite(guardian.uid, dependentId),
+]);
+await commit(professional.token, [
+  vaccinationCreateWrite('vaccination-pending-dependent', {
+    patientId: dependentId,
+    professionalUid: professional.uid,
+  }),
+]);
+assert(
+  (
+    await read(
+      guardian.token,
+      'vaccination_records/vaccination-pending-dependent',
+    )
+  ).status === 403,
+  'Relationship pending concedeu acesso à vacinação.',
+);
+
+const minorId = 'minor-for-relationship-test';
+const minorFields = {
+  ...userFields({
+    uid: minorId,
+    name: 'Pessoa Menor Teste',
+    cpf: '29537947000',
+    role: 'dependent',
+    roles: ['dependent'],
+    authUid: '',
+    canAuthenticate: false,
+    guardianIds: [otherUser.uid],
+    managedByUserIds: [otherUser.uid],
+    relationshipToGuardian: 'Filho(a)',
+  }),
+  birthDate: dateTimestamp('2015-01-01T00:00:00.000Z'),
+  majorityAt: dateTimestamp('2033-01-01T00:00:00.000Z'),
+};
+await adminCommit([userCreateWrite(minorId, minorFields)]);
+
+await commit(
+  guardian.token,
+  [
+    relationshipCreateWrite(guardian.uid, minorId, {
+      status: 'verified',
+      viewVaccination: true,
+      receiveNotifications: true,
+      consentStatus: 'not_required_minor',
+      verificationSource: 'self_declared',
+      verifiedAt: true,
+    }),
+  ],
+  403,
+);
+
+await adminCommit([
+  relationshipCreateWrite(guardian.uid, otherUser.uid, {
+    status: 'verified',
+    viewVaccination: true,
+    consentStatus: 'granted',
+    verificationSource: 'admin_test',
+    verifiedAt: true,
+  }),
+  relationshipCreateWrite(otherUser.uid, minorId, {
+    status: 'verified',
+    viewVaccination: true,
+    receiveNotifications: true,
+    consentStatus: 'not_required_minor',
+    verificationSource: 'admin_test',
+    verifiedAt: true,
+  }),
+]);
+await commit(professional.token, [
+  vaccinationCreateWrite('vaccination-minor-direct-only', {
+    patientId: minorId,
+    professionalUid: professional.uid,
+  }),
+]);
+assert(
+  (
+    await read(
+      otherUser.token,
+      'vaccination_records/vaccination-minor-direct-only',
+    )
+  ).status === 200,
+  'Relationship direta verificada de menor não concedeu a leitura esperada.',
+);
+assert(
+  (
+    await read(
+      guardian.token,
+      'vaccination_records/vaccination-minor-direct-only',
+    )
+  ).status === 403,
+  'O) Relationship transitiva concedeu acesso indevido.',
+);
+
+await commit(
+  guardian.token,
+  [accessGrantCreateWrite(guardian.uid, minorId)],
+  403,
+);
+
 console.log(
-  'Firestore Rules: login legado/novo, cadastro atômico, auth_links, majorityAt, dependentes/CPF e vaccination_records A-J aprovados.',
+  'Firestore Rules: cenários A-P, patientUid legado, vínculo pendente, relação direta e bloqueio transitivo aprovados.',
 );
