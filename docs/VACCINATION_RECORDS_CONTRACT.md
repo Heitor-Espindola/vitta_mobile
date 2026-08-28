@@ -106,7 +106,13 @@ UID Firebase que executou a operação para auditoria.
 - Após a maioridade: o relacionamento permanece, mas a leitura exige um
   `access_grants/{responsavelId}_{adultoId}` concedido e válido.
 - Profissional ativo: cria registros válidos e auditados pelo próprio UID;
-  não recebe leitura ampla, edição ou exclusão.
+  pode reler os registros criados pelo próprio UID, mas não recebe leitura
+  ampla, edição ou exclusão.
+- Atendimento profissional: a busca exata por CPF cria
+  `professional_patient_access/{professionalUid}_{patientId}` por no máximo
+  30 minutos. A Rule confere o hash em `cpf_registry` antes de liberar o GET
+  específico de `users/{personId}` e a consulta da carteira daquele paciente.
+- `users` e `cpf_registry` nunca podem ser listados pelo painel profissional.
 - Não existe acesso transitivo: um vínculo com a mãe não concede acesso
   automático ao filho dela.
 
@@ -128,6 +134,16 @@ orderBy appliedAt DESC
 
 Os dois índices compostos estão em `firestore.indexes.json`.
 
+O painel profissional também consulta somente os registros auditados pelo UID
+autenticado:
+
+```text
+where professionalUid == AUTH_UID
+orderBy appliedAt DESC
+```
+
+O índice correspondente também está em `firestore.indexes.json`.
+
 ## Teste manual Web → Firestore → Mobile
 
 1. Entre no mobile e obtenha o `personId` por `auth_links/{authUid}`; se o
@@ -146,6 +162,10 @@ autorização. Novos vínculos são representados também em `relationships`.
 Consulte `PERSON_IDENTITY_MIGRATION.md` antes de migrar dados existentes.
 
 ## Publicação das regras e índices
+
+`firestore.rules` na raiz do Vitta Mobile é a fonte de verdade compartilhada
+por Mobile e Web, conforme `firebase.json`. Não mantenha uma cópia divergente
+dentro do projeto Web ou da pasta `firebase/`.
 
 Publique cada alvo separadamente para evitar deploy de outros serviços:
 

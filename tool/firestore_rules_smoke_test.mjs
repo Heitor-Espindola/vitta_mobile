@@ -132,6 +132,32 @@ async function queryVaccinationRecords(token, patientId, field = 'patientId') {
   });
 }
 
+async function queryProfessionalRecords(token, professionalUid) {
+  return fetch(`${apiRoot}/documents:runQuery`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'vaccination_records' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'professionalUid' },
+            op: 'EQUAL',
+            value: string(professionalUid),
+          },
+        },
+        orderBy: [
+          { field: { fieldPath: 'appliedAt' }, direction: 'DESCENDING' },
+        ],
+        limit: 100,
+      },
+    }),
+  });
+}
+
 async function adminRead(path) {
   return fetch(`${apiRoot}/documents/${path}`, {
     headers: { authorization: 'Bearer owner' },
@@ -301,6 +327,36 @@ function accessGrantCreateWrite(granteePersonId, subjectPersonId) {
       },
     },
     currentDocument: { exists: false },
+  };
+}
+
+function professionalPatientAccessCreateWrite({
+  professionalUid,
+  patientId,
+  cpf,
+  expiresInMinutes = 20,
+  exists = false,
+}) {
+  const cpfHash = createHash('sha256').update(cpf).digest('hex');
+  return {
+    update: {
+      name: documentName(
+        `professional_patient_access/${professionalUid}_${patientId}`,
+      ),
+      fields: {
+        professionalUid: string(professionalUid),
+        patientId: string(patientId),
+        cpfHash: string(cpfHash),
+        expiresAt: dateTimestamp(
+          new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString(),
+        ),
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists },
   };
 }
 
@@ -724,12 +780,96 @@ await commit(
   403,
 );
 assert(
-  (await read(professional.token, `vaccination_records/${recordId}`)).status === 403,
-  'Profissional conseguiu ler registro do paciente.',
+  (await read(professional.token, `vaccination_records/${recordId}`)).status === 200,
+  'Profissional não leu a aplicação registrada pelo próprio UID.',
+);
+assert(
+  (await queryProfessionalRecords(professional.token, professional.uid)).status ===
+    200,
+  'Profissional não consultou os próprios registros auditados.',
 );
 assert(
   (await read(professional.token, 'users')).status === 403,
-  'Profissional conseguiu listar users.',
+  'I) Profissional conseguiu listar users.',
+);
+assert(
+  (await read(professional.token, 'cpf_registry')).status === 403,
+  'J) Profissional conseguiu listar cpf_registry.',
+);
+assert(
+  (await read(professional.token, guardianPath)).status === 403,
+  'Profissional leu paciente antes do lookup exato.',
+);
+assert(
+  (await read(professional.token, `cpf_registry/${guardianCpfHash}`)).status ===
+    200,
+  'H) Profissional não conseguiu o lookup exato permitido.',
+);
+
+await commit(
+  otherUser.token,
+  [professionalPatientAccessCreateWrite({
+    professionalUid: otherUser.uid,
+    patientId: guardian.uid,
+    cpf: guardianCpf,
+  })],
+  403,
+);
+assert(
+  (await read(otherUser.token, guardianPath)).status === 403,
+  'K) Usuário comum utilizou o lookup profissional.',
+);
+await commit(
+  blockedProfessional.token,
+  [professionalPatientAccessCreateWrite({
+    professionalUid: blockedProfessional.uid,
+    patientId: guardian.uid,
+    cpf: guardianCpf,
+  })],
+  403,
+);
+await commit(
+  professional.token,
+  [professionalPatientAccessCreateWrite({
+    professionalUid: professional.uid,
+    patientId: guardian.uid,
+    cpf: '12345678909',
+  })],
+  403,
+);
+await commit(
+  professional.token,
+  [professionalPatientAccessCreateWrite({
+    professionalUid: professional.uid,
+    patientId: guardian.uid,
+    cpf: guardianCpf,
+    expiresInMinutes: 31,
+  })],
+  403,
+);
+await commit(professional.token, [
+  professionalPatientAccessCreateWrite({
+    professionalUid: professional.uid,
+    patientId: guardian.uid,
+    cpf: guardianCpf,
+  }),
+]);
+await commit(professional.token, [
+  professionalPatientAccessCreateWrite({
+    professionalUid: professional.uid,
+    patientId: guardian.uid,
+    cpf: guardianCpf,
+    exists: true,
+  }),
+]);
+assert(
+  (await read(professional.token, guardianPath)).status === 200,
+  'H) Lookup exato não liberou o GET específico do paciente.',
+);
+assert(
+  (await queryVaccinationRecords(professional.token, guardian.uid)).status ===
+    200,
+  'H) Atendimento validado não liberou o histórico do paciente.',
 );
 
 await commit(guardian.token, [
@@ -834,5 +974,5 @@ await commit(
 );
 
 console.log(
-  'Firestore Rules: cenários A-P, patientUid legado, vínculo pendente, relação direta e bloqueio transitivo aprovados.',
+  'Firestore Rules: cenários A-P, lookup profissional temporário, patientUid legado, vínculo pendente, relação direta e bloqueio transitivo aprovados.',
 );

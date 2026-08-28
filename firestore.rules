@@ -45,6 +45,33 @@ service cloud.firestore {
         && currentUser().data.accountStatus == 'active';
     }
 
+    function isAdmin() {
+      return hasRole('admin')
+        && currentUser().data.accountStatus == 'active';
+    }
+
+    function isProfessional() {
+      return isHealthProfessional() || isAdmin();
+    }
+
+    function professionalAccessId(subjectPersonId) {
+      return request.auth.uid + '_' + subjectPersonId;
+    }
+
+    function professionalAccessPath(subjectPersonId) {
+      return /databases/$(database)/documents/professional_patient_access/$(professionalAccessId(subjectPersonId));
+    }
+
+    function hasProfessionalPatientAccess(subjectPersonId) {
+      let path = professionalAccessPath(subjectPersonId);
+      return isProfessional()
+        && exists(path)
+        && get(path).data.professionalUid == request.auth.uid
+        && get(path).data.patientId == subjectPersonId
+        && get(path).data.expiresAt is timestamp
+        && request.time < get(path).data.expiresAt;
+    }
+
     function userExistsAfter(userId) {
       return existsAfter(
         /databases/$(database)/documents/users/$(userId)
@@ -306,7 +333,7 @@ service cloud.firestore {
     }
 
     function validVaccinationRecordCreation() {
-      return isHealthProfessional()
+      return isProfessional()
         && hasValidVaccinationRecordKeys()
         && hasValidVaccinationRecordTypes()
         && request.resource.data.professionalUid == request.auth.uid
@@ -316,6 +343,58 @@ service cloud.firestore {
         )
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
+    }
+
+    function registryMatchesPatient(cpfHash, patientId) {
+      let registryPath = /databases/$(database)/documents/cpf_registry/$(cpfHash);
+      return exists(registryPath)
+        && ((get(registryPath).data.keys().hasAny(['personId'])
+              && get(registryPath).data.personId == patientId)
+          || (get(registryPath).data.keys().hasAny(['ownerUid'])
+              && get(registryPath).data.ownerUid == patientId));
+    }
+
+    function validProfessionalAccessData(accessId) {
+      return isProfessional()
+        && request.resource.data.keys().hasAll([
+          'professionalUid', 'patientId', 'cpfHash', 'expiresAt',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'professionalUid', 'patientId', 'cpfHash', 'expiresAt',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.professionalUid == request.auth.uid
+        && request.resource.data.patientId is string
+        && request.resource.data.patientId.size() > 0
+        && accessId == professionalAccessId(request.resource.data.patientId)
+        && request.resource.data.cpfHash is string
+        && request.resource.data.cpfHash.size() == 64
+        && registryMatchesPatient(
+          request.resource.data.cpfHash,
+          request.resource.data.patientId
+        )
+        && exists(
+          /databases/$(database)/documents/users/$(request.resource.data.patientId)
+        )
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt
+          <= request.time + duration.value(30, 'm')
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validProfessionalAccessCreation(accessId) {
+      return validProfessionalAccessData(accessId)
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function validProfessionalAccessUpdate(accessId) {
+      return validProfessionalAccessData(accessId)
+        && request.resource.data.professionalUid
+          == resource.data.professionalUid
+        && request.resource.data.patientId == resource.data.patientId
+        && request.resource.data.createdAt == request.time;
     }
 
     function relationshipId(fromPersonId, toPersonId) {
@@ -416,7 +495,8 @@ service cloud.firestore {
         || (userId != request.auth.uid && validDependentCreation(userId));
       allow get: if isOwner(userId)
         || (signedIn()
-          && resource.data.managedByUserIds.hasAny([currentPersonId()]));
+          && resource.data.managedByUserIds.hasAny([currentPersonId()]))
+        || hasProfessionalPatientAccess(userId);
       allow list: if false;
       allow update: if (request.resource.data.diff(resource.data)
           .affectedKeys().hasAny(['dependentIds'])
@@ -440,6 +520,19 @@ service cloud.firestore {
       allow list: if false;
       allow create: if validCpfRegistryCreation(cpfHash);
       allow update, delete: if false;
+    }
+
+    // Autoriza um atendimento profissional por no máximo 30 minutos.
+    // A autorização só pode nascer de um lookup exato em cpf_registry e
+    // nunca permite listar pacientes, CPFs ou carteiras de forma ampla.
+    match /professional_patient_access/{accessId} {
+      allow get: if signedIn()
+        && resource.data.professionalUid == request.auth.uid;
+      allow list: if false;
+      allow create: if validProfessionalAccessCreation(accessId);
+      allow update: if validProfessionalAccessUpdate(accessId);
+      allow delete: if signedIn()
+        && resource.data.professionalUid == request.auth.uid;
     }
 
     // Coleções legítimas já consumidas pelas telas existentes.
@@ -471,9 +564,13 @@ service cloud.firestore {
     match /vaccination_records/{recordId} {
       allow read: if signedIn()
         && ((resource.data.keys().hasAny(['patientId'])
-            && canReadVaccination(resource.data.patientId))
+            && (canReadVaccination(resource.data.patientId)
+              || hasProfessionalPatientAccess(resource.data.patientId)))
           || (resource.data.keys().hasAny(['patientUid'])
-            && resource.data.patientUid == request.auth.uid));
+            && resource.data.patientUid == request.auth.uid)
+          || (isProfessional()
+            && resource.data.keys().hasAny(['professionalUid'])
+            && resource.data.professionalUid == request.auth.uid));
       allow create: if validVaccinationRecordCreation();
       allow update, delete: if false;
     }

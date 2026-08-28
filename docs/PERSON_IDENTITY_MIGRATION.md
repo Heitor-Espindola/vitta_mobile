@@ -11,6 +11,12 @@ Novas contas começam com `personId == authUid`, mas o contrato não exige que
 essa igualdade permaneça para sempre. Dependentes possuem `personId` próprio,
 `authUid: null` e `canAuthenticate: false`.
 
+O painel profissional resolve a própria conta por
+`auth_links/{authUid}.personId`, mas nunca usa o UID do profissional como ID do
+paciente. A pessoa atendida é localizada por SHA-256 do CPF em
+`cpf_registry/{hash}`; `personId` é preferido e `ownerUid` permanece como
+fallback legado.
+
 ## Migração aditiva sugerida
 
 1. Fazer backup/exportação do Firestore.
