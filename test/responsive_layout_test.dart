@@ -7,6 +7,7 @@ import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.d
 import 'package:vitta_mobile/features/auth/presentation/login_screen.dart';
 import 'package:vitta_mobile/features/auth/presentation/register_screen.dart';
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
+import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/notifications/presentation/notifications_screen.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
@@ -77,6 +78,25 @@ void main() {
       expect(
         tester.getSize(find.byKey(const Key('home-header-band'))).width,
         412,
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('home-header-band'))).dy,
+        0,
+      );
+      final summaryCard = find.byKey(const Key('home-summary-card'));
+      expect(
+        find.descendant(
+          of: summaryCard,
+          matching: find.byIcon(Icons.check_rounded),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: summaryCard,
+          matching: find.byIcon(Icons.priority_high_rounded),
+        ),
+        findsNothing,
       );
       await tester.tap(find.byKey(const Key('share-wallet-button')));
       await tester.pump();
@@ -198,12 +218,14 @@ void main() {
   testWidgets('Home shows the badge when the shared feed has notifications', (
     tester,
   ) async {
+    final notificationReadController = NotificationReadController();
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
           authRepository: _FakeAuthRepository(),
           peopleRepository: _FakePeopleRepository(),
           vaccinationRepository: _FakeVaccinationRepository(),
+          notificationReadController: notificationReadController,
         ),
       ),
     );
@@ -213,7 +235,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('opening notifications marks the feed as viewed', (tester) async {
+    final notificationReadController = NotificationReadController();
+    final authRepository = _FakeAuthRepository();
+    final vaccinationRepository = _FakeVaccinationRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authRepository: authRepository,
+          peopleRepository: _FakePeopleRepository(),
+          vaccinationRepository: vaccinationRepository,
+          notificationReadController: notificationReadController,
+        ),
+        routes: {
+          AppRoutes.notifications: (_) => NotificationsScreen(
+            authRepository: authRepository,
+            vaccinationRepository: vaccinationRepository,
+            notificationReadController: notificationReadController,
+          ),
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('notification-badge')), findsOneWidget);
+    await tester.tap(find.byTooltip('Notificações'));
+    await tester.pumpAndSettle();
+    expect(find.text('Atualizações da sua carteira'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('notification-badge')), findsNothing);
+  });
+
   testWidgets('Home summary warns when a dose is overdue', (tester) async {
+    final notificationReadController = NotificationReadController();
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
@@ -230,6 +286,7 @@ void main() {
               ),
             ],
           ),
+          notificationReadController: notificationReadController,
         ),
       ),
     );

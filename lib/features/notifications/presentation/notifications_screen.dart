@@ -4,11 +4,14 @@ import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -17,11 +20,13 @@ class NotificationsScreen extends StatefulWidget {
     this.authRepository,
     this.vaccinationRepository,
     this.walletController,
+    this.notificationReadController,
   });
 
   final AuthRepository? authRepository;
   final VaccinationRepository? vaccinationRepository;
   final WalletSelectionController? walletController;
+  final NotificationReadController? notificationReadController;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -34,7 +39,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
+  late final NotificationReadController _notificationReadController =
+      widget.notificationReadController ?? NotificationReadController.instance;
   Stream<List<VaccinationRecord>>? _records;
+  String? _selectedPersonId;
+  String? _selectedPersonName;
+  bool _isViewingDependent = false;
   bool _loading = true;
   String? _error;
 
@@ -56,6 +66,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final selected = _wallet.selectedPerson ?? user;
       if (!mounted) return;
       setState(() {
+        _selectedPersonId = selected.effectivePersonId;
+        _selectedPersonName = selected.name;
+        _isViewingDependent =
+            selected.effectivePersonId != user.effectivePersonId;
         _records = _vaccinations.watchRecordsByPerson(
           personId: selected.effectivePersonId,
           responsibleId: user.effectivePersonId,
@@ -74,17 +88,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: _isViewingDependent
+        ? DependentWalletColors.background
+        : AppColors.background,
     body: SafeArea(
-      child: Column(
-        children: [
-          const AppPageHeader(
-            title: 'Notificações',
-            subtitle: 'Atualizações da sua carteira',
-            showBack: true,
-          ),
-          Expanded(child: _body()),
-        ],
+      child: DependentWalletBackground(
+        enabled: _isViewingDependent,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Column(
+              children: [
+                AppPageHeader(
+                  title: 'Notificações',
+                  subtitle: _isViewingDependent
+                      ? 'Novidades da carteira de ${_selectedPersonName ?? 'seu dependente'}'
+                      : 'Atualizações da sua carteira',
+                  showBack: true,
+                  backgroundColor: _isViewingDependent
+                      ? DependentWalletColors.sky
+                      : AppColors.primarySoft,
+                ),
+                Expanded(child: _body()),
+              ],
+            ),
+            const Positioned(
+              left: 0,
+              bottom: 8,
+              child: MuuniEntranceAnimation(
+                key: Key('muuni-notification-animation'),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -108,17 +144,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
         final records = snapshot.data ?? const <VaccinationRecord>[];
         final items = DemoPresentation.notificationsForPresentation(records);
+        _markVisibleNotificationsAsViewed(items);
         if (items.isEmpty) {
           return const _NotificationEmptyState();
         }
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 132),
           itemCount: items.length,
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (_, index) => _NotificationCard(item: items[index]),
         );
       },
     );
+  }
+
+  void _markVisibleNotificationsAsViewed(
+    List<VaccinationNotification> notifications,
+  ) {
+    final personId = _selectedPersonId;
+    if (personId == null || notifications.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _notificationReadController.markAsViewed(
+        personId: personId,
+        notifications: notifications,
+      );
+    });
   }
 }
 

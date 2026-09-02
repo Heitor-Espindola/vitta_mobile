@@ -10,20 +10,29 @@ import 'package:vitta_mobile/features/information/presentation/controllers/news_
 import 'package:vitta_mobile/features/information/presentation/models/educational_content.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/educational_content_widgets.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
-import 'package:vitta_mobile/features/information/presentation/widgets/news_category_selector.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_states.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class InformationScreen extends StatefulWidget {
-  const InformationScreen({super.key, this.newsRepository});
+  const InformationScreen({
+    super.key,
+    this.newsRepository,
+    this.walletController,
+  });
 
   final NewsRepository? newsRepository;
+  final WalletSelectionController? walletController;
 
   @override
   State<InformationScreen> createState() => _InformationScreenState();
 }
 
 class _InformationScreenState extends State<InformationScreen> {
+  late final WalletSelectionController _wallet =
+      widget.walletController ?? WalletSelectionController.instance;
   late final NewsController _controller = NewsController(
     repository: widget.newsRepository ?? ApiNewsRepository(),
   )..addListener(_onChanged);
@@ -33,8 +42,16 @@ class _InformationScreenState extends State<InformationScreen> {
   @override
   void initState() {
     super.initState();
+    _wallet.addListener(_onWalletChanged);
     _controller.loadInitialNews();
   }
+
+  void _onWalletChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _isViewingDependent =>
+      _wallet.currentPersonId != null && !_wallet.isViewingCurrent;
 
   void _onChanged() {
     if (mounted) setState(() {});
@@ -83,6 +100,7 @@ class _InformationScreenState extends State<InformationScreen> {
 
   @override
   void dispose() {
+    _wallet.removeListener(_onWalletChanged);
     _controller
       ..removeListener(_onChanged)
       ..dispose();
@@ -95,90 +113,95 @@ class _InformationScreenState extends State<InformationScreen> {
     title: 'Conteúdo',
     currentTab: VittaTab.content,
     showTopBar: false,
-    body: RefreshIndicator(
-      onRefresh: _controller.refreshNews,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        children: [
-          const _InformationHero(),
-          const SizedBox(height: 14),
-          NewsCategorySelector(
-            selectedCategory: _controller.selectedCategory,
-            enabled: !_controller.isLoading,
-            onSelected: _controller.selectCategory,
-          ),
-          const SizedBox(height: 8),
-          ExpandableSearch(
-            hint: 'Pesquisar notícias',
-            controller: _searchController,
-            onSubmitted: _search,
-            onClosed: _clearSearch,
-          ),
-          if (_controller.currentQuery.isNotEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _controller.isLoading ? null : _clearSearch,
-                icon: const Icon(Icons.close, size: 16),
-                label: Text('Limpar: ${_controller.currentQuery}'),
-              ),
+    bottomNavigationOverlay: _isViewingDependent
+        ? const MuuniSeatedNavMascot()
+        : null,
+    body: DependentWalletBackground(
+      key: Key(
+        _isViewingDependent
+            ? 'information-dependent-theme'
+            : 'information-standard-theme',
+      ),
+      enabled: _isViewingDependent,
+      child: RefreshIndicator(
+        onRefresh: _controller.refreshNews,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            _InformationHero(dependent: _isViewingDependent),
+            const SizedBox(height: 14),
+            ExpandableSearch(
+              hint: 'Pesquisar notícias',
+              controller: _searchController,
+              onSubmitted: _search,
+              onClosed: _clearSearch,
             ),
-          const SizedBox(height: 18),
-          _SectionHeader(
-            title: 'Conteúdos educativos',
-            actionLabel: 'Ver todos ›',
-            actionKey: const Key('show-all-educational-content'),
-            onAction: _openAllEducationalContents,
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(educationalContents.length, (index) {
-                final content = educationalContents[index];
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: index == educationalContents.length - 1 ? 0 : 10,
-                  ),
-                  child: EducationalContentCard(
-                    key: Key('educational-content-$index'),
-                    content: content,
-                    selected: _selectedContentIndex == index,
-                    onTap: () => _openEducationalContent(index),
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _SectionHeader(
-            title: 'Notícias recentes',
-            actionLabel: 'Ver todas ›',
-            actionKey: const Key('show-all-news'),
-            onAction: _openAllNews,
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Text(
-                  'Seleção editorial sobre vacinação. Consulte sempre os canais oficiais de saúde.',
-                  style: AppTypography.caption,
+            if (_controller.currentQuery.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _controller.isLoading ? null : _clearSearch,
+                  icon: const Icon(Icons.close, size: 16),
+                  label: Text('Limpar: ${_controller.currentQuery}'),
                 ),
               ),
-              IconButton(
-                tooltip: 'Atualizar notícias',
-                onPressed: _controller.isLoading
-                    ? null
-                    : _controller.refreshNews,
-                icon: const Icon(Icons.refresh, size: 20),
+            const SizedBox(height: 18),
+            _SectionHeader(
+              title: 'Conteúdos educativos',
+              actionLabel: 'Ver todos ›',
+              actionKey: const Key('show-all-educational-content'),
+              onAction: _openAllEducationalContents,
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(educationalContents.length, (index) {
+                  final content = educationalContents[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: index == educationalContents.length - 1 ? 0 : 10,
+                    ),
+                    child: EducationalContentCard(
+                      key: Key('educational-content-$index'),
+                      content: content,
+                      selected: _selectedContentIndex == index,
+                      onTap: () => _openEducationalContent(index),
+                    ),
+                  );
+                }),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _newsBody(),
-        ],
+            ),
+            const SizedBox(height: 20),
+            _SectionHeader(
+              title: 'Notícias recentes',
+              actionLabel: 'Ver todas ›',
+              actionKey: const Key('show-all-news'),
+              onAction: _openAllNews,
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Seleção editorial sobre vacinação. Consulte sempre os canais oficiais de saúde.',
+                    style: AppTypography.caption,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Atualizar notícias',
+                  onPressed: _controller.isLoading
+                      ? null
+                      : _controller.refreshNews,
+                  icon: const Icon(Icons.refresh, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _newsBody(),
+          ],
+        ),
       ),
     ),
   );
@@ -251,7 +274,9 @@ class _InformationScreenState extends State<InformationScreen> {
 }
 
 class _InformationHero extends StatelessWidget {
-  const _InformationHero();
+  const _InformationHero({required this.dependent});
+
+  final bool dependent;
 
   @override
   Widget build(BuildContext context) {
@@ -263,17 +288,25 @@ class _InformationHero extends StatelessWidget {
         key: const Key('information-header-band'),
         width: width,
         padding: const EdgeInsets.fromLTRB(18, 17, 16, 16),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
+            colors: dependent
+                ? const [DependentWalletColors.lavender, Color(0xFFFFF7E8)]
+                : const [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
+          border: Border(
+            bottom: BorderSide(
+              color: dependent
+                  ? DependentWalletColors.border
+                  : const Color(0xFFDCEBF4),
+            ),
+          ),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -293,8 +326,8 @@ class _InformationHero extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 12),
-            CircleAvatar(
+            const SizedBox(width: 12),
+            const CircleAvatar(
               radius: 22,
               backgroundColor: Color(0xFFDDEFFC),
               foregroundColor: AppColors.primaryDark,
