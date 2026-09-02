@@ -15,6 +15,7 @@ import 'package:vitta_mobile/features/information/domain/services/news_relevance
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
+import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
 
 const articleJson = {
   'source': {'name': 'Agência Saúde'},
@@ -83,6 +84,38 @@ void main() {
         NewsRelevanceFilter.isRelevant(
           const NewsArticle(
             sourceName: 'Fonte',
+            title: 'Saúde e bem-estar ganham destaque nesta semana',
+            description: 'A programação também menciona uma vacina.',
+            url: 'https://example.com/saude-generica',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Congresso debate nova proposta partidária',
+            description: 'O texto cita vacinação apenas de forma lateral.',
+            url: 'https://example.com/politica-com-mencao',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Congresso debate campanha de vacinação infantil',
+            url: 'https://example.com/vacinacao-no-congresso',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
             title: 'Congresso debate nova proposta política',
             description: 'Votação acontece nesta semana.',
             url: 'https://example.com/politica',
@@ -117,11 +150,14 @@ void main() {
       final response = await NewsApiService(
         client: client,
         apiKey: 'test-key',
+        now: () => DateTime.utc(2026, 8, 31),
       ).fetch(page: 1, searchTerm: 'febre amarela');
       expect(response.articles, hasLength(1));
       expect(requestedUri.host, 'newsapi.org');
       expect(requestedUri.queryParameters['q'], contains('febre amarela'));
       expect(requestedUri.queryParameters['pageSize'], '20');
+      expect(requestedUri.queryParameters['searchIn'], 'title,description');
+      expect(requestedUri.queryParameters['from'], '2026-08-01');
     });
 
     test('parses an empty response', () async {
@@ -243,6 +279,23 @@ void main() {
       expect(repository.lastQuery, 'febre amarela');
     });
 
+    test('combines search with category and clearing keeps category', () async {
+      final repository = RecordingRepository(nextResponse([article('1')]));
+      final controller = NewsController(repository: repository);
+
+      await controller.selectCategory(NewsCategory.hpv);
+      await controller.searchNews('adolescente');
+
+      expect(controller.selectedCategory, NewsCategory.hpv);
+      expect(repository.queries.last, contains(NewsCategory.hpv.query));
+      expect(repository.queries.last, contains('"adolescente"'));
+
+      await controller.clearSearch();
+      expect(controller.selectedCategory, NewsCategory.hpv);
+      expect(controller.currentQuery, isEmpty);
+      expect(repository.queries.last, NewsCategory.hpv.query);
+    });
+
     test('pagination removes duplicate URLs', () async {
       final repository = QueueRepository([
         nextResponse(List.generate(20, (i) => article('$i')), total: 40),
@@ -298,6 +351,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Conteúdo keeps category above search and clears only the term', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = ImmediateRepository(nextResponse([article('layout')]));
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    final category = find.byKey(const Key('news-category-forYou'));
+    final search = find.byKey(const ValueKey('collapsed-search'));
+    expect(
+      tester.getTopLeft(category).dy,
+      lessThan(tester.getTopLeft(search).dy),
+    );
+    expect(tester.getTopLeft(search).dx, lessThan(40));
+    expect(
+      tester.getSize(find.byKey(const Key('information-header-band'))).width,
+      412,
+    );
+
+    await tester.tap(find.byKey(const Key('news-category-children')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Pesquisar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('expandable-search-field')),
+      'vacinação infantil',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Limpar: vacinação infantil'), findsOneWidget);
+    await tester.tap(find.text('Limpar: vacinação infantil'));
+    await tester.pumpAndSettle();
+
+    final selectedChip = tester.widget<ChoiceChip>(
+      find.byKey(const Key('news-category-children')),
+    );
+    expect(selectedChip.selected, isTrue);
+    expect(find.text('Limpar: vacinação infantil'), findsNothing);
+  });
+
   testWidgets('educational cards open content and trigger related search', (
     tester,
   ) async {
@@ -334,6 +433,159 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Informações confiáveis'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty category explains state and returns to all news', (
+    tester,
+  ) async {
+    final repository = CallbackRepository((query) {
+      if (query == NewsCategory.children.query) return nextResponse([]);
+      return nextResponse([article('feed')]);
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('news-category-children')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sem novidades por aqui'), findsOneWidget);
+    expect(
+      find.text('Não encontramos notícias recentes sobre este tema.'),
+      findsOneWidget,
+    );
+
+    await tester.drag(
+      find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is ListView && widget.scrollDirection == Axis.vertical,
+          )
+          .first,
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('empty-show-all-news')));
+    await tester.pumpAndSettle();
+    expect(repository.queries.last, '');
+    expect(find.text('Notícia feed'), findsOneWidget);
+  });
+
+  testWidgets('empty search has its own state and can be cleared', (
+    tester,
+  ) async {
+    final repository = CallbackRepository(
+      (query) =>
+          query.isEmpty ? nextResponse([article('feed')]) : nextResponse([]),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Pesquisar').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('expandable-search-field')),
+      'termo inexistente',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is ListView && widget.scrollDirection == Axis.vertical,
+          )
+          .first,
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nenhum resultado encontrado'), findsOneWidget);
+    expect(find.text('Tente outro termo ou limpe a pesquisa.'), findsOneWidget);
+    await tester.tap(find.text('Limpar busca'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notícia feed'), findsOneWidget);
+  });
+
+  testWidgets('both Ver todos actions open useful listings', (tester) async {
+    final repository = ImmediateRepository(nextResponse([article('1')]));
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('show-all-educational-content')),
+    );
+    await tester.tap(find.byKey(const Key('show-all-educational-content')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Orientações gerais sobre vacinação'),
+      findsOneWidget,
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('show-all-news')));
+    await tester.tap(find.byKey(const Key('show-all-news')));
+    await tester.pumpAndSettle();
+    expect(find.text('Notícias e atualizações'), findsOneWidget);
+    expect(find.text('Notícia 1'), findsOneWidget);
+  });
+
+  testWidgets('API error keeps educational content visible and retry works', (
+    tester,
+  ) async {
+    final repository = FlakyRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Conteúdos educativos'), findsOneWidget);
+    expect(find.text('Sem conexão. Verifique sua internet.'), findsOneWidget);
+    await tester.drag(
+      find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is ListView && widget.scrollDirection == Axis.vertical,
+          )
+          .first,
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notícia recuperada'), findsOneWidget);
+  });
+
+  testWidgets('invalid article URL shows a friendly message', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: NewsArticleCard(
+            article: NewsArticle(
+              sourceName: 'Fonte',
+              title: 'Vacinação sem URL válida',
+              url: 'url-invalida',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Vacinação sem URL válida'));
+    await tester.pump();
+    expect(find.text('Não foi possível abrir esta notícia.'), findsOneWidget);
+  });
+
+  test('formats news dates in Brazilian Portuguese', () {
+    expect(
+      formatNewsDate(DateTime(2026, 8, 31), now: DateTime(2026, 9, 5)),
+      '31 ago. 2026',
+    );
   });
 }
 
@@ -379,6 +631,62 @@ class ImmediateRepository implements NewsRepository {
   }) async {
     lastQuery = query;
     return response;
+  }
+
+  @override
+  void dispose() {}
+}
+
+class RecordingRepository implements NewsRepository {
+  RecordingRepository(this.response);
+  final NewsResponse response;
+  final List<String> queries = [];
+
+  @override
+  Future<NewsResponse> getNews({
+    required String query,
+    required int page,
+    bool forceRefresh = false,
+  }) async {
+    queries.add(query);
+    return response;
+  }
+
+  @override
+  void dispose() {}
+}
+
+class CallbackRepository implements NewsRepository {
+  CallbackRepository(this.callback);
+  final NewsResponse Function(String query) callback;
+  final List<String> queries = [];
+
+  @override
+  Future<NewsResponse> getNews({
+    required String query,
+    required int page,
+    bool forceRefresh = false,
+  }) async {
+    queries.add(query);
+    return callback(query);
+  }
+
+  @override
+  void dispose() {}
+}
+
+class FlakyRepository implements NewsRepository {
+  int calls = 0;
+
+  @override
+  Future<NewsResponse> getNews({
+    required String query,
+    required int page,
+    bool forceRefresh = false,
+  }) async {
+    calls++;
+    if (calls == 1) throw const NewsException(NewsErrorType.network);
+    return nextResponse([article('recuperada')]);
   }
 
   @override

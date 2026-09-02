@@ -54,10 +54,34 @@ void main() {
       contains('Sua dose de Influenza está atrasada.'),
     );
     expect(
-      DemoPresentation.notificationsForPresentation(const <VaccinationRecord>[
-        VaccinationRecord(id: 'real-record', vaccineName: 'Vacina real'),
-      ], enabled: true),
-      isEmpty,
+      DemoPresentation.notificationsForPresentation(<VaccinationRecord>[
+        VaccinationRecord(
+          id: 'real-record',
+          vaccineName: 'Vacina real',
+          nextDoseAt: DateTime.now().add(const Duration(days: 2)),
+        ),
+      ], enabled: true).map((item) => item.id),
+      contains('upcoming-real-record'),
     );
   });
+
+  test(
+    'modo de demonstração desligado não injeta registros nem notificações',
+    () {
+      expect(
+        DemoPresentation.recordsForPresentation(
+          const <VaccinationRecord>[],
+          enabled: false,
+        ),
+        isEmpty,
+      );
+      expect(
+        DemoPresentation.notificationsForPresentation(
+          const <VaccinationRecord>[],
+          enabled: false,
+        ),
+        isEmpty,
+      );
+    },
+  );
 }

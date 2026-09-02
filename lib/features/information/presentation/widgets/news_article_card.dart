@@ -64,6 +64,15 @@ class NewsArticleCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (article.description != null) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            article.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10, height: 1.25),
+                          ),
+                        ],
                         const SizedBox(height: 5),
                         const Text(
                           'Ler notícia',
@@ -167,10 +176,14 @@ class _ArticleImage extends StatelessWidget {
   final double height;
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
-      color: const Color(0xFFE8F2F8),
-      alignment: Alignment.center,
-      child: const Icon(Icons.newspaper, color: vittaDarkBlue, size: 30),
+    final placeholder = Semantics(
+      image: true,
+      label: 'Imagem ilustrativa da notícia',
+      child: Container(
+        color: const Color(0xFFE8F2F8),
+        alignment: Alignment.center,
+        child: const Icon(Icons.newspaper, color: vittaDarkBlue, size: 30),
+      ),
     );
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
@@ -181,6 +194,7 @@ class _ArticleImage extends StatelessWidget {
             ? placeholder
             : Image.network(
                 url!,
+                semanticLabel: 'Imagem da notícia',
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, progress) =>
                     progress == null ? child : placeholder,
@@ -200,5 +214,19 @@ String formatNewsDate(DateTime? date, {DateTime? now}) {
     return 'Hoje, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
   if (value == today.subtract(const Duration(days: 1))) return 'Ontem';
-  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  const months = [
+    'jan.',
+    'fev.',
+    'mar.',
+    'abr.',
+    'mai.',
+    'jun.',
+    'jul.',
+    'ago.',
+    'set.',
+    'out.',
+    'nov.',
+    'dez.',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

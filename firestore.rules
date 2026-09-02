@@ -82,6 +82,62 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/users/$(userId));
     }
 
+    function relationshipPath(fromPersonId, toPersonId) {
+      return /databases/$(database)/documents/relationships/$(relationshipId(fromPersonId, toPersonId));
+    }
+
+    function grantPath(granteePersonId, subjectPersonId) {
+      return /databases/$(database)/documents/access_grants/$(relationshipId(granteePersonId, subjectPersonId));
+    }
+
+    function registryMatchesPatientAfter(cpfHash, patientId) {
+      let registryPath = /databases/$(database)/documents/cpf_registry/$(cpfHash);
+      return existsAfter(registryPath)
+        && ((getAfter(registryPath).data.keys().hasAny(['personId'])
+              && getAfter(registryPath).data.personId == patientId)
+          || (getAfter(registryPath).data.keys().hasAny(['ownerUid'])
+              && getAfter(registryPath).data.ownerUid == patientId));
+    }
+
+    function hasAcademicRelationshipAfter(fromPersonId, toPersonId) {
+      let path = relationshipPath(fromPersonId, toPersonId);
+      return existsAfter(path)
+        && getAfter(path).data.fromPersonId == fromPersonId
+        && getAfter(path).data.toPersonId == toPersonId
+        && getAfter(path).data.status == 'verified'
+        && getAfter(path).data.permissions.viewVaccination == true
+        && getAfter(path).data.permissions.receiveNotifications == true
+        && getAfter(path).data.consentStatus == 'granted'
+        && getAfter(path).data.verificationSource == 'academic_tcc'
+        && getAfter(path).data.cpfHash is string
+        && registryMatchesPatientAfter(
+          getAfter(path).data.cpfHash,
+          toPersonId
+        );
+    }
+
+    function hasAcademicGrantAfter(granteePersonId, subjectPersonId) {
+      let path = grantPath(granteePersonId, subjectPersonId);
+      return existsAfter(path)
+        && getAfter(path).data.granteePersonId == granteePersonId
+        && getAfter(path).data.subjectPersonId == subjectPersonId
+        && getAfter(path).data.viewVaccination == true
+        && getAfter(path).data.receiveNotifications == true
+        && getAfter(path).data.consentStatus == 'granted'
+        && getAfter(path).data.source == 'academic_tcc'
+        && getAfter(path).data.validUntil == null
+        && getAfter(path).data.cpfHash is string
+        && registryMatchesPatientAfter(
+          getAfter(path).data.cpfHash,
+          subjectPersonId
+        );
+    }
+
+    function hasAcademicPairAfter(fromPersonId, toPersonId) {
+      return hasAcademicRelationshipAfter(fromPersonId, toPersonId)
+        && hasAcademicGrantAfter(fromPersonId, toPersonId);
+    }
+
     function hasValidUserKeys() {
       return request.resource.data.keys().hasAll([
         'uid', 'id', 'authUid', 'canAuthenticate', 'name', 'fullName',
@@ -193,7 +249,8 @@ service cloud.firestore {
         && request.resource.data.relationshipToGuardian is string
         && request.resource.data.relationshipToGuardian.size() > 0
         && userExistsAfter(personId)
-        && userAfter(personId).data.dependentIds.hasAny([userId]);
+        && userAfter(personId).data.dependentIds.hasAny([userId])
+        && hasAcademicPairAfter(personId, userId);
     }
 
     function immutableUserFields() {
@@ -228,6 +285,9 @@ service cloud.firestore {
 
     function validDependentLinkUpdate(userId) {
       let personId = currentPersonId();
+      let addedId = request.resource.data.dependentIds[
+        request.resource.data.dependentIds.size() - 1
+      ];
       return signedIn()
         && userId == personId
         && hasValidUserKeys()
@@ -238,32 +298,11 @@ service cloud.firestore {
         && request.resource.data.dependentIds.size()
           == resource.data.dependentIds.size() + 1
         && request.resource.data.dependentIds.hasAll(resource.data.dependentIds)
-        && !resource.data.dependentIds.hasAny([
-          request.resource.data.dependentIds[
-            request.resource.data.dependentIds.size() - 1
-          ]
-        ])
+        && !resource.data.dependentIds.hasAny([addedId])
         && request.resource.data.dependentIds.toSet()
-          .difference(resource.data.dependentIds.toSet()).hasOnly([
-            request.resource.data.dependentIds[
-              request.resource.data.dependentIds.size() - 1
-            ]
-          ])
-        && userExistsAfter(
-          request.resource.data.dependentIds[
-            request.resource.data.dependentIds.size() - 1
-          ]
-        )
-        && userAfter(
-          request.resource.data.dependentIds[
-            request.resource.data.dependentIds.size() - 1
-          ]
-        ).data.guardianIds == [personId]
-        && userAfter(
-          request.resource.data.dependentIds[
-            request.resource.data.dependentIds.size() - 1
-          ]
-        ).data.managedByUserIds == [personId];
+          .difference(resource.data.dependentIds.toSet()).hasOnly([addedId])
+        && userExistsAfter(addedId)
+        && hasAcademicPairAfter(personId, addedId);
     }
 
     function validCpfRegistryCreation(cpfHash) {
@@ -276,17 +315,23 @@ service cloud.firestore {
             && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
             && request.resource.data.ownerUid == personId)
           || (request.resource.data.keys().hasAll([
-                'ownerUid', 'guardianUid', 'createdAt'
+                'ownerUid', 'personId', 'guardianUid', 'createdAt'
               ])
             && request.resource.data.keys().hasOnly([
-                'ownerUid', 'guardianUid', 'createdAt'
+                'ownerUid', 'personId', 'guardianUid', 'createdAt'
             ])
             && request.resource.data.guardianUid == personId
+            && request.resource.data.personId
+              == request.resource.data.ownerUid
             && userExistsAfter(request.resource.data.ownerUid)
             && userAfter(request.resource.data.ownerUid).data.guardianIds
               == [personId]
             && userAfter(request.resource.data.ownerUid).data.managedByUserIds
-              == [personId]));
+              == [personId]
+            && hasAcademicPairAfter(
+              personId,
+              request.resource.data.ownerUid
+            )));
     }
 
     function hasValidVaccinationRecordKeys() {
@@ -342,6 +387,63 @@ service cloud.firestore {
           /databases/$(database)/documents/users/$(request.resource.data.patientId)
         )
         && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validEmergencyContact() {
+      return request.resource.data.keys().hasAll([
+          'name', 'phone', 'relationship', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'name', 'phone', 'relationship', 'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 30
+        && request.resource.data.relationship is string
+        && request.resource.data.relationship.size() <= 80
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validVaccineCatalogEntry(vaccineId) {
+      return request.resource.data.keys().hasAll([
+          'id', 'name', 'shortName', 'description', 'recommendedAge',
+          'doseCount', 'intervalDays', 'prevents', 'targetGroups',
+          'doseSchedule', 'expectedReactions', 'warningSigns',
+          'contraindications', 'sourceName', 'sourceUrl', 'sourceUpdatedAt',
+          'calendarVersion', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'name', 'shortName', 'description', 'recommendedAge',
+          'doseCount', 'intervalDays', 'prevents', 'targetGroups',
+          'doseSchedule', 'expectedReactions', 'warningSigns',
+          'contraindications', 'sourceName', 'sourceUrl', 'sourceUpdatedAt',
+          'calendarVersion', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.id == vaccineId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 160
+        && request.resource.data.shortName is string
+        && request.resource.data.description is string
+        && request.resource.data.recommendedAge is string
+        && request.resource.data.doseCount is int
+        && request.resource.data.doseCount >= 0
+        && request.resource.data.intervalDays is int
+        && request.resource.data.intervalDays >= 0
+        && request.resource.data.prevents is list
+        && request.resource.data.targetGroups is list
+        && request.resource.data.doseSchedule is list
+        && request.resource.data.expectedReactions is list
+        && request.resource.data.warningSigns is list
+        && request.resource.data.contraindications is list
+        && request.resource.data.sourceName is string
+        && request.resource.data.sourceUrl is string
+        && request.resource.data.sourceUpdatedAt is timestamp
+        && request.resource.data.calendarVersion is string
+        && request.resource.data.active is bool
+        && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt == request.time;
     }
 
@@ -438,39 +540,118 @@ service cloud.firestore {
           || hasAdultVaccinationGrant(subjectPersonId));
     }
 
-    function validPendingRelationshipCreation(relationshipId) {
+    function validAcademicRelationshipData(documentId) {
       return signedIn()
         && request.resource.data.keys().hasAll([
           'fromPersonId', 'toPersonId', 'type', 'status', 'permissions',
           'consentStatus', 'verificationSource', 'verifiedAt', 'validUntil',
-          'createdAt', 'updatedAt'
+          'cpfHash', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.keys().hasOnly([
           'fromPersonId', 'toPersonId', 'type', 'status', 'permissions',
           'consentStatus', 'verificationSource', 'verifiedAt', 'validUntil',
-          'createdAt', 'updatedAt'
+          'cpfHash', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.fromPersonId == currentPersonId()
         && request.resource.data.toPersonId is string
         && request.resource.data.toPersonId != currentPersonId()
-        && relationshipId == request.resource.data.fromPersonId
+        && documentId == request.resource.data.fromPersonId
           + '_' + request.resource.data.toPersonId
         && request.resource.data.type in [
           'mother', 'father', 'legal_guardian', 'tutor', 'caregiver'
         ]
-        && request.resource.data.status == 'pending'
+        && request.resource.data.status == 'verified'
         && request.resource.data.permissions is map
-        && request.resource.data.permissions.viewVaccination == false
-        && request.resource.data.permissions.receiveNotifications == false
-        && request.resource.data.consentStatus in [
-          'not_required_minor', 'pending'
-        ]
-        && request.resource.data.verificationSource == 'manual_pending'
-        && request.resource.data.verifiedAt == null
+        && request.resource.data.permissions.keys().hasOnly([
+          'viewVaccination', 'receiveNotifications'
+        ])
+        && request.resource.data.permissions.viewVaccination == true
+        && request.resource.data.permissions.receiveNotifications == true
+        && request.resource.data.consentStatus == 'granted'
+        && request.resource.data.verificationSource == 'academic_tcc'
+        && request.resource.data.cpfHash is string
+        && request.resource.data.cpfHash.size() == 64
+        && request.resource.data.verifiedAt == request.time
         && request.resource.data.validUntil == null
-        && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
-        && userExistsAfter(request.resource.data.toPersonId);
+        && userExistsAfter(request.resource.data.toPersonId)
+        && userExistsAfter(currentPersonId())
+        && userAfter(currentPersonId()).data.dependentIds.hasAny([
+          request.resource.data.toPersonId
+        ])
+        && registryMatchesPatientAfter(
+          request.resource.data.cpfHash,
+          request.resource.data.toPersonId
+        )
+        && hasAcademicGrantAfter(
+          currentPersonId(),
+          request.resource.data.toPersonId
+        );
+    }
+
+    function validAcademicRelationshipCreation(documentId) {
+      return validAcademicRelationshipData(documentId)
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function validAcademicRelationshipUpdate(documentId) {
+      return validAcademicRelationshipData(documentId)
+        && resource.data.fromPersonId == currentPersonId()
+        && resource.data.toPersonId == request.resource.data.toPersonId
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validAcademicGrantData(documentId) {
+      return signedIn()
+        && request.resource.data.keys().hasAll([
+          'granteePersonId', 'subjectPersonId', 'viewVaccination',
+          'receiveNotifications', 'consentStatus', 'source', 'cpfHash',
+          'validUntil', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'granteePersonId', 'subjectPersonId', 'viewVaccination',
+          'receiveNotifications', 'consentStatus', 'source', 'cpfHash',
+          'validUntil', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.granteePersonId == currentPersonId()
+        && request.resource.data.subjectPersonId is string
+        && request.resource.data.subjectPersonId != currentPersonId()
+        && documentId == request.resource.data.granteePersonId
+          + '_' + request.resource.data.subjectPersonId
+        && request.resource.data.viewVaccination == true
+        && request.resource.data.receiveNotifications == true
+        && request.resource.data.consentStatus == 'granted'
+        && request.resource.data.source == 'academic_tcc'
+        && request.resource.data.cpfHash is string
+        && request.resource.data.cpfHash.size() == 64
+        && request.resource.data.validUntil == null
+        && request.resource.data.updatedAt == request.time
+        && userExistsAfter(request.resource.data.subjectPersonId)
+        && userExistsAfter(currentPersonId())
+        && userAfter(currentPersonId()).data.dependentIds.hasAny([
+          request.resource.data.subjectPersonId
+        ])
+        && registryMatchesPatientAfter(
+          request.resource.data.cpfHash,
+          request.resource.data.subjectPersonId
+        )
+        && hasAcademicRelationshipAfter(
+          currentPersonId(),
+          request.resource.data.subjectPersonId
+        );
+    }
+
+    function validAcademicGrantCreation(documentId) {
+      return validAcademicGrantData(documentId)
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function validAcademicGrantUpdate(documentId) {
+      return validAcademicGrantData(documentId)
+        && resource.data.granteePersonId == currentPersonId()
+        && resource.data.subjectPersonId
+          == request.resource.data.subjectPersonId
+        && request.resource.data.createdAt == resource.data.createdAt;
     }
 
     match /auth_links/{authUid} {
@@ -496,6 +677,7 @@ service cloud.firestore {
       allow get: if isOwner(userId)
         || (signedIn()
           && resource.data.managedByUserIds.hasAny([currentPersonId()]))
+        || hasAdultVaccinationGrant(userId)
         || hasProfessionalPatientAccess(userId);
       allow list: if false;
       allow update: if (request.resource.data.diff(resource.data)
@@ -512,6 +694,16 @@ service cloud.firestore {
 
       match /devices/{deviceId} {
         allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /private/{privateDocumentId} {
+        allow get: if isOwner(userId)
+          && privateDocumentId == 'emergency_contact';
+        allow list: if false;
+        allow create, update: if isOwner(userId)
+          && privateDocumentId == 'emergency_contact'
+          && validEmergencyContact();
+        allow delete: if false;
       }
     }
 
@@ -548,17 +740,23 @@ service cloud.firestore {
         && (resource.data.fromPersonId == currentPersonId()
           || resource.data.toPersonId == currentPersonId());
       allow list: if false;
-      allow create: if validPendingRelationshipCreation(
-        relationshipDocumentId
-      );
-      allow update, delete: if false;
+      allow create: if validAcademicRelationshipCreation(
+          relationshipDocumentId
+        );
+      allow update: if validAcademicRelationshipUpdate(
+          relationshipDocumentId
+        );
+      allow delete: if false;
     }
 
     match /access_grants/{grantId} {
       allow get: if signedIn()
         && (resource.data.granteePersonId == currentPersonId()
           || resource.data.subjectPersonId == currentPersonId());
-      allow list, create, update, delete: if false;
+      allow list: if false;
+      allow create: if validAcademicGrantCreation(grantId);
+      allow update: if validAcademicGrantUpdate(grantId);
+      allow delete: if false;
     }
 
     match /vaccination_records/{recordId} {
@@ -577,7 +775,13 @@ service cloud.firestore {
 
     match /vaccines/{vaccineId} {
       allow read: if signedIn();
-      allow write: if false;
+      allow create: if isAdmin()
+        && validVaccineCatalogEntry(vaccineId)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        && validVaccineCatalogEntry(vaccineId)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
     }
 
     match /vaccination_schedules/{scheduleId} {

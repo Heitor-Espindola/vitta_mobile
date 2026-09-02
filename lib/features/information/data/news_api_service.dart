@@ -13,10 +13,12 @@ class NewsApiService {
     http.Client? client,
     String? apiKey,
     Duration timeout = const Duration(seconds: 15),
+    DateTime Function()? now,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
        _apiKey = apiKey ?? AppEnvironment.newsApiKey,
-       _timeout = timeout;
+       _timeout = timeout,
+       _now = now ?? DateTime.now;
 
   static const defaultQuery =
       '("vacina" OR "vacinas" OR "vacinação" OR "imunização" OR "imunizante" OR "calendário vacinal" OR "cobertura vacinal" OR "campanha de vacinação")';
@@ -24,6 +26,7 @@ class NewsApiService {
   final bool _ownsClient;
   final String _apiKey;
   final Duration _timeout;
+  final DateTime Function() _now;
 
   Future<NewsResponse> fetch({
     required int page,
@@ -37,11 +40,14 @@ class NewsApiService {
     final normalized = searchTerm.trim().replaceAll(RegExp(r'\s+'), ' ');
     final query = normalized.isEmpty
         ? defaultQuery
-        : '$defaultQuery AND "${normalized.replaceAll('"', '')}"';
+        : '$defaultQuery AND ($normalized)';
+    final from = _now().toUtc().subtract(const Duration(days: 30));
     final uri = Uri.https('newsapi.org', '/v2/everything', {
       'q': query,
+      'searchIn': 'title,description',
       'language': 'pt',
       'sortBy': 'publishedAt',
+      'from': _formatApiDate(from),
       'pageSize': '$pageSize',
       'page': '$page',
     });
@@ -85,4 +91,9 @@ class NewsApiService {
   void dispose() {
     if (_ownsClient) _client.close();
   }
+
+  static String _formatApiDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }

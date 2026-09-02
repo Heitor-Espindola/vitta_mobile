@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
 import 'package:flutter/services.dart';
 
 class AuthBackground extends StatelessWidget {
@@ -66,19 +67,7 @@ class AuthBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.health_and_safety_outlined,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
+        const VittaLogo(size: 36, semanticLabel: 'Logo Vitta'),
         const SizedBox(width: 10),
         const Text(
           'Carteira Digital',

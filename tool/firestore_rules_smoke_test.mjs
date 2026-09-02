@@ -11,6 +11,7 @@ const timestamp = () => ({ timestampValue: new Date().toISOString() });
 const dateTimestamp = (value) => ({ timestampValue: value });
 const string = (value) => ({ stringValue: value });
 const boolean = (value) => ({ booleanValue: value });
+const integer = (value) => ({ integerValue: String(value) });
 const nullableString = (value) =>
   value == null ? { nullValue: null } : string(value);
 const strings = (values) => ({
@@ -53,7 +54,7 @@ function userFields({
     uid: string(uid),
     id: string(uid),
     personId: string(uid),
-    authUid: string(authUid),
+    authUid: nullableString(authUid),
     canAuthenticate: boolean(canAuthenticate),
     name: string(name),
     fullName: string(name),
@@ -310,7 +311,126 @@ function relationshipCreateWrite(
   };
 }
 
-function accessGrantCreateWrite(granteePersonId, subjectPersonId) {
+function vaccineCatalogCreateWrite(vaccineId) {
+  return {
+    update: {
+      name: documentName(`vaccines/${vaccineId}`),
+      fields: {
+        id: string(vaccineId),
+        name: string('BCG'),
+        shortName: string('BCG'),
+        description: string('Catálogo de teste'),
+        recommendedAge: string('Ao nascer'),
+        doseCount: integer(1),
+        intervalDays: integer(0),
+        prevents: strings(['Tuberculose grave']),
+        targetGroups: strings(['Crianças']),
+        doseSchedule: strings(['Dose única']),
+        expectedReactions: strings([]),
+        warningSigns: strings([]),
+        contraindications: strings([]),
+        sourceName: string('Calendário Nacional de Vacinação / PNI'),
+        sourceUrl: string('https://www.gov.br/saude/pt-br/vacinacao/calendario'),
+        sourceUpdatedAt: timestamp(),
+        calendarVersion: string('2026'),
+        active: boolean(true),
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists: false },
+  };
+}
+
+function publicProfileUpdateWrite(uid, fields) {
+  return {
+    update: {
+      name: documentName(`users/${uid}`),
+      fields: { ...fields, updatedAt: timestamp() },
+    },
+    updateMask: { fieldPaths: [...Object.keys(fields), 'updatedAt'] },
+    currentDocument: { exists: true },
+  };
+}
+
+function emergencyContactWrite(uid, { exists = false } = {}) {
+  return {
+    update: {
+      name: documentName(`users/${uid}/private/emergency_contact`),
+      fields: {
+        name: string('Maria Silva'),
+        phone: string('(16) 99999-9999'),
+        relationship: string('Mãe'),
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists },
+  };
+}
+
+function dependentIdsUpdateWrite(uid, dependentIds) {
+  return {
+    update: {
+      name: documentName(`users/${uid}`),
+      fields: {
+        dependentIds: strings(dependentIds),
+        updatedAt: timestamp(),
+      },
+    },
+    updateMask: { fieldPaths: ['dependentIds', 'updatedAt'] },
+    currentDocument: { exists: true },
+  };
+}
+
+function academicRelationshipCreateWrite(
+  fromPersonId,
+  toPersonId,
+  cpf,
+  { exists = false, type = 'legal_guardian' } = {},
+) {
+  const cpfHash = createHash('sha256').update(cpf).digest('hex');
+  return {
+    update: {
+      name: documentName(`relationships/${fromPersonId}_${toPersonId}`),
+      fields: {
+        fromPersonId: string(fromPersonId),
+        toPersonId: string(toPersonId),
+        type: string(type),
+        status: string('verified'),
+        permissions: {
+          mapValue: {
+            fields: {
+              viewVaccination: boolean(true),
+              receiveNotifications: boolean(true),
+            },
+          },
+        },
+        consentStatus: string('granted'),
+        verificationSource: string('academic_tcc'),
+        cpfHash: string(cpfHash),
+        validUntil: { nullValue: null },
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'verifiedAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists },
+  };
+}
+
+function academicAccessGrantCreateWrite(
+  granteePersonId,
+  subjectPersonId,
+  cpf,
+  { exists = false } = {},
+) {
+  const cpfHash = createHash('sha256').update(cpf).digest('hex');
   return {
     update: {
       name: documentName(
@@ -320,12 +440,35 @@ function accessGrantCreateWrite(granteePersonId, subjectPersonId) {
         granteePersonId: string(granteePersonId),
         subjectPersonId: string(subjectPersonId),
         viewVaccination: boolean(true),
+        receiveNotifications: boolean(true),
         consentStatus: string('granted'),
+        source: string('academic_tcc'),
+        cpfHash: string(cpfHash),
         validUntil: { nullValue: null },
-        createdAt: timestamp(),
-        updatedAt: timestamp(),
       },
     },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+    ],
+    currentDocument: { exists },
+  };
+}
+
+function dependentCpfRegistryCreateWrite(cpf, personId, guardianUid) {
+  const cpfHash = createHash('sha256').update(cpf).digest('hex');
+  return {
+    update: {
+      name: documentName(`cpf_registry/${cpfHash}`),
+      fields: {
+        ownerUid: string(personId),
+        personId: string(personId),
+        guardianUid: string(guardianUid),
+      },
+    },
+    updateTransforms: [
+      { fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' },
+    ],
     currentDocument: { exists: false },
   };
 }
@@ -523,7 +666,7 @@ const dependentFields = userFields({
   cpf: dependentCpf,
   role: 'dependent',
   roles: ['dependent'],
-  authUid: '',
+  authUid: null,
   canAuthenticate: false,
   guardianIds: [guardian.uid],
   managedByUserIds: [guardian.uid],
@@ -548,27 +691,84 @@ await commit(guardian.token, [
     currentDocument: { exists: true },
   },
   {
-    update: {
-      name: documentName(`cpf_registry/${cpfHash}`),
-      fields: {
-        ownerUid: string(dependentId),
-        guardianUid: string(guardian.uid),
-        createdAt: timestamp(),
-      },
-    },
-    currentDocument: { exists: false },
+    ...dependentCpfRegistryCreateWrite(
+      dependentCpf,
+      dependentId,
+      guardian.uid,
+    ),
   },
+  academicRelationshipCreateWrite(
+    guardian.uid,
+    dependentId,
+    dependentCpf,
+  ),
+  academicAccessGrantCreateWrite(
+    guardian.uid,
+    dependentId,
+    dependentCpf,
+  ),
 ]);
 
 assert((await read(guardian.token, dependentPath)).status === 200, 'Responsável não leu o dependente.');
 assert((await read(otherUser.token, dependentPath)).status === 403, 'Outro usuário acessou o dependente.');
 assert((await read(guardian.token, 'users')).status === 403, 'Listagem global de users foi permitida.');
+assert(
+  (await read(guardian.token, `relationships/${guardian.uid}_${dependentId}`)).status === 200,
+  'Relationship acadêmico direto não foi criado.',
+);
+assert(
+  (await read(guardian.token, `access_grants/${guardian.uid}_${dependentId}`)).status === 200,
+  'Access grant acadêmico direto não foi criado.',
+);
+
+const privilegedDependentId = 'dependent-admin-blocked';
+const privilegedCpf = '93541134780';
+const privilegedFields = userFields({
+  uid: privilegedDependentId,
+  name: 'Admin Indevido',
+  cpf: privilegedCpf,
+  role: 'admin',
+  roles: ['admin'],
+  authUid: null,
+  canAuthenticate: false,
+  guardianIds: [guardian.uid],
+  managedByUserIds: [guardian.uid],
+  relationshipToGuardian: 'Filho(a)',
+});
+await commit(
+  guardian.token,
+  [
+    userCreateWrite(privilegedDependentId, privilegedFields),
+    dependentIdsUpdateWrite(guardian.uid, [dependentId, privilegedDependentId]),
+    dependentCpfRegistryCreateWrite(
+      privilegedCpf,
+      privilegedDependentId,
+      guardian.uid,
+    ),
+    academicRelationshipCreateWrite(
+      guardian.uid,
+      privilegedDependentId,
+      privilegedCpf,
+    ),
+    academicAccessGrantCreateWrite(
+      guardian.uid,
+      privilegedDependentId,
+      privilegedCpf,
+    ),
+  ],
+  403,
+);
+assert(
+  (await adminRead(`users/${privilegedDependentId}`)).status === 404,
+  'Cliente conseguiu criar dependente com papel admin.',
+);
 
 const duplicateId = 'dependent-duplicate';
 const duplicateFields = {
   ...dependentFields,
   uid: string(duplicateId),
   id: string(duplicateId),
+  personId: string(duplicateId),
 };
 const guardianWithDuplicate = {
   ...guardianWithDependent,
@@ -596,24 +796,30 @@ const duplicateResponse = await fetch(`${apiRoot}/documents:commit`, {
         },
         currentDocument: { exists: true },
       },
-      {
-        update: {
-          name: documentName(`cpf_registry/${cpfHash}`),
-          fields: {
-            ownerUid: string(duplicateId),
-            guardianUid: string(guardian.uid),
-            createdAt: timestamp(),
-          },
-        },
-        currentDocument: { exists: false },
-      },
+      dependentCpfRegistryCreateWrite(
+        dependentCpf,
+        duplicateId,
+        guardian.uid,
+      ),
+      academicRelationshipCreateWrite(
+        guardian.uid,
+        duplicateId,
+        dependentCpf,
+      ),
+      academicAccessGrantCreateWrite(
+        guardian.uid,
+        duplicateId,
+        dependentCpf,
+      ),
     ],
   }),
 });
 assert(!duplicateResponse.ok, 'CPF duplicado foi aceito.');
 assert(
-  (await adminRead(`users/${duplicateId}`)).status === 404,
-  'Dependente duplicado ficou órfão.',
+  (await adminRead(`users/${duplicateId}`)).status === 404 &&
+    (await adminRead(`relationships/${guardian.uid}_${duplicateId}`)).status === 404 &&
+    (await adminRead(`access_grants/${guardian.uid}_${duplicateId}`)).status === 404,
+  'Falha transacional deixou dados parciais do dependente duplicado.',
 );
 
 const guardianAfter = await (await read(guardian.token, guardianPath)).json();
@@ -637,6 +843,165 @@ await registerAccount(
   }),
   '12345678909',
 );
+
+// Simula um dependente criado antes de relationships/access_grants. O cliente
+// só pode completar o par quando o vínculo direto já existe nos dois perfis e
+// o cpf_registry exato aponta para a mesma pessoa.
+const legacyDependentId = 'dependent-legacy-migration';
+const legacyDependentCpf = '24681357928';
+const legacyDependentFields = userFields({
+  uid: legacyDependentId,
+  name: 'Dependente Legado',
+  cpf: legacyDependentCpf,
+  role: 'dependent',
+  roles: ['dependent'],
+  authUid: null,
+  canAuthenticate: false,
+  guardianIds: [otherUser.uid],
+  managedByUserIds: [otherUser.uid],
+  relationshipToGuardian: 'Filho(a)',
+});
+await adminCommit([
+  userCreateWrite(legacyDependentId, legacyDependentFields),
+  dependentIdsUpdateWrite(otherUser.uid, [legacyDependentId]),
+  dependentCpfRegistryCreateWrite(
+    legacyDependentCpf,
+    legacyDependentId,
+    otherUser.uid,
+  ),
+]);
+assert(
+  (await adminRead(`relationships/${otherUser.uid}_${legacyDependentId}`))
+    .status === 404,
+  'Cenário legado iniciou com relationship inesperado.',
+);
+await commit(otherUser.token, [
+  academicRelationshipCreateWrite(
+    otherUser.uid,
+    legacyDependentId,
+    legacyDependentCpf,
+  ),
+  academicAccessGrantCreateWrite(
+    otherUser.uid,
+    legacyDependentId,
+    legacyDependentCpf,
+  ),
+]);
+assert(
+  (
+    await read(
+      otherUser.token,
+      `relationships/${otherUser.uid}_${legacyDependentId}`,
+    )
+  ).status === 200 &&
+    (
+      await read(
+        otherUser.token,
+        `access_grants/${otherUser.uid}_${legacyDependentId}`,
+      )
+    ).status === 200,
+  'Migração segura do vínculo legado não criou o par de autorização.',
+);
+
+const existingFamilyUser = await createAuthUser('existing-family');
+const existingFamilyCpf = '39053344705';
+await registerAccount(
+  existingFamilyUser,
+  userFields({
+    uid: existingFamilyUser.uid,
+    name: 'Pessoa Já Cadastrada',
+    cpf: existingFamilyCpf,
+    role: 'responsible',
+    roles: ['user'],
+    authUid: existingFamilyUser.uid,
+    canAuthenticate: true,
+  }),
+  existingFamilyCpf,
+);
+await commit(guardian.token, [
+  dependentIdsUpdateWrite(guardian.uid, [
+    dependentId,
+    existingFamilyUser.uid,
+  ]),
+  academicRelationshipCreateWrite(
+    guardian.uid,
+    existingFamilyUser.uid,
+    existingFamilyCpf,
+  ),
+  academicAccessGrantCreateWrite(
+    guardian.uid,
+    existingFamilyUser.uid,
+    existingFamilyCpf,
+  ),
+]);
+assert(
+  (await read(guardian.token, `users/${existingFamilyUser.uid}`)).status === 200,
+  'CPF existente não foi vinculado imediatamente.',
+);
+const existingFamilyCpfHash = createHash('sha256')
+  .update(existingFamilyCpf)
+  .digest('hex');
+const existingRegistry = await (
+  await read(guardian.token, `cpf_registry/${existingFamilyCpfHash}`)
+).json();
+assert(
+  existingRegistry.fields.ownerUid.stringValue === existingFamilyUser.uid,
+  'Vínculo de CPF existente alterou ou duplicou o cpf_registry.',
+);
+await commit(
+  otherUser.token,
+  [
+    academicRelationshipCreateWrite(
+      guardian.uid,
+      existingFamilyUser.uid,
+      existingFamilyCpf,
+      { exists: true },
+    ),
+    academicAccessGrantCreateWrite(
+      guardian.uid,
+      existingFamilyUser.uid,
+      existingFamilyCpf,
+      { exists: true },
+    ),
+  ],
+  403,
+);
+
+await commit(guardian.token, [
+  publicProfileUpdateWrite(guardian.uid, { phone: string('(16) 98888-7777') }),
+]);
+await commit(
+  guardian.token,
+  [publicProfileUpdateWrite(guardian.uid, { cpf: string('12345678909') })],
+  403,
+);
+await commit(
+  guardian.token,
+  [publicProfileUpdateWrite(guardian.uid, { role: string('admin') })],
+  403,
+);
+await commit(guardian.token, [emergencyContactWrite(guardian.uid)]);
+assert(
+  (
+    await read(
+      guardian.token,
+      `users/${guardian.uid}/private/emergency_contact`,
+    )
+  ).status === 200,
+  'Titular não conseguiu ler o próprio contato de emergência.',
+);
+assert(
+  (
+    await read(
+      otherUser.token,
+      `users/${guardian.uid}/private/emergency_contact`,
+    )
+  ).status === 403,
+  'Outro usuário leu contato de emergência privado.',
+);
+await commit(guardian.token, [
+  emergencyContactWrite(guardian.uid, { exists: true }),
+]);
 
 const professional = await createAuthUser('professional');
 const blockedProfessional = await createAuthUser('professional-blocked');
@@ -677,6 +1042,33 @@ await adminCommit([
     currentDocument: { exists: false },
   },
 ]);
+
+const adminUser = await createAuthUser('catalog-admin');
+await adminCommit([
+  userCreateWrite(
+    adminUser.uid,
+    userFields({
+      uid: adminUser.uid,
+      name: 'Administrador do Catálogo',
+      cpf: '15350946056',
+      role: 'admin',
+      roles: ['admin'],
+      authUid: adminUser.uid,
+      canAuthenticate: true,
+    }),
+  ),
+]);
+await commit(adminUser.token, [vaccineCatalogCreateWrite('bcg')]);
+await commit(
+  guardian.token,
+  [vaccineCatalogCreateWrite('catalog-write-blocked')],
+  403,
+);
+await commit(
+  adminUser.token,
+  [{ delete: documentName('vaccines/bcg') }],
+  403,
+);
 
 const recordId = 'vaccination-valid';
 await commit(professional.token, [
@@ -867,16 +1259,27 @@ assert(
   'H) Lookup exato não liberou o GET específico do paciente.',
 );
 assert(
+  (
+    await read(
+      professional.token,
+      `users/${guardian.uid}/private/emergency_contact`,
+    )
+  ).status === 403,
+  'Atendimento profissional expôs o contato de emergência privado.',
+);
+assert(
   (await queryVaccinationRecords(professional.token, guardian.uid)).status ===
     200,
   'H) Atendimento validado não liberou o histórico do paciente.',
 );
 
-await commit(guardian.token, [
-  relationshipCreateWrite(guardian.uid, dependentId),
-]);
+await commit(
+  guardian.token,
+  [relationshipCreateWrite(guardian.uid, otherUser.uid)],
+  403,
+);
 await commit(professional.token, [
-  vaccinationCreateWrite('vaccination-pending-dependent', {
+  vaccinationCreateWrite('vaccination-academic-dependent', {
     patientId: dependentId,
     professionalUid: professional.uid,
   }),
@@ -885,10 +1288,10 @@ assert(
   (
     await read(
       guardian.token,
-      'vaccination_records/vaccination-pending-dependent',
+      'vaccination_records/vaccination-academic-dependent',
     )
-  ).status === 403,
-  'Relationship pending concedeu acesso à vacinação.',
+  ).status === 200,
+  'Vínculo acadêmico direto não liberou a carteira imediatamente.',
 );
 
 const minorId = 'minor-for-relationship-test';
@@ -899,7 +1302,7 @@ const minorFields = {
     cpf: '29537947000',
     role: 'dependent',
     roles: ['dependent'],
-    authUid: '',
+    authUid: null,
     canAuthenticate: false,
     guardianIds: [otherUser.uid],
     managedByUserIds: [otherUser.uid],
@@ -969,10 +1372,16 @@ assert(
 
 await commit(
   guardian.token,
-  [accessGrantCreateWrite(guardian.uid, minorId)],
+  [
+    academicAccessGrantCreateWrite(
+      guardian.uid,
+      minorId,
+      '29537947000',
+    ),
+  ],
   403,
 );
 
 console.log(
-  'Firestore Rules: cenários A-P, lookup profissional temporário, patientUid legado, vínculo pendente, relação direta e bloqueio transitivo aprovados.',
+  'Firestore Rules: cenários A-P, dependente acadêmico atômico, CPF existente, grant direto, bloqueio de spoof/list/transitividade e rollback aprovados.',
 );

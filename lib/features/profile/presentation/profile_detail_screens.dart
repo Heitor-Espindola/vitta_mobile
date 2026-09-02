@@ -1,0 +1,406 @@
+import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
+import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
+
+class ProfileSettingsScreen extends StatelessWidget {
+  const ProfileSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _ProfileDetailPage(
+    title: 'Configurações',
+    intro: 'Preferências atuais do aplicativo neste dispositivo.',
+    children: [
+      _DetailCard(
+        children: [
+          _DetailRow(
+            icon: Icons.language_rounded,
+            title: 'Idioma',
+            value: 'Português (Brasil)',
+          ),
+          _DetailRow(
+            icon: Icons.light_mode_outlined,
+            title: 'Aparência',
+            value: 'Tema claro',
+          ),
+          _DetailRow(
+            icon: Icons.phonelink_lock_outlined,
+            title: 'Sessão',
+            value: 'Persistente neste dispositivo',
+          ),
+        ],
+      ),
+      SizedBox(height: AppSpacing.md),
+      _NoticeCard(
+        icon: Icons.info_outline_rounded,
+        text:
+            'Somente preferências já disponíveis são exibidas. Novas opções serão adicionadas quando estiverem prontas para uso.',
+      ),
+    ],
+  );
+}
+
+class AccountSecurityScreen extends StatefulWidget {
+  const AccountSecurityScreen({
+    super.key,
+    required this.email,
+    required this.authRepository,
+    this.emailVerified,
+  });
+
+  final String email;
+  final bool? emailVerified;
+  final AuthRepository authRepository;
+
+  @override
+  State<AccountSecurityScreen> createState() => _AccountSecurityScreenState();
+}
+
+class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
+  bool _sendingReset = false;
+
+  String get _verificationLabel => switch (widget.emailVerified) {
+    true => 'E-mail verificado',
+    false => 'Verificação pendente',
+    null => 'Status indisponível',
+  };
+
+  Future<void> _sendPasswordReset() async {
+    if (_sendingReset) return;
+
+    setState(() => _sendingReset = true);
+    try {
+      await widget.authRepository.sendPasswordResetEmail(widget.email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Se o e-mail estiver disponível, você receberá as instruções para redefinir a senha.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível enviar as instruções agora. Tente novamente.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingReset = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _ProfileDetailPage(
+    title: 'Segurança da conta',
+    intro: 'Informações e ações para proteger o acesso ao Vitta.',
+    children: [
+      _DetailCard(
+        children: [
+          _DetailRow(
+            icon: Icons.alternate_email_rounded,
+            title: 'E-mail da conta',
+            value: widget.email,
+          ),
+          _DetailRow(
+            icon: Icons.verified_user_outlined,
+            title: 'Verificação',
+            value: _verificationLabel,
+          ),
+          const _DetailRow(
+            icon: Icons.lock_clock_outlined,
+            title: 'Autenticação',
+            value: 'Sessão protegida pelo Firebase',
+          ),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.md),
+      FilledButton.icon(
+        onPressed: _sendingReset ? null : _sendPasswordReset,
+        icon: _sendingReset
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.key_rounded, size: 18),
+        label: Text(
+          _sendingReset ? 'Enviando instruções...' : 'Redefinir senha',
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      const _NoticeCard(
+        icon: Icons.shield_outlined,
+        text:
+            'Nunca compartilhe sua senha. O Vitta não exibe identificadores internos, tokens ou dados técnicos da sua conta.',
+      ),
+    ],
+  );
+}
+
+class HelpCenterScreen extends StatelessWidget {
+  const HelpCenterScreen({super.key});
+
+  static const _questions = <(String, String)>[
+    (
+      'Como acompanho minhas vacinas?',
+      'A Home apresenta um resumo. Para consultar todos os registros, abra a Carteira Digital.',
+    ),
+    (
+      'Como funciona a Carteira Digital?',
+      'Ela reúne as aplicações registradas para a pessoa selecionada e organiza o histórico por data.',
+    ),
+    (
+      'Como vejo próximas doses?',
+      'As próximas doses aparecem na Home e na Carteira quando existe uma data futura registrada.',
+    ),
+    (
+      'Como funcionam dependentes?',
+      'Pessoas vinculadas podem ser acompanhadas conforme o relacionamento e as permissões disponíveis na conta.',
+    ),
+    (
+      'Como atualizar meus dados?',
+      'No Perfil, toque em Dados pessoais ou em Editar. CPF, nascimento e dados de acesso permanecem protegidos.',
+    ),
+    (
+      'Como recuperar minha senha?',
+      'Abra Segurança da conta e solicite a redefinição. As instruções serão enviadas para o e-mail cadastrado.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) => _ProfileDetailPage(
+    title: 'Central de ajuda',
+    intro: 'Respostas rápidas sobre os principais recursos do Vitta.',
+    children: [
+      for (final question in _questions) ...[
+        _QuestionCard(question: question.$1, answer: question.$2),
+        const SizedBox(height: AppSpacing.sm),
+      ],
+    ],
+  );
+}
+
+class TermsPrivacyScreen extends StatelessWidget {
+  const TermsPrivacyScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _ProfileDetailPage(
+    title: 'Termos e privacidade',
+    intro: 'Resumo informativo sobre o uso responsável de dados no Vitta.',
+    children: [
+      _TextSection(
+        title: 'Finalidade dos dados',
+        text:
+            'As informações são utilizadas para identificar a pessoa, organizar a carteira de vacinação e apresentar lembretes relacionados à saúde.',
+      ),
+      _TextSection(
+        title: 'Proteção e autenticação',
+        text:
+            'O acesso exige autenticação. As permissões limitam quais pessoas e profissionais podem consultar informações da carteira.',
+      ),
+      _TextSection(
+        title: 'Dados de vacinação',
+        text:
+            'Registros de aplicação são tratados como informações sensíveis e exibidos somente nos fluxos autorizados do aplicativo.',
+      ),
+      _TextSection(
+        title: 'Privacidade e LGPD',
+        text:
+            'O projeto adota privacidade, necessidade e controle de acesso como princípios alinhados à LGPD.',
+      ),
+      _NoticeCard(
+        icon: Icons.gavel_outlined,
+        text:
+            'Este conteúdo é um resumo informativo do projeto Vitta e não substitui termos jurídicos ou uma política de privacidade completa.',
+      ),
+    ],
+  );
+}
+
+class _ProfileDetailPage extends StatelessWidget {
+  const _ProfileDetailPage({
+    required this.title,
+    required this.intro,
+    required this.children,
+  });
+
+  final String title;
+  final String intro;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+          children: [
+            AppPageHeader(title: title, showBack: true),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.normal,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(intro, style: AppTypography.body),
+                  const SizedBox(height: AppSpacing.lg),
+                  ...children,
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailCard extends StatelessWidget {
+  const _DetailCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppCardStyle.decoration(),
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            children[index],
+            if (index < children.length - 1)
+              const Divider(height: 1, color: AppColors.border),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primaryDark),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTypography.caption),
+                const SizedBox(height: AppSpacing.xs),
+                Text(value, style: AppTypography.body),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primaryDark),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(text, style: AppTypography.caption)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionCard extends StatelessWidget {
+  const _QuestionCard({required this.question, required this.answer});
+
+  final String question;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      elevation: 1,
+      shadowColor: const Color(0x0A173B50),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        title: Text(
+          question,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(answer, style: AppTypography.body),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TextSection extends StatelessWidget {
+  const _TextSection({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.sectionTitle),
+          const SizedBox(height: AppSpacing.sm),
+          Text(text, style: AppTypography.body),
+        ],
+      ),
+    );
+  }
+}

@@ -22,12 +22,15 @@ extension NewsCategoryDetails on NewsCategory {
   String get query => switch (this) {
     NewsCategory.forYou => '',
     NewsCategory.children =>
-      '("vacinação infantil" OR "vacina criança" OR "imunização infantil")',
+      '("vacinação infantil" OR "vacina para crianças" OR "imunização infantil" OR "calendário vacinal infantil")',
     NewsCategory.campaigns =>
-      '("campanha de vacinação" OR "mutirão vacinação" OR "cobertura vacinal")',
-    NewsCategory.hpv => '("vacina HPV" OR "vacinação HPV")',
-    NewsCategory.influenza => '("vacina influenza" OR "vacinação gripe")',
-    NewsCategory.covid => '("vacina covid" OR "vacinação covid")',
-    NewsCategory.yellowFever => '"vacina febre amarela"',
+      '("campanha de vacinação" OR "campanha vacinal" OR "mutirão de vacinação" OR "cobertura vacinal")',
+    NewsCategory.hpv => '("vacina HPV" OR "vacinação contra HPV")',
+    NewsCategory.influenza =>
+      '("vacina influenza" OR "vacinação contra gripe")',
+    NewsCategory.covid =>
+      '("vacina covid" OR "vacinação contra covid" OR "imunização covid")',
+    NewsCategory.yellowFever =>
+      '("vacina febre amarela" OR "vacinação contra febre amarela")',
   };
 }

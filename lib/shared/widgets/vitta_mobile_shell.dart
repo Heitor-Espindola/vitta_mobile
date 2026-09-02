@@ -248,7 +248,9 @@ class AppPageHeader extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    color: AppColors.primarySoft,
     padding: const EdgeInsets.fromLTRB(
       AppSpacing.normal,
       AppSpacing.sm,
@@ -357,7 +359,7 @@ class _ExpandableSearchState extends State<ExpandableSearch> {
           )
         : Align(
             key: const ValueKey('collapsed-search'),
-            alignment: Alignment.centerRight,
+            alignment: Alignment.centerLeft,
             child: IconButton(
               tooltip: 'Pesquisar',
               onPressed: _open,

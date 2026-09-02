@@ -22,6 +22,13 @@ class NewsController extends ChangeNotifier {
   bool get isLoading => state == NewsState.loading;
   bool get isLoadingMore => state == NewsState.loadingMore;
 
+  String get effectiveQuery {
+    final categoryQuery = selectedCategory.query;
+    if (categoryQuery.isEmpty) return currentQuery;
+    if (currentQuery.isEmpty) return categoryQuery;
+    return '$categoryQuery AND "${currentQuery.replaceAll('"', '')}"';
+  }
+
   Future<void> loadInitialNews() => _load(reset: true);
 
   Future<void> searchNews(String term) async {
@@ -34,11 +41,16 @@ class NewsController extends ChangeNotifier {
   Future<void> selectCategory(NewsCategory category) async {
     if (selectedCategory == category && state != NewsState.initial) return;
     selectedCategory = category;
-    currentQuery = category.query;
     await _load(reset: true);
   }
 
   Future<void> clearSearch() async {
+    if (currentQuery.isEmpty) return;
+    currentQuery = '';
+    await _load(reset: true);
+  }
+
+  Future<void> showAllNews() async {
     selectedCategory = NewsCategory.forYou;
     currentQuery = '';
     await _load(reset: true);
@@ -64,7 +76,7 @@ class NewsController extends ChangeNotifier {
     try {
       final nextPage = currentPage + 1;
       final response = await _repository.getNews(
-        query: currentQuery,
+        query: effectiveQuery,
         page: nextPage,
         forceRefresh: forceRefresh,
       );

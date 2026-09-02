@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
+import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_schedule.dart';
@@ -105,6 +106,7 @@ void main() {
         home: DependentsScreen(
           authRepository: _PeopleAuthRepository(),
           peopleRepository: peopleRepository,
+          demoModeEnabled: true,
         ),
       ),
     );
@@ -122,13 +124,48 @@ void main() {
       '52998224725',
     );
     expect(find.text('529.982.247-25'), findsOneWidget);
-    await tester.ensureVisible(find.text('Criar carteira'));
+    final addButton = find.widgetWithText(FilledButton, 'Adicionar familiar');
+    await tester.ensureVisible(addButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Criar carteira'));
+    await tester.tap(addButton);
     await tester.pumpAndSettle();
 
     expect(peopleRepository.savedName, 'Ana Souza');
     expect(peopleRepository.savedCpf, '529.982.247-25');
+  });
+
+  testWidgets('invalid CPF does not call the family repository', (
+    tester,
+  ) async {
+    final peopleRepository = _RecordingPeopleRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DependentsScreen(
+          authRepository: _PeopleAuthRepository(),
+          peopleRepository: peopleRepository,
+          demoModeEnabled: false,
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nome completo'),
+      'Ana Souza',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'CPF'),
+      '11111111111',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Data de nascimento'),
+      '01012015',
+    );
+    final addButton = find.widgetWithText(FilledButton, 'Adicionar familiar');
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    expect(peopleRepository.savedCpf, isNull);
   });
 }
 
@@ -167,6 +204,10 @@ class _RecordingPeopleRepository implements PeopleRepository {
   Future<List<AppUser>> getAvailablePeople(String guardianId) async => const [
     _guardian,
   ];
+
+  @override
+  Future<List<FamilyMember>> getFamilyMembers(String currentPersonId) async =>
+      const [FamilyMember(person: _guardian, isCurrent: true)];
 }
 
 class _PeopleAuthRepository implements AuthRepository {

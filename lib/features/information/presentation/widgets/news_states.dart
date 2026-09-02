@@ -40,9 +40,16 @@ class NewsErrorState extends StatelessWidget {
 }
 
 class NewsEmptyState extends StatelessWidget {
-  const NewsEmptyState({this.onClearSearch, super.key});
+  const NewsEmptyState({
+    required this.hasSearch,
+    this.onClearSearch,
+    this.onShowAllNews,
+    super.key,
+  });
 
+  final bool hasSearch;
   final VoidCallback? onClearSearch;
+  final VoidCallback? onShowAllNews;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -50,13 +57,34 @@ class NewsEmptyState extends StatelessWidget {
     child: Center(
       child: Column(
         children: [
-          const Text('Nenhuma notícia encontrada', textAlign: TextAlign.center),
-          if (onClearSearch != null) ...[
+          Text(
+            hasSearch
+                ? 'Nenhum resultado encontrado'
+                : 'Sem novidades por aqui',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            hasSearch
+                ? 'Tente outro termo ou limpe a pesquisa.'
+                : 'Não encontramos notícias recentes sobre este tema.',
+            textAlign: TextAlign.center,
+          ),
+          if (hasSearch && onClearSearch != null) ...[
             const SizedBox(height: 10),
             TextButton.icon(
               onPressed: onClearSearch,
               icon: const Icon(Icons.close),
               label: const Text('Limpar busca'),
+            ),
+          ] else if (onShowAllNews != null) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              key: const Key('empty-show-all-news'),
+              onPressed: onShowAllNews,
+              icon: const Icon(Icons.article_outlined),
+              label: const Text('Ver todas as notícias'),
             ),
           ],
         ],
