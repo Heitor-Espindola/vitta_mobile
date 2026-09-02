@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
@@ -7,6 +8,7 @@ import 'package:vitta_mobile/core/validators/full_name_validator.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/profile/presentation/profile_detail_screens.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -87,7 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
   }
 
-  Future<void> _editProfile() async {
+  Future<void> _editProfile(_ProfileSection section) async {
     final user = _user;
     if (user == null) {
       return;
@@ -96,36 +98,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final updated = await showModalBottomSheet<AppUser>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _ProfileEditor(user: user),
+      useSafeArea: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.large),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) =>
+          _ProfileEditor(user: user, section: section, onSave: _saveProfile),
     );
-    if (updated == null) {
+    if (updated == null || !mounted) {
       return;
     }
 
-    setState(() => _isLoading = true);
-    try {
-      final saved = await _authRepository.updateProfile(updated);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _user = saved;
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Dados atualizados com sucesso.')),
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível salvar. Tente novamente.'),
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dados atualizados com sucesso.')),
+    );
+  }
+
+  Future<AppUser> _saveProfile(AppUser updated) async {
+    final saved = await _authRepository.updateProfile(updated);
+    if (mounted) setState(() => _user = saved);
+    return saved;
+  }
+
+  void _openPage(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  void _openSettings() {
+    _openPage(const ProfileSettingsScreen());
+  }
+
+  void _openSecurity() {
+    final user = _user;
+    if (user == null) return;
+
+    final emailVerified = _authRepository is FirebaseAuthRepository
+        ? FirebaseAuth.instance.currentUser?.emailVerified
+        : null;
+    _openPage(
+      AccountSecurityScreen(
+        email: user.email,
+        emailVerified: emailVerified,
+        authRepository: _authRepository,
+      ),
+    );
+  }
+
+  void _openHelpCenter() {
+    _openPage(const HelpCenterScreen());
+  }
+
+  void _openTermsAndPrivacy() {
+    _openPage(const TermsPrivacyScreen());
   }
 
   @override
@@ -134,6 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = _filled(user?.name, 'Usuário');
     final email = _filled(user?.email, 'E-mail não informado');
     final cpf = _filled(user?.cpf, 'Não informado');
+    final phone = user?.phone?.trim();
     final birthDate = user?.birthDate == null
         ? 'Não informada'
         : formatBrazilianDate(user!.birthDate);
@@ -150,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Perfil',
                     showBack: true,
                     action: TextButton(
-                      onPressed: _editProfile,
+                      onPressed: () => _editProfile(_ProfileSection.personal),
                       child: const Text('Editar'),
                     ),
                   ),
@@ -211,13 +240,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.person_outline,
                               title: 'Dados pessoais',
                               subtitle: 'Nascimento: $birthDate',
-                              onTap: _editProfile,
+                              onTap: () =>
+                                  _editProfile(_ProfileSection.personal),
                             ),
                             _SettingsRow(
                               icon: Icons.mail_outline,
                               title: 'Contato',
-                              subtitle: _filled(user?.phone, email),
-                              onTap: _editProfile,
+                              subtitle: phone == null || phone.isEmpty
+                                  ? email
+                                  : '$email  •  $phone',
+                              onTap: () =>
+                                  _editProfile(_ProfileSection.contact),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _Label('Preferências'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _SettingsGroup(
+                          children: [
+                            _SettingsRow(
+                              icon: Icons.tune_rounded,
+                              title: 'Configurações',
+                              subtitle: 'Idioma, aparência e sessão',
+                              onTap: _openSettings,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _Label('Segurança'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _SettingsGroup(
+                          children: [
+                            _SettingsRow(
+                              icon: Icons.shield_outlined,
+                              title: 'Segurança da conta',
+                              subtitle: 'E-mail, senha e autenticação',
+                              onTap: _openSecurity,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _Label('Suporte'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _SettingsGroup(
+                          children: [
+                            _SettingsRow(
+                              icon: Icons.help_outline_rounded,
+                              title: 'Central de ajuda',
+                              onTap: _openHelpCenter,
+                            ),
+                            _SettingsRow(
+                              icon: Icons.policy_outlined,
+                              title: 'Termos e privacidade',
+                              onTap: _openTermsAndPrivacy,
                             ),
                           ],
                         ),
@@ -242,10 +318,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+enum _ProfileSection { personal, contact }
+
 class _ProfileEditor extends StatefulWidget {
-  const _ProfileEditor({required this.user});
+  const _ProfileEditor({
+    required this.user,
+    required this.section,
+    required this.onSave,
+  });
 
   final AppUser user;
+  final _ProfileSection section;
+  final Future<AppUser> Function(AppUser user) onSave;
 
   @override
   State<_ProfileEditor> createState() => _ProfileEditorState();
@@ -265,6 +349,17 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   late final _phoneController = TextEditingController(
     text: widget.user.phone ?? '',
   );
+  late final _emergencyNameController = TextEditingController(
+    text: widget.user.emergencyContact?.name ?? '',
+  );
+  late final _emergencyPhoneController = TextEditingController(
+    text: widget.user.emergencyContact?.phone ?? '',
+  );
+  late final _emergencyRelationshipController = TextEditingController(
+    text: widget.user.emergencyContact?.relationship ?? '',
+  );
+  bool _isSaving = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -272,81 +367,187 @@ class _ProfileEditorState extends State<_ProfileEditor> {
     _cpfController.dispose();
     _birthDateController.dispose();
     _phoneController.dispose();
+    _emergencyNameController.dispose();
+    _emergencyPhoneController.dispose();
+    _emergencyRelationshipController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+    final updated = widget.user.copyWith(
+      name: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      emergencyContact: EmergencyContact(
+        name: _emergencyNameController.text,
+        phone: _emergencyPhoneController.text,
+        relationship: _emergencyRelationshipController.text,
+      ),
+    );
+    try {
+      final saved = await widget.onSave(updated);
+      if (mounted) Navigator.of(context).pop(saved);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _error = 'Não foi possível salvar. Revise os dados e tente novamente.';
+      });
+    }
+  }
+
+  String? _validateEmergencyField(String? value) {
+    final fields = [
+      _emergencyNameController.text.trim(),
+      _emergencyPhoneController.text.trim(),
+      _emergencyRelationshipController.text.trim(),
+    ];
+    final hasAny = fields.any((field) => field.isNotEmpty);
+    if (hasAny && (value == null || value.trim().isEmpty)) {
+      return 'Preencha todos os dados do contato de emergência.';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 18,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
-      child: Form(
-        key: _formKey,
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isPersonal = widget.section == _ProfileSection.personal;
+
+    return SafeArea(
+      top: false,
+      maintainBottomViewPadding: true,
+      minimum: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: keyboardInset),
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Dados pessoais',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nome completo'),
-                inputFormatters: [NameInputFormatter()],
-                validator: validateFullName,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _cpfController,
-                enabled: false,
-                decoration: const InputDecoration(
-                  labelText: 'CPF',
-                  helperText: 'O CPF não pode ser alterado.',
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.lg,
+            AppSpacing.xl,
+            AppSpacing.md,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  isPersonal ? 'Dados pessoais' : 'Contato',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _birthDateController,
-                enabled: false,
-                decoration: const InputDecoration(
-                  labelText: 'Data de nascimento',
-                  helperText:
-                      'A data é protegida para preservar a maioridade calculada.',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Telefone opcional',
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () {
-                  if (!_formKey.currentState!.validate()) {
-                    return;
-                  }
-                  Navigator.of(context).pop(
-                    widget.user.copyWith(
-                      name: _nameController.text.trim(),
-                      cpf: _cpfController.text.trim(),
-                      birthDate: parseBrazilianDate(_birthDateController.text),
-                      phone: _phoneController.text.trim(),
+                const SizedBox(height: 16),
+                if (isPersonal) ...[
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome completo',
                     ),
-                  );
-                },
-                child: const Text('Salvar dados'),
-              ),
-            ],
+                    inputFormatters: [NameInputFormatter()],
+                    validator: validateFullName,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _cpfController,
+                    enabled: false,
+                    decoration: const InputDecoration(
+                      labelText: 'CPF',
+                      helperText: 'O CPF não pode ser alterado.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _birthDateController,
+                    enabled: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Data de nascimento',
+                      helperText: 'A data de nascimento é protegida.',
+                    ),
+                  ),
+                ] else ...[
+                  TextFormField(
+                    initialValue: widget.user.email,
+                    enabled: false,
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail',
+                      helperText:
+                          'O e-mail da conta não pode ser alterado aqui.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const Key('profile-phone-field'),
+                    controller: _phoneController,
+                    decoration: const InputDecoration(labelText: 'Telefone'),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Contato de emergência',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Dado privado, não exibido automaticamente para profissionais.',
+                    style: AppTypography.caption,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const Key('emergency-contact-name-field'),
+                    controller: _emergencyNameController,
+                    decoration: const InputDecoration(labelText: 'Nome'),
+                    inputFormatters: [NameInputFormatter()],
+                    validator: _validateEmergencyField,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const Key('emergency-contact-phone-field'),
+                    controller: _emergencyPhoneController,
+                    decoration: const InputDecoration(labelText: 'Telefone'),
+                    keyboardType: TextInputType.phone,
+                    validator: _validateEmergencyField,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const Key('emergency-contact-relationship-field'),
+                    controller: _emergencyRelationshipController,
+                    decoration: const InputDecoration(
+                      labelText: 'Parentesco/relação',
+                    ),
+                    validator: _validateEmergencyField,
+                  ),
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: AppColors.danger),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: _isSaving ? null : _submit,
+                  child: _isSaving
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Salvar dados'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+            ),
           ),
         ),
       ),
@@ -385,7 +586,15 @@ class _SettingsGroup extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE0E5EA)),
       ),
-      child: Column(children: children),
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            children[index],
+            if (index < children.length - 1)
+              const Divider(height: 1, color: AppColors.border),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -410,9 +619,6 @@ class _SettingsRow extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(minHeight: 48),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFE9EDF1))),
-        ),
         child: Row(
           children: [
             Icon(icon, size: 18, color: vittaDarkBlue),

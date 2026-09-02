@@ -186,9 +186,22 @@ class FirebaseAuthRepository implements AuthRepository {
       name: formatPersonName(user.name),
       updatedAt: DateTime.now(),
     );
-    await _users
-        .doc(user.effectivePersonId)
-        .set(updatedUser.toMap(), SetOptions(merge: true));
+    final userDocument = _users.doc(user.effectivePersonId);
+    final batch = _firestore.batch();
+    batch.update(userDocument, {
+      'name': updatedUser.name,
+      'fullName': updatedUser.name,
+      'normalizedName': normalizedPersonName(updatedUser.name),
+      'phone': updatedUser.phone,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    if (updatedUser.emergencyContact != null) {
+      batch.set(userDocument.collection('private').doc('emergency_contact'), {
+        ...updatedUser.emergencyContact!.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
     final firebaseUser = _firebaseAuth.currentUser;
     if (firebaseUser != null && firebaseUser.displayName != updatedUser.name) {
       await firebaseUser.updateDisplayName(updatedUser.name);
@@ -213,11 +226,22 @@ class FirebaseAuthRepository implements AuthRepository {
     final userDocument = _users.doc(personId);
     final snapshot = await userDocument.get();
     if (snapshot.exists && snapshot.data() != null) {
+      Map<String, dynamic>? emergencyContact;
+      try {
+        final privateSnapshot = await userDocument
+            .collection('private')
+            .doc('emergency_contact')
+            .get();
+        emergencyContact = privateSnapshot.data();
+      } on FirebaseException {
+        emergencyContact = null;
+      }
       return AppUser.fromMap({
         ...snapshot.data()!,
         'uid': personId,
         'personId': personId,
         'authUid': snapshot.data()!['authUid'] ?? firebaseUser.uid,
+        'emergencyContact': ?emergencyContact,
       });
     }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,6 +12,7 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
@@ -26,11 +28,15 @@ class VaccinationCardScreen extends StatefulWidget {
     this.authRepository,
     this.vaccinationRepository,
     this.selectedPerson,
+    this.walletController,
+    this.initialShowBooklet = false,
   });
 
   final AuthRepository? authRepository;
   final VaccinationRepository? vaccinationRepository;
   final AppUser? selectedPerson;
+  final WalletSelectionController? walletController;
+  final bool initialShowBooklet;
 
   @override
   State<VaccinationCardScreen> createState() => _VaccinationCardScreenState();
@@ -41,6 +47,8 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final VaccinationRepository _repository =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
+  late final WalletSelectionController _wallet =
+      widget.walletController ?? WalletSelectionController.instance;
   final _searchController = TextEditingController();
   StreamSubscription<List<VaccinationRecord>>? _recordsSubscription;
   AppUser? _guardian;
@@ -48,13 +56,15 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   List<VaccinationRecord> _records = const [];
   List<Vaccine> _vaccines = const [];
   _VaccineFilter _filter = _VaccineFilter.all;
-  bool _showBooklet = false;
+  late bool _showBooklet;
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _showBooklet = widget.initialShowBooklet;
+    _wallet.addListener(_loadSelectedWallet);
     _searchController.addListener(_refresh);
     _load();
   }
@@ -62,6 +72,7 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   @override
   void dispose() {
     _recordsSubscription?.cancel();
+    _wallet.removeListener(_loadSelectedWallet);
     _searchController
       ..removeListener(_refresh)
       ..dispose();
@@ -69,6 +80,10 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   }
 
   void _refresh() => setState(() {});
+
+  void _loadSelectedWallet() {
+    if (mounted && widget.selectedPerson == null) _load();
+  }
 
   Future<void> _load() async {
     await _recordsSubscription?.cancel();
@@ -79,7 +94,9 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
     try {
       final guardian = await _authRepository.getCurrentUser();
       if (guardian == null) throw StateError('Usuário não autenticado.');
-      final person = widget.selectedPerson ?? guardian;
+      _wallet.bindCurrentPerson(guardian);
+      final person =
+          widget.selectedPerson ?? _wallet.selectedPerson ?? guardian;
       if (!mounted) return;
       setState(() {
         _guardian = guardian;
@@ -87,8 +104,8 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       });
       _recordsSubscription = _repository
           .watchRecordsByPerson(
-            personId: person.uid,
-            responsibleId: guardian.uid,
+            personId: person.effectivePersonId,
+            responsibleId: guardian.effectivePersonId,
           )
           .listen(
             (records) {
@@ -197,14 +214,17 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   Widget build(BuildContext context) => VittaMobileShell(
     title: 'Carteira',
     currentTab: VittaTab.card,
+    showTopBar: false,
     body: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         children: [
+          const _VaccinationCardHeader(),
+          const SizedBox(height: 18),
           _PersonHeader(
             person: _person,
-            isOwner: _person?.uid == _guardian?.uid,
+            isOwner: _person?.effectivePersonId == _guardian?.effectivePersonId,
           ),
           const SizedBox(height: 18),
           _ModeSelector(
@@ -235,21 +255,22 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
               onExport: _exportPdf,
             )
           else ...[
+            _Filters(
+              key: const Key('vaccination-card-filters'),
+              selected: _filter,
+              onSelected: (value) => setState(() => _filter = value),
+            ),
+            const SizedBox(height: 8),
             ExpandableSearch(
               controller: _searchController,
               hint: 'Pesquisar vacina',
               onChanged: (_) => _refresh(),
             ),
-            const SizedBox(height: 16),
-            _Filters(
-              selected: _filter,
-              onSelected: (value) => setState(() => _filter = value),
-            ),
             const SizedBox(height: 20),
             if (_visibleRecords.isEmpty)
               _MessageCard(
                 message: _records.isEmpty
-                    ? 'Sua carteira ainda não possui aplicações registradas. Quando um profissional registrar uma aplicação, ela aparecerá aqui.'
+                    ? 'Nenhuma aplicação registrada nesta carteira. Quando um profissional registrar uma aplicação, ela aparecerá aqui.'
                     : 'Nenhum registro encontrado para este filtro.',
               )
             else
@@ -264,6 +285,76 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       ),
     ),
   );
+}
+
+class _VaccinationCardHeader extends StatelessWidget {
+  const _VaccinationCardHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return OverflowBox(
+      maxWidth: width,
+      fit: OverflowBoxFit.deferToChild,
+      child: Container(
+        key: const Key('vaccination-card-header-band'),
+        width: width,
+        padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Carteira',
+                    style: TextStyle(
+                      fontSize: 23,
+                      height: 1.05,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.8,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Acompanhe aplicações e próximas doses\nde quem você cuida.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: Color(0xFF496273),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFFDDEFFC),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.article_outlined,
+                color: vittaDarkBlue,
+                size: 22,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PersonHeader extends StatelessWidget {
@@ -410,7 +501,7 @@ class _ModeOption extends StatelessWidget {
 }
 
 class _Filters extends StatelessWidget {
-  const _Filters({required this.selected, required this.onSelected});
+  const _Filters({super.key, required this.selected, required this.onSelected});
   final _VaccineFilter selected;
   final ValueChanged<_VaccineFilter> onSelected;
 

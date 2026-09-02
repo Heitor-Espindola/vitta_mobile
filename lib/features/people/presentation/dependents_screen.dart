@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/date_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
@@ -18,10 +19,12 @@ class DependentsScreen extends StatefulWidget {
     super.key,
     this.authRepository,
     this.peopleRepository,
+    this.demoModeEnabled,
   });
 
   final AuthRepository? authRepository;
   final PeopleRepository? peopleRepository;
+  final bool? demoModeEnabled;
 
   @override
   State<DependentsScreen> createState() => _DependentsScreenState();
@@ -75,7 +78,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
         throw StateError('Sessão expirada. Entre novamente.');
       }
       final dependent = await _peopleRepository.createDependent(
-        guardianId: guardian.uid,
+        guardianId: guardian.effectivePersonId,
         name: _nameController.text,
         birthDate: parseBirthDate(_birthDateController.text)!,
         relationship: _relationship,
@@ -95,139 +98,156 @@ class _DependentsScreenState extends State<DependentsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: vittaSurface,
-    appBar: AppBar(title: const Text('Adicionar dependente')),
+    backgroundColor: AppColors.background,
     body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const Icon(
-                Icons.family_restroom_rounded,
-                size: 48,
-                color: vittaBlue,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Nova carteira',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'O dependente ficará vinculado à sua conta e não receberá um login próprio.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF718096)),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0F000000),
-                      blurRadius: 18,
-                      offset: Offset(0, 7),
+      child: Column(
+        children: [
+          const AppPageHeader(title: 'Adicionar familiar', showBack: true),
+          Expanded(child: _form()),
+        ],
+      ),
+    ),
+  );
+
+  Widget _form() => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 620),
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.normal),
+            decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.science_outlined, color: AppColors.primaryDark),
+                SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    'Versão acadêmica do Vitta. O familiar será vinculado imediatamente para uso no aplicativo; este fluxo não representa validação governamental.',
+                    style: AppTypography.body,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.normal),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.normal),
+            decoration: AppCardStyle.decoration(),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: [NameInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Nome completo',
+                    ),
+                    validator: validateFullName,
+                  ),
+                  const SizedBox(height: AppSpacing.normal),
+                  TextFormField(
+                    controller: _cpfController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CpfInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'CPF',
+                      hintText: '000.000.000-00',
+                    ),
+                    validator: validateCpf,
+                  ),
+                  const SizedBox(height: AppSpacing.normal),
+                  TextFormField(
+                    controller: _birthDateController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [DateInputFormatter()],
+                    decoration: InputDecoration(
+                      labelText: 'Data de nascimento',
+                      hintText: 'DD/MM/AAAA',
+                      suffixIcon: IconButton(
+                        onPressed: _pickDate,
+                        tooltip: 'Selecionar data',
+                        icon: const Icon(Icons.calendar_month_outlined),
+                      ),
+                    ),
+                    validator: validateBirthDate,
+                  ),
+                  const SizedBox(height: AppSpacing.normal),
+                  DropdownButtonFormField<String>(
+                    initialValue: _relationship,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de vínculo',
+                    ),
+                    items:
+                        const [
+                              'Filho(a)',
+                              'Responsável legal',
+                              'Outro familiar',
+                            ]
+                            .map(
+                              (value) => DropdownMenuItem(
+                                value: value,
+                                child: Text(value),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (value) =>
+                        setState(() => _relationship = value ?? _relationship),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.normal),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.danger),
                     ),
                   ],
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
                     children: [
-                      TextFormField(
-                        controller: _nameController,
-                        textCapitalization: TextCapitalization.words,
-                        inputFormatters: [NameInputFormatter()],
-                        decoration: const InputDecoration(
-                          labelText: 'Nome completo',
-                        ),
-                        validator: validateFullName,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _birthDateController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [DateInputFormatter()],
-                        decoration: InputDecoration(
-                          labelText: 'Data de nascimento',
-                          hintText: 'DD/MM/AAAA',
-                          suffixIcon: IconButton(
-                            onPressed: _pickDate,
-                            tooltip: 'Selecionar data',
-                            icon: const Icon(Icons.calendar_month_outlined),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
                           ),
+                          child: const Text('Cancelar'),
                         ),
-                        validator: validateBirthDate,
                       ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: _relationship,
-                        decoration: const InputDecoration(labelText: 'Vínculo'),
-                        items:
-                            const [
-                                  'Filho(a)',
-                                  'Enteado(a)',
-                                  'Neto(a)',
-                                  'Tutelado(a)',
-                                  'Outro',
-                                ]
-                                .map(
-                                  (value) => DropdownMenuItem(
-                                    value: value,
-                                    child: Text(value),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: _saving
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
                                 )
-                                .toList(),
-                        onChanged: (value) => setState(
-                          () => _relationship = value ?? _relationship,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _cpfController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [CpfInputFormatter()],
-                        decoration: const InputDecoration(labelText: 'CPF'),
-                        validator: validateCpf,
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ],
-                      const SizedBox(height: 22),
-                      FilledButton.icon(
-                        onPressed: _saving ? null : _save,
-                        icon: _saving
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.person_add_alt_1_rounded),
-                        label: Text(_saving ? 'Salvando...' : 'Criar carteira'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                              : const Icon(Icons.person_add_alt_1_rounded),
+                          label: Text(
+                            _saving ? 'Salvando...' : 'Adicionar familiar',
+                          ),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     ),
   );

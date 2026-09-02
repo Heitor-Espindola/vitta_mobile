@@ -8,4 +8,5 @@ abstract final class AppRoutes {
   static const profile = '/profile';
   static const vaccines = '/vaccines';
   static const notifications = '/notifications';
+  static const family = '/family';
 }

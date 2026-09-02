@@ -21,6 +21,7 @@ class AppUser {
     this.birthDate,
     this.majorityAt,
     this.phone,
+    this.emergencyContact,
     this.photoUrl,
     this.createdAt,
     this.updatedAt,
@@ -44,6 +45,7 @@ class AppUser {
   final DateTime? birthDate;
   final DateTime? majorityAt;
   final String? phone;
+  final EmergencyContact? emergencyContact;
   final String? photoUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -68,6 +70,7 @@ class AppUser {
       birthDate: dateTimeFromMap(map['birthDate']),
       majorityAt: dateTimeFromMap(map['majorityAt']),
       phone: map['phone'] as String?,
+      emergencyContact: EmergencyContact.fromMap(map['emergencyContact']),
       photoUrl: map['photoUrl'] as String?,
       createdAt: dateTimeFromMap(map['createdAt']),
       updatedAt: dateTimeFromMap(map['updatedAt']),
@@ -128,6 +131,7 @@ class AppUser {
     DateTime? birthDate,
     DateTime? majorityAt,
     String? phone,
+    EmergencyContact? emergencyContact,
     String? photoUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -152,6 +156,7 @@ class AppUser {
       birthDate: birthDate ?? this.birthDate,
       majorityAt: majorityAt ?? this.majorityAt,
       phone: phone ?? this.phone,
+      emergencyContact: emergencyContact ?? this.emergencyContact,
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -163,6 +168,40 @@ class AppUser {
 
   DateTime? get effectiveMajorityAt =>
       majorityAt ?? calculateMajorityAt(birthDate);
+}
+
+class EmergencyContact {
+  const EmergencyContact({
+    required this.name,
+    required this.phone,
+    required this.relationship,
+  });
+
+  final String name;
+  final String phone;
+  final String relationship;
+
+  bool get isEmpty =>
+      name.trim().isEmpty &&
+      phone.trim().isEmpty &&
+      relationship.trim().isEmpty;
+
+  factory EmergencyContact.fromMap(Object? value) {
+    if (value is! Map) {
+      return const EmergencyContact(name: '', phone: '', relationship: '');
+    }
+    return EmergencyContact(
+      name: value['name'] as String? ?? '',
+      phone: value['phone'] as String? ?? '',
+      relationship: value['relationship'] as String? ?? '',
+    );
+  }
+
+  Map<String, String> toMap() => {
+    'name': name.trim(),
+    'phone': phone.trim(),
+    'relationship': relationship.trim(),
+  };
 }
 
 DateTime? calculateMajorityAt(DateTime? birthDate) {

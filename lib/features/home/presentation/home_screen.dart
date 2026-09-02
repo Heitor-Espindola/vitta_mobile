@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
+import 'package:share_plus/share_plus.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
+import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
+import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
+import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
+import 'package:vitta_mobile/features/people/presentation/family_screen.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
+import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
+
+typedef ShareTextCallback = Future<void> Function(String text);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -18,11 +29,17 @@ class HomeScreen extends StatefulWidget {
     this.authRepository,
     this.vaccinationRepository,
     this.peopleRepository,
+    this.walletController,
+    this.demoModeEnabled,
+    this.shareText,
   });
 
   final AuthRepository? authRepository;
   final VaccinationRepository? vaccinationRepository;
   final PeopleRepository? peopleRepository;
+  final WalletSelectionController? walletController;
+  final bool? demoModeEnabled;
+  final ShareTextCallback? shareText;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -33,14 +50,57 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final VaccinationRepository _vaccinationRepository =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
-  late Future<_HomeData> _data = _loadData();
+  late final PeopleRepository _peopleRepository =
+      widget.peopleRepository ?? FirebasePeopleRepository();
+  late final WalletSelectionController _wallet =
+      widget.walletController ?? WalletSelectionController.instance;
+  late Future<_HomeData> _data;
   String? _recordsStreamPersonId;
   Stream<List<VaccinationRecord>>? _recordsStream;
+
+  bool get _demoEnabled => widget.demoModeEnabled ?? DemoPresentation.isEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _wallet.addListener(_handleWalletSelection);
+    _data = _loadData();
+  }
+
+  @override
+  void dispose() {
+    _wallet.removeListener(_handleWalletSelection);
+    super.dispose();
+  }
+
+  void _handleWalletSelection() {
+    if (!mounted) return;
+    setState(() {
+      _recordsStreamPersonId = null;
+      _recordsStream = null;
+    });
+  }
 
   Future<_HomeData> _loadData() async {
     final user = await _authRepository.getCurrentUser();
     if (user == null) return const _HomeData();
-    return _HomeData(user: user);
+    _wallet.bindCurrentPerson(user);
+    try {
+      final members = await _peopleRepository.getFamilyMembers(
+        user.effectivePersonId,
+      );
+      return _HomeData(
+        user: user,
+        familyMembers: members.isEmpty
+            ? [FamilyMember(person: user, isCurrent: true)]
+            : members,
+      );
+    } catch (_) {
+      return _HomeData(
+        user: user,
+        familyMembers: [FamilyMember(person: user, isCurrent: true)],
+      );
+    }
   }
 
   void _retry() => setState(() {
@@ -49,35 +109,70 @@ class _HomeScreenState extends State<HomeScreen> {
     _data = _loadData();
   });
 
-  Future<void> _showDependentsInfo() {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.family_restroom_outlined, color: vittaBlue),
-        title: const Text('Vincular dependente'),
-        content: const Text(
-          'O vínculo familiar com acesso à carteira será disponibilizado '
-          'quando houver validação segura. Esta área já está preparada para '
-          'acompanhar suas carteiras.',
+  Future<void> _shareWallet() async {
+    const text = 'Minha carteira de vacinação está no Vitta.';
+    try {
+      if (widget.shareText != null) {
+        await widget.shareText!(text);
+      } else {
+        await SharePlus.instance.share(ShareParams(text: text));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível abrir o compartilhamento.'),
         ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Entendi'),
-          ),
-        ],
+      );
+    }
+  }
+
+  Future<void> _openFamily() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FamilyScreen(
+          authRepository: _authRepository,
+          peopleRepository: _peopleRepository,
+          vaccinationRepository: _vaccinationRepository,
+          walletController: _wallet,
+          demoModeEnabled: _demoEnabled,
+        ),
       ),
     );
+    if (mounted) _retry();
+  }
+
+  Future<void> _addFamilyMember() async {
+    final created = await Navigator.of(context).push<AppUser>(
+      MaterialPageRoute(
+        builder: (_) => DependentsScreen(
+          authRepository: _authRepository,
+          peopleRepository: _peopleRepository,
+          demoModeEnabled: _demoEnabled,
+        ),
+      ),
+    );
+    if (created != null && mounted) {
+      _retry();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Familiar adicionado com sucesso.')),
+      );
+    }
   }
 
   Stream<List<VaccinationRecord>> _recordsFor(_HomeData data) {
     final user = data.user;
-    if (user == null) return const Stream.empty();
-    if (_recordsStreamPersonId == user.uid && _recordsStream != null) {
+    final selected = _wallet.selectedPerson ?? user;
+    if (user == null || selected == null) return const Stream.empty();
+    final selectedId = selected.effectivePersonId;
+    if (_recordsStreamPersonId == selectedId && _recordsStream != null) {
       return _recordsStream!;
     }
-    _recordsStreamPersonId = user.uid;
-    _recordsStream = _vaccinationRepository.watchPatientRecords(user.uid);
+    _recordsStreamPersonId = selectedId;
+    _recordsStream = _vaccinationRepository.watchRecordsByPerson(
+      personId: selectedId,
+      responsibleId: user.effectivePersonId,
+    );
     return _recordsStream!;
   }
 
@@ -101,11 +196,19 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, recordsSnapshot) {
             final realRecords =
                 recordsSnapshot.data ?? const <VaccinationRecord>[];
-            final usingDemoRecords =
-                DemoPresentation.isEnabled && realRecords.isEmpty;
+            final usingDemoRecords = _demoEnabled && realRecords.isEmpty;
+            final notifications = DemoPresentation.notificationsForPresentation(
+              realRecords,
+              enabled: _demoEnabled,
+            );
             final data = _HomeData(
               user: baseData.user,
-              records: DemoPresentation.recordsForPresentation(realRecords),
+              selectedPerson: _wallet.selectedPerson ?? baseData.user,
+              familyMembers: baseData.familyMembers,
+              records: DemoPresentation.recordsForPresentation(
+                realRecords,
+                enabled: _demoEnabled,
+              ),
             );
             return _buildContent(
               data,
@@ -113,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   recordsSnapshot.connectionState == ConnectionState.waiting &&
                   !usingDemoRecords,
               hasError: recordsSnapshot.hasError && !usingDemoRecords,
-              showDemoDependent: usingDemoRecords,
+              hasNotifications: notifications.isNotEmpty,
             );
           },
         );
@@ -125,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _HomeData data, {
     required bool loading,
     required bool hasError,
-    required bool showDemoDependent,
+    required bool hasNotifications,
   }) {
     final upcoming = data.upcoming;
     final recent = data.recent;
@@ -135,15 +238,33 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
           sliver: SliverList.list(
             children: [
-              _HomeHeader(name: _firstName(data.user?.name)),
+              _HomeHeader(
+                name: _firstName(data.user?.name),
+                hasNotifications: hasNotifications,
+              ),
+              if (!data.isViewingCurrent) ...[
+                const SizedBox(height: AppSpacing.md),
+                _ViewingWalletBanner(
+                  personName: data.selectedPerson?.name ?? 'Familiar',
+                  onReturn: _wallet.selectCurrentPerson,
+                ),
+              ],
               const SizedBox(height: 16),
-              _SummaryCard(appliedCount: data.appliedCount),
+              _SummaryCard(
+                appliedCount: data.appliedCount,
+                message: data.summaryMessage,
+                needsAttention: data.hasOverdue,
+                onShare: _shareWallet,
+              ),
               const SizedBox(height: 20),
               _WalletsSection(
                 user: data.user!,
-                appliedCount: data.appliedCount,
-                showDemoDependent: showDemoDependent,
-                onAddDependent: _showDependentsInfo,
+                familyMembers: data.familyMembers,
+                selectedPersonId: data.selectedPerson?.effectivePersonId,
+                demoEnabled: _demoEnabled,
+                onOpenFamily: _openFamily,
+                onAddFamily: _addFamilyMember,
+                onSelect: _wallet.selectPerson,
               ),
               const SizedBox(height: 22),
               const _SectionHeader(title: 'Próximas doses'),
@@ -155,7 +276,9 @@ class _HomeScreenState extends State<HomeScreen> {
               else if (upcoming.isEmpty)
                 const _EmptyCard(
                   icon: Icons.event_available_outlined,
-                  text: 'Nenhuma próxima dose cadastrada.',
+                  title: 'Nenhuma próxima dose cadastrada',
+                  text:
+                      'Sua carteira não possui doses futuras registradas no momento.',
                 )
               else
                 _DoseTimeline(records: upcoming),
@@ -169,7 +292,9 @@ class _HomeScreenState extends State<HomeScreen> {
               else if (recent.isEmpty)
                 const _EmptyCard(
                   icon: Icons.vaccines_outlined,
-                  text: 'Nenhuma vacina registrada ainda.',
+                  title: 'Nenhuma aplicação registrada ainda',
+                  text:
+                      'Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
                 )
               else
                 ...recent.map(_RecentVaccineCard.new),
@@ -182,83 +307,106 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.name});
+  const _HomeHeader({required this.name, required this.hasNotifications});
 
   final String name;
+  final bool hasNotifications;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFFEAF5FC),
-          shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(color: Color(0x140A5B91), blurRadius: 12),
-          ],
-        ),
-        child: const Icon(Icons.vaccines_outlined, color: vittaBlue, size: 23),
-      ),
-      const SizedBox(width: 13),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Olá, $name',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
-            ),
-            const Text(
-              'Minha Carteira',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-            ),
-            const Text(
-              'Digital de Vacinação',
-              style: TextStyle(fontSize: 11, color: Color(0xFF718096)),
-            ),
-          ],
-        ),
-      ),
-      Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton(
-            onPressed: () =>
-                Navigator.of(context).pushNamed(AppRoutes.notifications),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              shadowColor: const Color(0x25000000),
-              elevation: 2,
-            ),
-            icon: const Icon(Icons.notifications_none_rounded),
-            tooltip: 'Notificações',
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return OverflowBox(
+      maxWidth: width,
+      fit: OverflowBoxFit.deferToChild,
+      child: Container(
+        key: const Key('home-header-band'),
+        width: width,
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          Positioned(
-            right: 8,
-            top: 7,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE84B4B),
-                shape: BoxShape.circle,
+          border: Border(bottom: BorderSide(color: Color(0xFFE1EDF4))),
+        ),
+        child: Row(
+          children: [
+            const VittaLogo(size: 44, semanticLabel: 'Logo Vitta'),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Olá, $name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF718096),
+                    ),
+                  ),
+                  const Text(
+                    'Minha Carteira',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                  ),
+                  const Text(
+                    'Digital de Vacinação',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(AppRoutes.notifications),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    shadowColor: const Color(0x25000000),
+                    elevation: 2,
+                  ),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  tooltip: 'Notificações',
+                ),
+                if (hasNotifications)
+                  Positioned(
+                    right: 8,
+                    top: 7,
+                    child: Container(
+                      key: const Key('notification-badge'),
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE84B4B),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ],
-  );
+    );
+  }
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.appliedCount});
+  const _SummaryCard({
+    required this.appliedCount,
+    required this.message,
+    required this.needsAttention,
+    required this.onShare,
+  });
 
   final int appliedCount;
+  final String message;
+  final bool needsAttention;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -278,50 +426,115 @@ class _SummaryCard extends StatelessWidget {
         ),
       ],
     ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$appliedCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 38,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'vacinas aplicadas',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                needsAttention
+                    ? Icons.priority_high_rounded
+                    : Icons.check_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('share-wallet-button'),
+            onPressed: onShare,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.72)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            ),
+            icon: const Icon(Icons.share_outlined, size: 18),
+            label: const Text('Compartilhar'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ViewingWalletBanner extends StatelessWidget {
+  const _ViewingWalletBanner({
+    required this.personName,
+    required this.onReturn,
+  });
+
+  final String personName;
+  final VoidCallback onReturn;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
+    decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
     child: Row(
       children: [
+        const Icon(
+          Icons.switch_account_outlined,
+          color: AppColors.primaryDark,
+          size: 20,
+        ),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$appliedCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 38,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'vacinas aplicadas',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sua carteira digital está atualizada',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.78),
-                  fontSize: 11,
-                ),
-              ),
-            ],
+          child: Text(
+            'Visualizando: $personName',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ),
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.18),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.check_rounded, color: Colors.white, size: 34),
-        ),
+        TextButton(onPressed: onReturn, child: const Text('Minha carteira')),
       ],
     ),
   );
@@ -330,21 +543,32 @@ class _SummaryCard extends StatelessWidget {
 class _WalletsSection extends StatelessWidget {
   const _WalletsSection({
     required this.user,
-    required this.appliedCount,
-    required this.showDemoDependent,
-    required this.onAddDependent,
+    required this.familyMembers,
+    required this.selectedPersonId,
+    required this.demoEnabled,
+    required this.onOpenFamily,
+    required this.onAddFamily,
+    required this.onSelect,
   });
 
   final AppUser user;
-  final int appliedCount;
-  final bool showDemoDependent;
-  final VoidCallback onAddDependent;
+  final List<FamilyMember> familyMembers;
+  final String? selectedPersonId;
+  final bool demoEnabled;
+  final VoidCallback onOpenFamily;
+  final VoidCallback onAddFamily;
+  final ValueChanged<AppUser> onSelect;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const _SectionHeader(title: 'Carteiras'),
+      Row(
+        children: [
+          const Expanded(child: _SectionHeader(title: 'Minha família')),
+          TextButton(onPressed: onOpenFamily, child: const Text('Gerenciar')),
+        ],
+      ),
       const SizedBox(height: 12),
       SizedBox(
         height: 116,
@@ -354,22 +578,33 @@ class _WalletsSection extends StatelessWidget {
             _WalletPersonCard(
               name: user.name,
               subtitle: 'Minha carteira',
-              detail: '$appliedCount aplicações',
+              detail: 'Titular',
               color: const Color(0xFFEAF5FC),
               icon: Icons.person_outline_rounded,
+              selected: selectedPersonId == user.effectivePersonId,
+              onTap: () => onSelect(user),
             ),
-            if (showDemoDependent) ...[
-              const SizedBox(width: 10),
-              const _WalletPersonCard(
-                name: DemoPresentation.dependentName,
-                subtitle: 'Dependente',
-                detail: DemoPresentation.dependentDescription,
-                color: Color(0xFFFFF4E6),
-                icon: Icons.child_care_outlined,
-              ),
-            ],
+            ...familyMembers.where((member) => !member.isCurrent).map((member) {
+              final canOpen = member.canViewVaccination(
+                currentPersonId: user.effectivePersonId,
+              );
+              return Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: _WalletPersonCard(
+                  name: member.person.name,
+                  subtitle: member.person.relationshipToGuardian ?? 'Familiar',
+                  detail: canOpen
+                      ? 'Carteira disponível'
+                      : 'Acesso indisponível',
+                  color: const Color(0xFFFFF4E6),
+                  icon: Icons.family_restroom_outlined,
+                  selected: selectedPersonId == member.person.effectivePersonId,
+                  onTap: canOpen ? () => onSelect(member.person) : onOpenFamily,
+                ),
+              );
+            }),
             const SizedBox(width: 10),
-            _AddDependentCard(onTap: onAddDependent),
+            _AddDependentCard(onTap: onAddFamily),
           ],
         ),
       ),
@@ -384,6 +619,8 @@ class _WalletPersonCard extends StatelessWidget {
     required this.detail,
     required this.color,
     required this.icon,
+    required this.selected,
+    required this.onTap,
   });
 
   final String name;
@@ -391,56 +628,77 @@ class _WalletPersonCard extends StatelessWidget {
   final String detail;
   final Color color;
   final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 194,
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: color,
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Colors.white),
-    ),
-    child: Row(
-      children: [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: Colors.white.withValues(alpha: .88),
-          foregroundColor: vittaDarkBlue,
-          child: Icon(icon, size: 22),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                name.trim().isEmpty ? 'Usuário' : name.trim(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF426B86)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                detail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: vittaDarkBlue,
-                ),
-              ),
-            ],
+      child: Ink(
+        width: 194,
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.white,
+            width: selected ? 1.5 : 1,
           ),
         ),
-      ],
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: Colors.white.withValues(alpha: .88),
+              foregroundColor: vittaDarkBlue,
+              child: Icon(icon, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name.trim().isEmpty ? 'Usuário' : name.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF426B86),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: vittaDarkBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primaryDark,
+                size: 18,
+              ),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -453,7 +711,7 @@ class _AddDependentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    label: 'Adicionar dependente',
+    label: 'Adicionar familiar',
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -479,7 +737,7 @@ class _AddDependentCard extends StatelessWidget {
             ),
             SizedBox(height: 4),
             Text(
-              'Adicionar\ndependente',
+              'Adicionar\nfamiliar',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10,
@@ -575,7 +833,7 @@ class _UpcomingDoseCard extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: overdue ? const Color(0xFFFFEEEE) : Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(AppRadius.card),
       border: Border.all(
         color: overdue ? const Color(0xFFFFD2D2) : const Color(0xFFE8EEF3),
       ),
@@ -608,8 +866,8 @@ class _UpcomingDoseCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 overdue
-                    ? 'Dose atrasada desde ${formatBrazilianDate(record.nextDoseDate)}'
-                    : 'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
+                    ? 'Atrasada desde ${formatBrazilianDate(record.nextDoseDate)}'
+                    : 'Próxima dose em ${formatBrazilianDate(record.nextDoseDate)}',
                 style: TextStyle(
                   fontSize: 11,
                   color: overdue
@@ -641,7 +899,7 @@ class _RecentVaccineCard extends StatelessWidget {
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
       color: const Color(0xFFF4F9FC),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(AppRadius.card),
     ),
     child: Row(
       children: [
@@ -681,27 +939,48 @@ class _RecentVaccineCard extends StatelessWidget {
 }
 
 class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.icon, required this.text});
+  const _EmptyCard({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
 
   final IconData icon;
+  final String title;
   final String text;
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12)],
-    ),
+    padding: const EdgeInsets.all(AppSpacing.normal),
+    decoration: AppCardStyle.decoration(),
     child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF8AA7BA)),
+        Container(
+          width: 38,
+          height: 38,
+          decoration: const BoxDecoration(
+            color: AppColors.primarySoft,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: AppColors.primaryDark, size: 20),
+        ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(text, style: AppTypography.caption),
+            ],
           ),
         ),
       ],
@@ -749,12 +1028,47 @@ class _HomeError extends StatelessWidget {
 }
 
 class _HomeData {
-  const _HomeData({this.user, this.records = const []});
+  const _HomeData({
+    this.user,
+    this.selectedPerson,
+    this.familyMembers = const [],
+    this.records = const [],
+  });
 
   final AppUser? user;
+  final AppUser? selectedPerson;
+  final List<FamilyMember> familyMembers;
   final List<VaccinationRecord> records;
 
+  bool get isViewingCurrent =>
+      selectedPerson?.effectivePersonId == user?.effectivePersonId;
+
   int get appliedCount => VaccinationRecordInsights.appliedCount(records);
+
+  bool get hasOverdue => records.any(
+    (record) =>
+        record.effectiveNextDoseAt != null &&
+        VaccinationRecordInsights.situation(record) ==
+            VaccinationRecordSituation.overdue,
+  );
+
+  bool get hasUpcoming => records.any(
+    (record) =>
+        record.effectiveNextDoseAt != null &&
+        VaccinationRecordInsights.situation(record) ==
+            VaccinationRecordSituation.upcoming,
+  );
+
+  String get summaryMessage {
+    if (hasOverdue) {
+      return 'Você possui uma dose que precisa de atenção.';
+    }
+    if (hasUpcoming) return 'Você possui próximas doses programadas.';
+    if (appliedCount > 0) {
+      return 'Suas aplicações registradas estão disponíveis.';
+    }
+    return 'Sua carteira ainda não possui aplicações.';
+  }
 
   List<VaccinationRecord> get upcoming {
     return VaccinationRecordInsights.nextDoses(

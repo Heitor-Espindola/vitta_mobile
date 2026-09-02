@@ -5,7 +5,7 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
-import 'package:vitta_mobile/features/notifications/domain/services/vaccination_notification_service.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
@@ -16,10 +16,12 @@ class NotificationsScreen extends StatefulWidget {
     super.key,
     this.authRepository,
     this.vaccinationRepository,
+    this.walletController,
   });
 
   final AuthRepository? authRepository;
   final VaccinationRepository? vaccinationRepository;
+  final WalletSelectionController? walletController;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -30,6 +32,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final VaccinationRepository _vaccinations =
       widget.vaccinationRepository ?? FirebaseVaccinationRepository();
+  late final WalletSelectionController _wallet =
+      widget.walletController ?? WalletSelectionController.instance;
   Stream<List<VaccinationRecord>>? _records;
   bool _loading = true;
   String? _error;
@@ -48,9 +52,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final user = await _auth.getCurrentUser();
       if (user == null) throw StateError('Sessão não encontrada.');
+      _wallet.bindCurrentPerson(user);
+      final selected = _wallet.selectedPerson ?? user;
       if (!mounted) return;
       setState(() {
-        _records = _vaccinations.watchPatientRecords(user.uid);
+        _records = _vaccinations.watchRecordsByPerson(
+          personId: selected.effectivePersonId,
+          responsibleId: user.effectivePersonId,
+        );
         _loading = false;
       });
     } catch (_) {
@@ -98,13 +107,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           );
         }
         final records = snapshot.data ?? const <VaccinationRecord>[];
-        final items = DemoPresentation.isEnabled && records.isEmpty
-            ? DemoPresentation.notificationsForPresentation(records)
-            : VaccinationNotificationService.derive(records);
+        final items = DemoPresentation.notificationsForPresentation(records);
         if (items.isEmpty) {
-          return const _NotificationMessage(
-            message: 'Nenhuma notificação no momento.',
-          );
+          return const _NotificationEmptyState();
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -124,27 +129,39 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = switch (item.kind) {
+    final (icon, color, background) = switch (item.kind) {
       VaccinationNotificationKind.overdue => (
         Icons.warning_amber_rounded,
         AppColors.danger,
+        const Color(0xFFFFEEEE),
       ),
       VaccinationNotificationKind.upcoming => (
         Icons.event_outlined,
         AppColors.primaryDark,
+        AppColors.primarySoft,
       ),
       VaccinationNotificationKind.applied => (
         Icons.check_circle_outline,
         AppColors.success,
+        const Color(0xFFEAF7F0),
       ),
     };
     return Container(
-      padding: const EdgeInsets.all(14),
+      key: Key('notification-${item.id}'),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: AppCardStyle.decoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 22),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: background,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -168,6 +185,39 @@ class _NotificationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NotificationEmptyState extends StatelessWidget {
+  const _NotificationEmptyState();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      key: const Key('notifications-empty-state'),
+      margin: const EdgeInsets.all(AppSpacing.normal),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: AppCardStyle.decoration(),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 23,
+            backgroundColor: AppColors.primarySoft,
+            foregroundColor: AppColors.primaryDark,
+            child: Icon(Icons.check_rounded),
+          ),
+          SizedBox(height: AppSpacing.md),
+          Text('Tudo certo por aqui', style: AppTypography.sectionTitle),
+          SizedBox(height: AppSpacing.xs),
+          Text(
+            'Você não possui notificações no momento.',
+            textAlign: TextAlign.center,
+            style: AppTypography.body,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _NotificationMessage extends StatelessWidget {

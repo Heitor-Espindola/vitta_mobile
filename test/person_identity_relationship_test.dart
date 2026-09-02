@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/people/domain/models/auth_link.dart';
+import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/models/relationship.dart';
+import 'package:vitta_mobile/features/people/domain/services/majority_transition_service.dart';
 import 'package:vitta_mobile/features/people/domain/services/person_identity_resolver.dart';
 import 'package:vitta_mobile/features/people/domain/services/relationship_access_policy.dart';
 
@@ -40,6 +42,26 @@ void main() {
   test('majorityAt is derived from birth date, including leap day', () {
     expect(calculateMajorityAt(DateTime(2008, 6, 23)), DateTime(2026, 6, 23));
     expect(calculateMajorityAt(DateTime(2008, 2, 29)), DateTime(2026, 2, 28));
+  });
+
+  test('a person may be both a dependent and a responsible guardian', () {
+    final youngMother = AppUser(
+      uid: 'mother-17',
+      personId: 'mother-17',
+      name: 'Mãe adolescente',
+      email: '',
+      role: 'dependent',
+      birthDate: DateTime(2009, 1, 1),
+      guardianIds: const ['grandmother'],
+      dependentIds: const ['baby'],
+    );
+
+    expect(youngMother.guardianIds, ['grandmother']);
+    expect(youngMother.dependentIds, ['baby']);
+    expect(
+      MajorityTransitionService.state(youngMother, now: DateTime(2026, 8, 31)),
+      MajorityTransitionState.minor,
+    );
   });
 
   group('direct relationship access', () {
@@ -138,6 +160,129 @@ void main() {
           grandmotherToMother,
           'grandmother',
           'baby',
+        ),
+        isFalse,
+      );
+    });
+
+    test('Demo Mode never bypasses a pending relationship', () {
+      final pending = PersonRelationship(
+        id: PersonRelationship.deterministicId('mother-17', 'baby'),
+        fromPersonId: 'mother-17',
+        toPersonId: 'baby',
+        type: RelationshipType.mother,
+      );
+      final member = FamilyMember(person: minor, relationship: pending);
+
+      expect(
+        member.canViewVaccination(
+          currentPersonId: 'mother-17',
+          demoEnabled: false,
+        ),
+        isFalse,
+      );
+      expect(
+        member.canViewVaccination(
+          currentPersonId: 'mother-17',
+          demoEnabled: true,
+        ),
+        isFalse,
+      );
+      expect(
+        member.canViewVaccination(
+          currentPersonId: 'grandmother',
+          demoEnabled: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'an adult access grant is direct and expires without deleting data',
+      () {
+        final grant = VaccinationAccessGrant(
+          id: 'parent_adult',
+          granteePersonId: 'parent',
+          subjectPersonId: 'adult',
+          viewVaccination: true,
+          consentStatus: 'granted',
+          validUntil: DateTime(2027, 1, 1),
+        );
+
+        expect(
+          grant.isActiveDirect(
+            granteeId: 'parent',
+            subjectId: 'adult',
+            now: DateTime(2026, 8, 31),
+          ),
+          isTrue,
+        );
+        expect(
+          grant.isActiveDirect(
+            granteeId: 'grandparent',
+            subjectId: 'adult',
+            now: DateTime(2026, 8, 31),
+          ),
+          isFalse,
+        );
+        expect(
+          grant.isActiveDirect(
+            granteeId: 'parent',
+            subjectId: 'adult',
+            now: DateTime(2027, 1, 2),
+          ),
+          isFalse,
+        );
+        final adultMember = FamilyMember(
+          person: adult,
+          relationship: relationship(
+            from: 'parent',
+            to: 'adult',
+            type: RelationshipType.father,
+            consent: AdultConsentStatus.granted,
+          ),
+          accessGrant: grant,
+        );
+        expect(
+          adultMember.canViewVaccination(
+            currentPersonId: 'parent',
+            now: DateTime(2026, 8, 31),
+          ),
+          isTrue,
+        );
+        expect(
+          adultMember.canViewVaccination(
+            currentPersonId: 'parent',
+            now: DateTime(2027, 1, 2),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('an active direct grant opens a migrated legacy dependent', () {
+      final migrated = FamilyMember(
+        person: minor,
+        accessGrant: const VaccinationAccessGrant(
+          id: 'mother-17_baby',
+          granteePersonId: 'mother-17',
+          subjectPersonId: 'baby',
+          viewVaccination: true,
+          consentStatus: 'granted',
+        ),
+      );
+
+      expect(
+        migrated.canViewVaccination(
+          currentPersonId: 'mother-17',
+          now: DateTime(2026, 8, 31),
+        ),
+        isTrue,
+      );
+      expect(
+        migrated.canViewVaccination(
+          currentPersonId: 'grandmother',
+          now: DateTime(2026, 8, 31),
         ),
         isFalse,
       );

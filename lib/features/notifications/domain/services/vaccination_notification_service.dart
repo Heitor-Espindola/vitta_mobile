@@ -47,6 +47,12 @@ abstract final class VaccinationNotificationService {
       records,
       limit: 3,
     )) {
+      final appliedAt = record.effectiveAppliedAt!;
+      final earliestRecentDate = reference.subtract(const Duration(days: 30));
+      if (appliedAt.isBefore(earliestRecentDate) ||
+          appliedAt.isAfter(reference)) {
+        continue;
+      }
       notifications.add(
         VaccinationNotification(
           id: 'applied-${record.id}',
@@ -54,7 +60,7 @@ abstract final class VaccinationNotificationService {
           title: 'Aplicação registrada',
           message:
               '${record.vaccineName} (${record.effectiveDoseLabel}) foi adicionada à sua carteira.',
-          date: record.effectiveAppliedAt!,
+          date: appliedAt,
         ),
       );
     }

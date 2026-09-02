@@ -1,4 +1,5 @@
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
+import 'package:vitta_mobile/features/notifications/domain/services/vaccination_notification_service.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 
 /// Dados exclusivamente locais para screenshots e apresentações acadêmicas.
@@ -14,9 +15,6 @@ abstract final class DemoPresentation {
     defaultValue: false,
   );
 
-  static const dependentName = 'Sofia Martins';
-  static const dependentDescription = 'Dependente • 4 aplicações';
-
   static List<VaccinationRecord> recordsForPresentation(
     Iterable<VaccinationRecord> records, {
     bool? enabled,
@@ -29,44 +27,49 @@ abstract final class DemoPresentation {
   static List<VaccinationNotification> notificationsForPresentation(
     Iterable<VaccinationRecord> records, {
     bool? enabled,
+    DateTime? now,
   }) {
-    if (records.isNotEmpty || !(enabled ?? isEnabled)) return const [];
-    final now = DateTime.now();
+    final values = List<VaccinationRecord>.unmodifiable(records);
+    if (values.isNotEmpty) {
+      return VaccinationNotificationService.derive(values, now: now);
+    }
+    if (!(enabled ?? isEnabled)) return const [];
+    final reference = now ?? DateTime.now();
     return [
       VaccinationNotification(
         id: 'demo-influenza-overdue',
         kind: VaccinationNotificationKind.overdue,
         title: 'Vacina atrasada',
         message: 'Sua dose de Influenza está atrasada.',
-        date: now.subtract(const Duration(days: 8)),
+        date: reference.subtract(const Duration(days: 8)),
       ),
       VaccinationNotification(
         id: 'demo-triplice-applied',
         kind: VaccinationNotificationKind.applied,
         title: 'Aplicação registrada',
         message: 'Nova aplicação registrada: Tríplice Viral.',
-        date: now.subtract(const Duration(days: 3)),
+        date: reference.subtract(const Duration(days: 3)),
       ),
       VaccinationNotification(
         id: 'demo-hpv-upcoming',
         kind: VaccinationNotificationKind.upcoming,
         title: 'Próxima dose',
         message: 'Próxima dose de HPV em 14 dias.',
-        date: now.add(const Duration(days: 14)),
+        date: reference.add(const Duration(days: 14)),
       ),
       VaccinationNotification(
         id: 'demo-wallet-updated',
         kind: VaccinationNotificationKind.applied,
         title: 'Carteira atualizada',
         message: 'Sua carteira foi atualizada com novas informações.',
-        date: now.subtract(const Duration(days: 1)),
+        date: reference.subtract(const Duration(days: 1)),
       ),
       VaccinationNotification(
         id: 'demo-influenza-campaign',
         kind: VaccinationNotificationKind.upcoming,
         title: 'Campanha disponível',
         message: 'Campanha de vacinação contra Influenza disponível.',
-        date: now,
+        date: reference,
       ),
     ];
   }
