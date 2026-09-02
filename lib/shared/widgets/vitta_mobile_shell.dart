@@ -20,6 +20,7 @@ class VittaMobileShell extends StatelessWidget {
     this.showGreetingHeader = false,
     this.showTopBar = true,
     this.appBarHeight = 58,
+    this.bottomNavigationOverlay,
   });
 
   final String title;
@@ -28,6 +29,7 @@ class VittaMobileShell extends StatelessWidget {
   final bool showGreetingHeader;
   final bool showTopBar;
   final double appBarHeight;
+  final Widget? bottomNavigationOverlay;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +47,18 @@ class VittaMobileShell extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: VittaBottomNav(currentTab: currentTab),
+      bottomNavigationBar: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          VittaBottomNav(currentTab: currentTab),
+          if (bottomNavigationOverlay != null)
+            Positioned(
+              right: 24,
+              top: -64,
+              child: IgnorePointer(child: bottomNavigationOverlay!),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -239,49 +252,59 @@ class AppPageHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.showBack = false,
+    this.center,
     this.action,
+    this.backgroundColor = AppColors.primarySoft,
   });
 
   final String title;
   final String? subtitle;
   final bool showBack;
+  final Widget? center;
   final Widget? action;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    color: AppColors.primarySoft,
+    color: backgroundColor,
     padding: const EdgeInsets.fromLTRB(
       AppSpacing.normal,
       AppSpacing.sm,
       AppSpacing.normal,
       AppSpacing.md,
     ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Stack(
+      alignment: Alignment.topCenter,
       children: [
-        if (showBack) ...[
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: 'Voltar',
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back_rounded, size: 22),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTypography.pageTitle),
-              if (subtitle != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(subtitle!, style: AppTypography.caption),
-              ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showBack) ...[
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Voltar',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded, size: 22),
+              ),
+              const SizedBox(width: AppSpacing.xs),
             ],
-          ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.pageTitle),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(subtitle!, style: AppTypography.caption),
+                  ],
+                ],
+              ),
+            ),
+            ?action,
+          ],
         ),
-        ?action,
+        if (center != null) IgnorePointer(child: center),
       ],
     ),
   );

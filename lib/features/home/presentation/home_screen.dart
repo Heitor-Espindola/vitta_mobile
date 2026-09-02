@@ -8,6 +8,7 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
@@ -18,6 +19,8 @@ import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebas
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
 
@@ -32,6 +35,7 @@ class HomeScreen extends StatefulWidget {
     this.walletController,
     this.demoModeEnabled,
     this.shareText,
+    this.notificationReadController,
   });
 
   final AuthRepository? authRepository;
@@ -40,6 +44,7 @@ class HomeScreen extends StatefulWidget {
   final WalletSelectionController? walletController;
   final bool? demoModeEnabled;
   final ShareTextCallback? shareText;
+  final NotificationReadController? notificationReadController;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -54,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.peopleRepository ?? FirebasePeopleRepository();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
+  late final NotificationReadController _notificationReadController =
+      widget.notificationReadController ?? NotificationReadController.instance;
   late Future<_HomeData> _data;
   String? _recordsStreamPersonId;
   Stream<List<VaccinationRecord>>? _recordsStream;
@@ -64,13 +71,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _wallet.addListener(_handleWalletSelection);
+    _notificationReadController.addListener(_handleNotificationReadState);
     _data = _loadData();
   }
 
   @override
   void dispose() {
     _wallet.removeListener(_handleWalletSelection);
+    _notificationReadController.removeListener(_handleNotificationReadState);
     super.dispose();
+  }
+
+  void _handleNotificationReadState() {
+    if (mounted) setState(() {});
   }
 
   void _handleWalletSelection() {
@@ -180,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) => VittaMobileShell(
     title: 'Início',
     currentTab: VittaTab.home,
-    showGreetingHeader: true,
+    showTopBar: false,
     body: FutureBuilder<_HomeData>(
       future: _data,
       builder: (context, snapshot) {
@@ -210,13 +223,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 enabled: _demoEnabled,
               ),
             );
+            final selectedPersonId =
+                data.selectedPerson?.effectivePersonId ??
+                data.user!.effectivePersonId;
             return _buildContent(
               data,
               loading:
                   recordsSnapshot.connectionState == ConnectionState.waiting &&
                   !usingDemoRecords,
               hasError: recordsSnapshot.hasError && !usingDemoRecords,
-              hasNotifications: notifications.isNotEmpty,
+              hasNotifications: _notificationReadController.hasUnread(
+                personId: selectedPersonId,
+                notifications: notifications,
+              ),
             );
           },
         );
@@ -232,76 +251,79 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final upcoming = data.upcoming;
     final recent = data.recent;
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-          sliver: SliverList.list(
-            children: [
-              _HomeHeader(
-                name: _firstName(data.user?.name),
-                hasNotifications: hasNotifications,
-              ),
-              if (!data.isViewingCurrent) ...[
-                const SizedBox(height: AppSpacing.md),
-                _ViewingWalletBanner(
-                  personName: data.selectedPerson?.name ?? 'Familiar',
-                  onReturn: _wallet.selectCurrentPerson,
+    return DependentWalletBackground(
+      enabled: !data.isViewingCurrent,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: SliverList.list(
+              children: [
+                _HomeHeader(
+                  name: _firstName(data.user?.name),
+                  hasNotifications: hasNotifications,
                 ),
+                if (!data.isViewingCurrent) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _ViewingWalletBanner(
+                    personName: data.selectedPerson?.name ?? 'Familiar',
+                    onReturn: _wallet.selectCurrentPerson,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _SummaryCard(
+                  appliedCount: data.appliedCount,
+                  message: data.summaryMessage,
+                  onShare: _shareWallet,
+                  isDependent: !data.isViewingCurrent,
+                ),
+                const SizedBox(height: 20),
+                _WalletsSection(
+                  user: data.user!,
+                  familyMembers: data.familyMembers,
+                  selectedPersonId: data.selectedPerson?.effectivePersonId,
+                  demoEnabled: _demoEnabled,
+                  onOpenFamily: _openFamily,
+                  onAddFamily: _addFamilyMember,
+                  onSelect: _wallet.selectPerson,
+                ),
+                const SizedBox(height: 22),
+                const _SectionHeader(title: 'Próximas doses'),
+                const SizedBox(height: 14),
+                if (loading)
+                  const _HomeLoading()
+                else if (hasError)
+                  _HomeError(onRetry: _retry)
+                else if (upcoming.isEmpty)
+                  const _EmptyCard(
+                    icon: Icons.event_available_outlined,
+                    title: 'Nenhuma próxima dose cadastrada',
+                    text:
+                        'Sua carteira não possui doses futuras registradas no momento.',
+                  )
+                else
+                  _DoseTimeline(records: upcoming),
+                const SizedBox(height: 30),
+                const _SectionHeader(title: 'Últimas vacinas'),
+                const SizedBox(height: 14),
+                if (loading)
+                  const _HomeLoading()
+                else if (hasError)
+                  const SizedBox.shrink()
+                else if (recent.isEmpty)
+                  const _EmptyCard(
+                    icon: Icons.vaccines_outlined,
+                    title: 'Nenhuma aplicação registrada ainda',
+                    text:
+                        'Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
+                  )
+                else
+                  ...recent.map(_RecentVaccineCard.new),
               ],
-              const SizedBox(height: 16),
-              _SummaryCard(
-                appliedCount: data.appliedCount,
-                message: data.summaryMessage,
-                needsAttention: data.hasOverdue,
-                onShare: _shareWallet,
-              ),
-              const SizedBox(height: 20),
-              _WalletsSection(
-                user: data.user!,
-                familyMembers: data.familyMembers,
-                selectedPersonId: data.selectedPerson?.effectivePersonId,
-                demoEnabled: _demoEnabled,
-                onOpenFamily: _openFamily,
-                onAddFamily: _addFamilyMember,
-                onSelect: _wallet.selectPerson,
-              ),
-              const SizedBox(height: 22),
-              const _SectionHeader(title: 'Próximas doses'),
-              const SizedBox(height: 14),
-              if (loading)
-                const _HomeLoading()
-              else if (hasError)
-                _HomeError(onRetry: _retry)
-              else if (upcoming.isEmpty)
-                const _EmptyCard(
-                  icon: Icons.event_available_outlined,
-                  title: 'Nenhuma próxima dose cadastrada',
-                  text:
-                      'Sua carteira não possui doses futuras registradas no momento.',
-                )
-              else
-                _DoseTimeline(records: upcoming),
-              const SizedBox(height: 30),
-              const _SectionHeader(title: 'Últimas vacinas'),
-              const SizedBox(height: 14),
-              if (loading)
-                const _HomeLoading()
-              else if (hasError)
-                const SizedBox.shrink()
-              else if (recent.isEmpty)
-                const _EmptyCard(
-                  icon: Icons.vaccines_outlined,
-                  title: 'Nenhuma aplicação registrada ainda',
-                  text:
-                      'Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
-                )
-              else
-                ...recent.map(_RecentVaccineCard.new),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -399,21 +421,24 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.appliedCount,
     required this.message,
-    required this.needsAttention,
     required this.onShare,
+    required this.isDependent,
   });
 
   final int appliedCount;
   final String message;
-  final bool needsAttention;
   final VoidCallback onShare;
+  final bool isDependent;
 
   @override
   Widget build(BuildContext context) => Container(
+    key: const Key('home-summary-card'),
     padding: const EdgeInsets.all(17),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF3C9FE3), Color(0xFF267BB8)],
+      gradient: LinearGradient(
+        colors: isDependent
+            ? const [Color(0xFF60B7DC), Color(0xFF4D93C5)]
+            : const [Color(0xFF3C9FE3), Color(0xFF267BB8)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -429,58 +454,35 @@ class _SummaryCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$appliedCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 38,
-                      height: 1,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'vacinas aplicadas',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    message,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.78),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
+        Text(
+          '$appliedCount',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 38,
+            height: 1,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'vacinas aplicadas',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 5),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Text(
+            message,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 11,
+              height: 1.35,
             ),
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                needsAttention
-                    ? Icons.priority_high_rounded
-                    : Icons.check_rounded,
-                color: Colors.white,
-                size: 34,
-              ),
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 14),
         Align(
@@ -513,25 +515,24 @@ class _ViewingWalletBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.md,
-      vertical: AppSpacing.sm,
-    ),
-    decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+    padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+    decoration: AppCardStyle.decoration(
+      color: DependentWalletColors.peach,
+    ).copyWith(border: Border.all(color: DependentWalletColors.border)),
     child: Row(
       children: [
-        const Icon(
-          Icons.switch_account_outlined,
-          color: AppColors.primaryDark,
-          size: 20,
-        ),
-        const SizedBox(width: AppSpacing.sm),
+        const MuuniSpriteFrame(frame: 11, size: 44),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             'Visualizando: $personName',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: DependentWalletColors.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
         TextButton(onPressed: onReturn, child: const Text('Minha carteira')),

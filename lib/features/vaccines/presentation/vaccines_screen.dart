@@ -13,6 +13,8 @@ import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccines/domain/models/patient_vaccine_summary.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 const _pageBackground = Color(0xFFF7F9FB);
@@ -145,6 +147,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isViewingDependent =
+        _selectedPerson != null &&
+        _selectedPerson?.effectivePersonId != _currentPerson?.effectivePersonId;
     final normalizedQuery = _query.toLowerCase();
     final summaries = PatientVaccineSummary.combine(_catalog, _records);
     final vaccines = summaries.where((summary) {
@@ -161,72 +166,74 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
       title: 'Vacinas',
       currentTab: VittaTab.vaccines,
       showTopBar: false,
-      body: ColoredBox(
-        color: _pageBackground,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _VaccinesHeader(),
-                    if (_selectedPerson?.effectivePersonId !=
-                        _currentPerson?.effectivePersonId) ...[
+      body: DependentWalletBackground(
+        enabled: isViewingDependent,
+        child: ColoredBox(
+          color: isViewingDependent ? Colors.transparent : _pageBackground,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _VaccinesHeader(dependent: isViewingDependent),
+                      if (isViewingDependent) ...[
+                        const SizedBox(height: 8),
+                        _SelectedPersonBanner(
+                          name: _selectedPerson?.name ?? 'Familiar',
+                          onReturn: _wallet.selectCurrentPerson,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      const _SectionHeading('Categorias'),
+                      const SizedBox(height: 14),
+                      _CategorySelector(
+                        key: const Key('vaccine-category-filters'),
+                        selected: _category,
+                        onSelected: (category) =>
+                            setState(() => _category = category),
+                      ),
                       const SizedBox(height: 8),
-                      _SelectedPersonBanner(
-                        name: _selectedPerson?.name ?? 'Familiar',
-                        onReturn: _wallet.selectCurrentPerson,
+                      ExpandableSearch(
+                        controller: _searchController,
+                        hint: 'Pesquisar vacina',
+                        onChanged: (value) =>
+                            setState(() => _query = value.trim()),
                       ),
-                    ],
-                    const SizedBox(height: 16),
-                    const _SectionHeading('Categorias'),
-                    const SizedBox(height: 14),
-                    _CategorySelector(
-                      key: const Key('vaccine-category-filters'),
-                      selected: _category,
-                      onSelected: (category) =>
-                          setState(() => _category = category),
-                    ),
-                    const SizedBox(height: 8),
-                    ExpandableSearch(
-                      controller: _searchController,
-                      hint: 'Pesquisar vacina',
-                      onChanged: (value) =>
-                          setState(() => _query = value.trim()),
-                    ),
-                    const SizedBox(height: 20),
-                    const _EducationalCard(),
-                    const SizedBox(height: 20),
-                    const _SectionHeading('Vacinas recomendadas'),
-                    const SizedBox(height: 16),
-                    if (_error != null) ...[
-                      Text(_error!),
-                      TextButton(
-                        onPressed: _load,
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ] else if (_loading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (vaccines.isEmpty)
-                      const _EmptyVaccines()
-                    else
-                      ...vaccines.map(
-                        (summary) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _VaccineCard(
-                            item: _VaccineItem.fromVaccine(summary.vaccine),
-                            summary: summary,
+                      const SizedBox(height: 20),
+                      const _EducationalCard(),
+                      const SizedBox(height: 20),
+                      const _SectionHeading('Vacinas recomendadas'),
+                      const SizedBox(height: 16),
+                      if (_error != null) ...[
+                        Text(_error!),
+                        TextButton(
+                          onPressed: _load,
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ] else if (_loading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (vaccines.isEmpty)
+                        const _EmptyVaccines()
+                      else
+                        ...vaccines.map(
+                          (summary) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _VaccineCard(
+                              item: _VaccineItem.fromVaccine(summary.vaccine),
+                              summary: summary,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -234,7 +241,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
 }
 
 class _VaccinesHeader extends StatelessWidget {
-  const _VaccinesHeader();
+  const _VaccinesHeader({required this.dependent});
+
+  final bool dependent;
 
   @override
   Widget build(BuildContext context) {
@@ -246,13 +255,21 @@ class _VaccinesHeader extends StatelessWidget {
         key: const Key('vaccines-header-band'),
         width: width,
         padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
+            colors: dependent
+                ? const [DependentWalletColors.sky, Color(0xFFFFF7E8)]
+                : const [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
+          border: Border(
+            bottom: BorderSide(
+              color: dependent
+                  ? DependentWalletColors.border
+                  : const Color(0xFFDCEBF4),
+            ),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,19 +300,22 @@ class _VaccinesHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: _softBlue,
-                shape: BoxShape.circle,
+            if (dependent)
+              const MuuniSpriteFrame(frame: 11, size: 54)
+            else
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: _softBlue,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.vaccines_outlined,
+                  color: vittaDarkBlue,
+                  size: 22,
+                ),
               ),
-              child: const Icon(
-                Icons.vaccines_outlined,
-                color: vittaDarkBlue,
-                size: 22,
-              ),
-            ),
           ],
         ),
       ),
@@ -311,11 +331,11 @@ class _SelectedPersonBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
     decoration: BoxDecoration(
-      color: _softBlue,
+      color: DependentWalletColors.peach,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFFD1E6F3)),
+      border: Border.all(color: DependentWalletColors.border),
     ),
     child: Row(
       children: [
@@ -330,7 +350,11 @@ class _SelectedPersonBanner extends StatelessWidget {
             'Visualizando: $name',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: DependentWalletColors.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
         TextButton(onPressed: onReturn, child: const Text('Minha carteira')),

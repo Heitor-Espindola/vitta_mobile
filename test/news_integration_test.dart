@@ -351,7 +351,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Conteúdo keeps category above search and clears only the term', (
+  testWidgets('Conteúdo hides category filters and keeps functional search', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(412, 915);
@@ -364,20 +364,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final category = find.byKey(const Key('news-category-forYou'));
     final search = find.byKey(const ValueKey('collapsed-search'));
-    expect(
-      tester.getTopLeft(category).dy,
-      lessThan(tester.getTopLeft(search).dy),
-    );
+    expect(find.byType(ChoiceChip), findsNothing);
+    for (final category in NewsCategory.values) {
+      expect(find.byKey(Key('news-category-${category.name}')), findsNothing);
+    }
     expect(tester.getTopLeft(search).dx, lessThan(40));
     expect(
       tester.getSize(find.byKey(const Key('information-header-band'))).width,
       412,
     );
 
-    await tester.tap(find.byKey(const Key('news-category-children')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Pesquisar'));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -390,11 +387,8 @@ void main() {
     await tester.tap(find.text('Limpar: vacinação infantil'));
     await tester.pumpAndSettle();
 
-    final selectedChip = tester.widget<ChoiceChip>(
-      find.byKey(const Key('news-category-children')),
-    );
-    expect(selectedChip.selected, isTrue);
     expect(find.text('Limpar: vacinação infantil'), findsNothing);
+    expect(repository.lastQuery, '');
   });
 
   testWidgets('educational cards open content and trigger related search', (
@@ -433,42 +427,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Informações confiáveis'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('empty category explains state and returns to all news', (
-    tester,
-  ) async {
-    final repository = CallbackRepository((query) {
-      if (query == NewsCategory.children.query) return nextResponse([]);
-      return nextResponse([article('feed')]);
-    });
-    await tester.pumpWidget(
-      MaterialApp(home: InformationScreen(newsRepository: repository)),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('news-category-children')));
-    await tester.pumpAndSettle();
-    expect(find.text('Sem novidades por aqui'), findsOneWidget);
-    expect(
-      find.text('Não encontramos notícias recentes sobre este tema.'),
-      findsOneWidget,
-    );
-
-    await tester.drag(
-      find
-          .byWidgetPredicate(
-            (widget) =>
-                widget is ListView && widget.scrollDirection == Axis.vertical,
-          )
-          .first,
-      const Offset(0, -180),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('empty-show-all-news')));
-    await tester.pumpAndSettle();
-    expect(repository.queries.last, '');
-    expect(find.text('Notícia feed'), findsOneWidget);
   });
 
   testWidgets('empty search has its own state and can be cleared', (

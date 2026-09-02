@@ -8,13 +8,17 @@ import 'package:vitta_mobile/core/validators/full_name_validator.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/profile/presentation/profile_detail_screens.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.authRepository});
+  const ProfileScreen({super.key, this.authRepository, this.walletController});
 
   final AuthRepository? authRepository;
+  final WalletSelectionController? walletController;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -23,6 +27,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late final AuthRepository _authRepository =
       widget.authRepository ?? FirebaseAuthRepository();
+  late final WalletSelectionController _wallet =
+      widget.walletController ?? WalletSelectionController.instance;
 
   AppUser? _user;
   bool _isLoading = true;
@@ -30,7 +36,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _wallet.addListener(_onWalletChanged);
     _loadUser();
+  }
+
+  void _onWalletChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _isViewingDependent =>
+      _wallet.currentPersonId != null && !_wallet.isViewingCurrent;
+
+  @override
+  void dispose() {
+    _wallet.removeListener(_onWalletChanged);
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -38,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) {
       return;
     }
+    if (user != null) _wallet.bindCurrentPerson(user);
     setState(() {
       _user = user;
       _isLoading = false;
@@ -168,151 +189,172 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : formatBrazilianDate(user!.birthDate);
 
     return Scaffold(
-      backgroundColor: vittaSurface,
+      backgroundColor: _isViewingDependent
+          ? DependentWalletColors.background
+          : vittaSurface,
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-                children: [
-                  AppPageHeader(
-                    title: 'Perfil',
-                    showBack: true,
-                    action: TextButton(
-                      onPressed: () => _editProfile(_ProfileSection.personal),
-                      child: const Text('Editar'),
+        child: DependentWalletBackground(
+          key: Key(
+            _isViewingDependent
+                ? 'profile-dependent-theme'
+                : 'profile-standard-theme',
+          ),
+          enabled: _isViewingDependent,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+                  children: [
+                    AppPageHeader(
+                      title: 'Perfil',
+                      showBack: true,
+                      backgroundColor: _isViewingDependent
+                          ? DependentWalletColors.sky
+                          : AppColors.primarySoft,
+                      center: _isViewingDependent
+                          ? const MuuniSpriteFrame(frame: 9, size: 44)
+                          : null,
+                      action: TextButton(
+                        onPressed: () => _editProfile(_ProfileSection.personal),
+                        child: const Text('Editar'),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.normal,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.normal),
-                          decoration: AppCardStyle.decoration(),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: AppColors.primarySoft,
-                                foregroundColor: AppColors.primaryDark,
-                                child: Text(
-                                  _initials(name),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.normal,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.normal),
+                            decoration: AppCardStyle.decoration(),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: _isViewingDependent
+                                      ? DependentWalletColors.peach
+                                      : AppColors.primarySoft,
+                                  foregroundColor: _isViewingDependent
+                                      ? DependentWalletColors.ink
+                                      : AppColors.primaryDark,
+                                  child: Text(
+                                    _initials(name),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w800,
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(email, style: AppTypography.caption),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'CPF $cpf  •  Nascimento $birthDate',
-                                      style: AppTypography.caption,
-                                    ),
-                                  ],
+                                      const SizedBox(height: 3),
+                                      Text(email, style: AppTypography.caption),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'CPF $cpf  •  Nascimento $birthDate',
+                                        style: AppTypography.caption,
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _Label('Conta'),
+                          const SizedBox(height: AppSpacing.sm),
+                          _SettingsGroup(
+                            children: [
+                              _SettingsRow(
+                                icon: Icons.person_outline,
+                                title: 'Dados pessoais',
+                                subtitle: 'Nascimento: $birthDate',
+                                onTap: () =>
+                                    _editProfile(_ProfileSection.personal),
+                              ),
+                              _SettingsRow(
+                                icon: Icons.mail_outline,
+                                title: 'Contato',
+                                subtitle: phone == null || phone.isEmpty
+                                    ? email
+                                    : '$email  •  $phone',
+                                onTap: () =>
+                                    _editProfile(_ProfileSection.contact),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Conta'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.person_outline,
-                              title: 'Dados pessoais',
-                              subtitle: 'Nascimento: $birthDate',
-                              onTap: () =>
-                                  _editProfile(_ProfileSection.personal),
-                            ),
-                            _SettingsRow(
-                              icon: Icons.mail_outline,
-                              title: 'Contato',
-                              subtitle: phone == null || phone.isEmpty
-                                  ? email
-                                  : '$email  •  $phone',
-                              onTap: () =>
-                                  _editProfile(_ProfileSection.contact),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Preferências'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.tune_rounded,
-                              title: 'Configurações',
-                              subtitle: 'Idioma, aparência e sessão',
-                              onTap: _openSettings,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Segurança'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.shield_outlined,
-                              title: 'Segurança da conta',
-                              subtitle: 'E-mail, senha e autenticação',
-                              onTap: _openSecurity,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _Label('Suporte'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _SettingsGroup(
-                          children: [
-                            _SettingsRow(
-                              icon: Icons.help_outline_rounded,
-                              title: 'Central de ajuda',
-                              onTap: _openHelpCenter,
-                            ),
-                            _SettingsRow(
-                              icon: Icons.policy_outlined,
-                              title: 'Termos e privacidade',
-                              onTap: _openTermsAndPrivacy,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        OutlinedButton.icon(
-                          onPressed: _signOut,
-                          icon: const Icon(Icons.logout, size: 17),
-                          label: const Text('Sair da conta'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.danger,
-                            minimumSize: const Size.fromHeight(42),
-                            side: const BorderSide(color: AppColors.border),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _Label('Preferências'),
+                          const SizedBox(height: AppSpacing.sm),
+                          _SettingsGroup(
+                            children: [
+                              _SettingsRow(
+                                icon: Icons.tune_rounded,
+                                title: 'Configurações',
+                                subtitle: 'Idioma, aparência e sessão',
+                                onTap: _openSettings,
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: AppSpacing.lg),
+                          const _Label('Segurança'),
+                          const SizedBox(height: AppSpacing.sm),
+                          _SettingsGroup(
+                            children: [
+                              _SettingsRow(
+                                icon: Icons.shield_outlined,
+                                title: 'Segurança da conta',
+                                subtitle: 'E-mail, senha e autenticação',
+                                onTap: _openSecurity,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _Label('Suporte'),
+                          const SizedBox(height: AppSpacing.sm),
+                          _SettingsGroup(
+                            children: [
+                              _SettingsRow(
+                                icon: Icons.help_outline_rounded,
+                                title: 'Central de ajuda',
+                                onTap: _openHelpCenter,
+                              ),
+                              _SettingsRow(
+                                icon: Icons.policy_outlined,
+                                title: 'Termos e privacidade',
+                                onTap: _openTermsAndPrivacy,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          OutlinedButton.icon(
+                            onPressed: _signOut,
+                            icon: const Icon(Icons.logout, size: 17),
+                            label: const Text('Sair da conta'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                              minimumSize: const Size.fromHeight(42),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }

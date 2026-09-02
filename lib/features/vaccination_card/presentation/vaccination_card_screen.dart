@@ -18,6 +18,8 @@ import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
+import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
+import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 enum _VaccineFilter { all, late, next, done }
@@ -210,85 +212,96 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
     );
   }
 
+  bool get _isViewingDependent =>
+      _person != null &&
+      _guardian != null &&
+      _person?.effectivePersonId != _guardian?.effectivePersonId;
+
   @override
   Widget build(BuildContext context) => VittaMobileShell(
     title: 'Carteira',
     currentTab: VittaTab.card,
     showTopBar: false,
-    body: RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-        children: [
-          const _VaccinationCardHeader(),
-          const SizedBox(height: 18),
-          _PersonHeader(
-            person: _person,
-            isOwner: _person?.effectivePersonId == _guardian?.effectivePersonId,
-          ),
-          const SizedBox(height: 18),
-          _ModeSelector(
-            showBooklet: _showBooklet,
-            onChanged: (value) => setState(() => _showBooklet = value),
-          ),
-          const SizedBox(height: 22),
-          if (_error != null) ...[
-            _MessageCard(message: _error!, error: true),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: _load,
-                child: const Text('Tentar novamente'),
-              ),
-            ),
-          ],
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_showBooklet)
-            _DigitalBooklet(
+    body: DependentWalletBackground(
+      enabled: _isViewingDependent,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+          children: [
+            _VaccinationCardHeader(dependent: _isViewingDependent),
+            const SizedBox(height: 18),
+            _PersonHeader(
               person: _person,
-              records: _records,
-              onRecordTap: _openDetails,
-              onExport: _exportPdf,
-            )
-          else ...[
-            _Filters(
-              key: const Key('vaccination-card-filters'),
-              selected: _filter,
-              onSelected: (value) => setState(() => _filter = value),
+              isOwner:
+                  _person?.effectivePersonId == _guardian?.effectivePersonId,
             ),
-            const SizedBox(height: 8),
-            ExpandableSearch(
-              controller: _searchController,
-              hint: 'Pesquisar vacina',
-              onChanged: (_) => _refresh(),
+            const SizedBox(height: 18),
+            _ModeSelector(
+              showBooklet: _showBooklet,
+              onChanged: (value) => setState(() => _showBooklet = value),
             ),
-            const SizedBox(height: 20),
-            if (_visibleRecords.isEmpty)
-              _MessageCard(
-                message: _records.isEmpty
-                    ? 'Nenhuma aplicação registrada nesta carteira. Quando um profissional registrar uma aplicação, ela aparecerá aqui.'
-                    : 'Nenhum registro encontrado para este filtro.',
-              )
-            else
-              ..._visibleRecords.map(
-                (record) => _RecordCard(
-                  record: record,
-                  onTap: () => _openDetails(record),
+            const SizedBox(height: 22),
+            if (_error != null) ...[
+              _MessageCard(message: _error!, error: true),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _load,
+                  child: const Text('Tentar novamente'),
                 ),
               ),
+            ],
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_showBooklet)
+              _DigitalBooklet(
+                person: _person,
+                records: _records,
+                onRecordTap: _openDetails,
+                onExport: _exportPdf,
+              )
+            else ...[
+              _Filters(
+                key: const Key('vaccination-card-filters'),
+                selected: _filter,
+                onSelected: (value) => setState(() => _filter = value),
+              ),
+              const SizedBox(height: 8),
+              ExpandableSearch(
+                controller: _searchController,
+                hint: 'Pesquisar vacina',
+                onChanged: (_) => _refresh(),
+              ),
+              const SizedBox(height: 20),
+              if (_visibleRecords.isEmpty)
+                _MessageCard(
+                  message: _records.isEmpty
+                      ? 'Nenhuma aplicação registrada nesta carteira. Quando um profissional registrar uma aplicação, ela aparecerá aqui.'
+                      : 'Nenhum registro encontrado para este filtro.',
+                )
+              else
+                ..._visibleRecords.map(
+                  (record) => _RecordCard(
+                    record: record,
+                    onTap: () => _openDetails(record),
+                  ),
+                ),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );
 }
 
 class _VaccinationCardHeader extends StatelessWidget {
-  const _VaccinationCardHeader();
+  const _VaccinationCardHeader({required this.dependent});
+
+  final bool dependent;
 
   @override
   Widget build(BuildContext context) {
@@ -300,13 +313,21 @@ class _VaccinationCardHeader extends StatelessWidget {
         key: const Key('vaccination-card-header-band'),
         width: width,
         padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
+            colors: dependent
+                ? const [DependentWalletColors.sky, Color(0xFFFFF7E8)]
+                : const [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
+          border: Border(
+            bottom: BorderSide(
+              color: dependent
+                  ? DependentWalletColors.border
+                  : const Color(0xFFDCEBF4),
+            ),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,19 +358,26 @@ class _VaccinationCardHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: Color(0xFFDDEFFC),
-                shape: BoxShape.circle,
+            if (dependent)
+              const MuuniEntranceAnimation(
+                key: Key('muuni-card-animation'),
+                size: 54,
+                fadeOut: false,
+              )
+            else
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDDEFFC),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.article_outlined,
+                  color: vittaDarkBlue,
+                  size: 22,
+                ),
               ),
-              child: const Icon(
-                Icons.article_outlined,
-                color: vittaDarkBlue,
-                size: 22,
-              ),
-            ),
           ],
         ),
       ),
@@ -371,9 +399,15 @@ class _PersonHeader extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: vittaBlue,
+            backgroundColor: isOwner ? vittaBlue : DependentWalletColors.peach,
             foregroundColor: Colors.white,
-            child: Text(_initials(name)),
+            child: Text(
+              _initials(name),
+              style: TextStyle(
+                color: isOwner ? Colors.white : DependentWalletColors.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -397,7 +431,10 @@ class _PersonHeader extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.verified_user_outlined, color: vittaBlue),
+          Icon(
+            isOwner ? Icons.verified_user_outlined : Icons.auto_awesome_rounded,
+            color: isOwner ? vittaBlue : const Color(0xFFB56F3C),
+          ),
         ],
       ),
     );
