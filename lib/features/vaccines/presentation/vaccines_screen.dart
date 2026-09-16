@@ -180,13 +180,6 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _VaccinesHeader(dependent: isViewingDependent),
-                      if (isViewingDependent) ...[
-                        const SizedBox(height: 8),
-                        _SelectedPersonBanner(
-                          name: _selectedPerson?.name ?? 'Familiar',
-                          onReturn: _wallet.selectCurrentPerson,
-                        ),
-                      ],
                       const SizedBox(height: 16),
                       const _SectionHeading('Categorias'),
                       const SizedBox(height: 14),
@@ -301,7 +294,11 @@ class _VaccinesHeader extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (dependent)
-              const MuuniSpriteFrame(frame: 11, size: 54)
+              const SizedBox(
+                width: 76,
+                height: 76,
+                child: MuuniSpriteFrame(frame: 11, size: 76),
+              )
             else
               Container(
                 width: 44,
@@ -321,46 +318,6 @@ class _VaccinesHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SelectedPersonBanner extends StatelessWidget {
-  const _SelectedPersonBanner({required this.name, required this.onReturn});
-
-  final String name;
-  final VoidCallback onReturn;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
-    decoration: BoxDecoration(
-      color: DependentWalletColors.peach,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: DependentWalletColors.border),
-    ),
-    child: Row(
-      children: [
-        const Icon(
-          Icons.switch_account_outlined,
-          color: vittaDarkBlue,
-          size: 20,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'Visualizando: $name',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: DependentWalletColors.ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        TextButton(onPressed: onReturn, child: const Text('Minha carteira')),
-      ],
-    ),
-  );
 }
 
 class _SectionHeading extends StatelessWidget {

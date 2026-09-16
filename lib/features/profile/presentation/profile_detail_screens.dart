@@ -1,40 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vitta_mobile/app/design_system.dart';
+import 'package:vitta_mobile/core/config/app_preferences.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
-class ProfileSettingsScreen extends StatelessWidget {
-  const ProfileSettingsScreen({super.key});
+class ProfileSettingsScreen extends StatefulWidget {
+  const ProfileSettingsScreen({
+    super.key,
+    this.preferences,
+    this.walletController,
+  });
+
+  final AppPreferences? preferences;
+  final WalletSelectionController? walletController;
 
   @override
-  Widget build(BuildContext context) => const _ProfileDetailPage(
+  State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+}
+
+class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+  AppPreferences get _preferences =>
+      widget.preferences ?? AppPreferences.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _preferences.addListener(_refresh);
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _preferences.removeListener(_refresh);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Configurações',
-    intro: 'Preferências atuais do aplicativo neste dispositivo.',
+    intro: 'Escolha como o Vitta funciona neste dispositivo.',
     children: [
       _DetailCard(
         children: [
-          _DetailRow(
-            icon: Icons.language_rounded,
-            title: 'Idioma',
-            value: 'Português (Brasil)',
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.animation_rounded),
+            title: const Text('Animações da Muuni'),
+            value: _preferences.animationsEnabled,
+            onChanged: _preferences.setAnimationsEnabled,
           ),
-          _DetailRow(
-            icon: Icons.light_mode_outlined,
-            title: 'Aparência',
-            value: 'Tema claro',
-          ),
-          _DetailRow(
-            icon: Icons.phonelink_lock_outlined,
-            title: 'Sessão',
-            value: 'Persistente neste dispositivo',
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.wallet_outlined),
+            title: const Text('Lembrar última carteira selecionada'),
+            value: _preferences.rememberLastWallet,
+            onChanged: (value) => _preferences.setRememberLastWallet(
+              value,
+              ownerId:
+                  (widget.walletController ??
+                          WalletSelectionController.instance)
+                      .currentPersonId,
+            ),
           ),
         ],
-      ),
-      SizedBox(height: AppSpacing.md),
-      _NoticeCard(
-        icon: Icons.info_outline_rounded,
-        text:
-            'Somente preferências já disponíveis são exibidas. Novas opções serão adicionadas quando estiverem prontas para uso.',
       ),
     ],
   );
@@ -46,11 +77,15 @@ class AccountSecurityScreen extends StatefulWidget {
     required this.email,
     required this.authRepository,
     this.emailVerified,
+    this.sendVerificationEmail,
+    this.reloadEmailVerified,
   });
 
   final String email;
   final bool? emailVerified;
   final AuthRepository authRepository;
+  final Future<void> Function()? sendVerificationEmail;
+  final Future<bool?> Function()? reloadEmailVerified;
 
   @override
   State<AccountSecurityScreen> createState() => _AccountSecurityScreenState();
@@ -58,10 +93,18 @@ class AccountSecurityScreen extends StatefulWidget {
 
 class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   bool _sendingReset = false;
+  bool _sendingVerification = false;
+  bool? _verified;
 
-  String get _verificationLabel => switch (widget.emailVerified) {
+  @override
+  void initState() {
+    super.initState();
+    _verified = widget.emailVerified;
+  }
+
+  String get _verificationLabel => switch (_verified) {
     true => 'E-mail verificado',
-    false => 'Verificação pendente',
+    false => 'E-mail não verificado',
     null => 'Status indisponível',
   };
 
@@ -75,7 +118,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Se o e-mail estiver disponível, você receberá as instruções para redefinir a senha.',
+            'Instruções para redefinir sua senha foram enviadas para seu e-mail.',
           ),
         ),
       );
@@ -90,6 +133,63 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       );
     } finally {
       if (mounted) setState(() => _sendingReset = false);
+    }
+  }
+
+  Future<void> _sendVerification() async {
+    if (_sendingVerification) return;
+    setState(() => _sendingVerification = true);
+    try {
+      if (widget.sendVerificationEmail != null) {
+        await widget.sendVerificationEmail!();
+      } else {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) throw StateError('Sessão não encontrada');
+        await user.sendEmailVerification();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'E-mail de verificação enviado. Confira sua caixa de entrada.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível reenviar o e-mail. Tente novamente.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingVerification = false);
+    }
+  }
+
+  Future<void> _refreshVerification() async {
+    try {
+      bool? verified;
+      if (widget.reloadEmailVerified != null) {
+        verified = await widget.reloadEmailVerified!();
+      } else {
+        final user = FirebaseAuth.instance.currentUser;
+        await user?.reload();
+        verified = FirebaseAuth.instance.currentUser?.emailVerified;
+      }
+      if (mounted) setState(() => _verified = verified);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível atualizar o status agora.'),
+          ),
+        );
+      }
     }
   }
 
@@ -117,6 +217,23 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
           ),
         ],
       ),
+      if (_verified == false) ...[
+        const SizedBox(height: AppSpacing.md),
+        OutlinedButton.icon(
+          onPressed: _sendingVerification ? null : _sendVerification,
+          icon: _sendingVerification
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.mark_email_unread_outlined),
+          label: const Text('Reenviar e-mail de verificação'),
+        ),
+        TextButton(
+          onPressed: _refreshVerification,
+          child: const Text('Já confirmei meu e-mail'),
+        ),
+      ],
       const SizedBox(height: AppSpacing.md),
       FilledButton.icon(
         onPressed: _sendingReset ? null : _sendPasswordReset,
@@ -162,7 +279,7 @@ class HelpCenterScreen extends StatelessWidget {
     ),
     (
       'Como atualizar meus dados?',
-      'No Perfil, toque em Dados pessoais ou em Editar. CPF, nascimento e dados de acesso permanecem protegidos.',
+      'No Perfil, toque em Dados pessoais ou em Contato. CPF, nascimento e dados de acesso permanecem protegidos.',
     ),
     (
       'Como recuperar minha senha?',
@@ -269,14 +386,19 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: AppCardStyle.decoration(),
-      child: Column(
-        children: [
-          for (var index = 0; index < children.length; index++) ...[
-            children[index],
-            if (index < children.length - 1)
-              const Divider(height: 1, color: AppColors.border),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              children[index],
+              if (index < children.length - 1)
+                const Divider(height: 1, color: AppColors.border),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -391,8 +513,12 @@ class _TextSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

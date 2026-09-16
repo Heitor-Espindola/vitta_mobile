@@ -48,40 +48,45 @@ void main() {
     expect(find.text('Adicionar familiar'), findsWidgets);
   });
 
-  testWidgets('family selects a direct member and returns to current wallet', (
+  testWidgets('family selects a direct member without a redundant detail', (
     tester,
   ) async {
     final controller = WalletSelectionController();
     await tester.pumpWidget(
       MaterialApp(
-        home: FamilyScreen(
-          authRepository: _AuthFake(),
-          peopleRepository: _PeopleFake(),
-          vaccinationRepository: _VaccinationFake(),
-          walletController: controller,
-          demoModeEnabled: false,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FamilyScreen(
+                    authRepository: _AuthFake(),
+                    peopleRepository: _PeopleFake(),
+                    vaccinationRepository: _VaccinationFake(),
+                    walletController: controller,
+                    demoModeEnabled: false,
+                  ),
+                ),
+              ),
+              child: const Text('Abrir família'),
+            ),
+          ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Abrir família'));
     await tester.pumpAndSettle();
 
     expect(find.text('Minha família'), findsOneWidget);
     expect(find.text('Criança Teste'), findsOneWidget);
     await tester.tap(find.text('Criança Teste'));
     await tester.pumpAndSettle();
-    expect(
-      find.textContaining('Nenhuma aplicação registrada nesta carteira'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Selecionar carteira'));
-    await tester.pumpAndSettle();
     expect(controller.selectedPersonId, 'child-person');
-    expect(find.text('Voltar para Minha carteira'), findsOneWidget);
-
-    await tester.tap(find.text('Voltar para Minha carteira'));
-    await tester.pumpAndSettle();
-    expect(controller.selectedPersonId, 'owner-person');
+    expect(find.text('Abrir família'), findsOneWidget);
+    expect(find.text('Selecionar carteira'), findsNothing);
   });
 
   testWidgets('vaccination card queries the selected patientId', (
@@ -125,6 +130,169 @@ void main() {
       find.textContaining('Acompanhe aplicações e próximas doses'),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+    'vaccine detail scrolls above Android bar and never exposes professional UID',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(bottom: 30);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 30);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      const uid = 'technical-professional-uid-secret';
+      final repository = _VaccinationFake(
+        vaccines: const [
+          Vaccine(
+            id: 'bcg',
+            name: 'BCG',
+            sourceName: 'Calendário Nacional de Vacinação / PNI',
+            description: 'Protege contra formas graves de tuberculose.',
+          ),
+        ],
+        records: [
+          VaccinationRecord(
+            id: 'bcg',
+            patientId: 'owner-person',
+            vaccineName: 'BCG',
+            doseLabel: 'Dose única',
+            appliedAt: DateTime(2026, 9, 14),
+            professionalUid: uid,
+            source: 'professional_panel',
+            notes: 'Observação de teste',
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VaccinationCardScreen(
+            authRepository: _AuthFake(),
+            vaccinationRepository: repository,
+            walletController: WalletSelectionController()
+              ..bindCurrentPerson(_owner),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.text('BCG'),
+        find.byType(ListView).first,
+        const Offset(0, -120),
+      );
+      await tester.tap(find.text('BCG').first);
+      await tester.pumpAndSettle();
+      expect(find.text(uid), findsNothing);
+      final source = find.textContaining(
+        'Fonte: Calendário Nacional de Vacinação / PNI',
+      );
+      await tester.dragUntilVisible(
+        source,
+        find.byType(ListView).last,
+        const Offset(0, -150),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Registrado pelo Portal Vitta'), findsOneWidget);
+      expect(source, findsOneWidget);
+      expect(tester.getBottomRight(source).dy, lessThanOrEqualTo(538));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Applied, upcoming and overdue cards match their own occurrence',
+    (tester) async {
+      final today = DateTime.now();
+      final repository = _VaccinationFake(
+        records: [
+          VaccinationRecord(
+            id: 'bcg',
+            patientId: 'owner-person',
+            vaccineName: 'BCG',
+            appliedAt: today.subtract(const Duration(days: 2)),
+            nextDoseAt: today.add(const Duration(days: 20)),
+          ),
+          VaccinationRecord(
+            id: 'hpv',
+            patientId: 'owner-person',
+            vaccineName: 'HPV',
+            nextDoseAt: today.subtract(const Duration(days: 4)),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VaccinationCardScreen(
+            authRepository: _AuthFake(),
+            vaccinationRepository: repository,
+            walletController: WalletSelectionController()
+              ..bindCurrentPerson(_owner),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Aplicadas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aplicada'), findsOneWidget);
+      expect(find.textContaining('Aplicada em'), findsOneWidget);
+      expect(find.text('Próxima'), findsNothing);
+      await tester.tap(find.text('Próximas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Próxima'), findsOneWidget);
+      expect(find.textContaining('Próxima dose em'), findsOneWidget);
+      expect(find.text('Aplicada'), findsNothing);
+      await tester.tap(find.text('Atrasadas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Atrasada'), findsOneWidget);
+      expect(find.textContaining('Dose prevista para'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Home summary has no check and recent records have a surface', (
+    tester,
+  ) async {
+    final repository = _VaccinationFake(
+      records: [
+        VaccinationRecord(
+          id: 'bcg',
+          patientId: 'owner-person',
+          vaccineName: 'BCG',
+          appliedAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authRepository: _AuthFake(),
+          peopleRepository: _PeopleFake(),
+          vaccinationRepository: repository,
+          walletController: WalletSelectionController()
+            ..bindCurrentPerson(_owner),
+          demoModeEnabled: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('home-summary-card')),
+        matching: find.byIcon(Icons.check_circle),
+      ),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('manage-family-button')), findsOneWidget);
+    expect(find.byKey(const Key('home-header-band')), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.byKey(const Key('recent-vaccine-surface')),
+      find.byType(CustomScrollView),
+      const Offset(0, -200),
+    );
+    expect(find.byKey(const Key('recent-vaccine-surface')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Carteira places filters above the left search', (tester) async {
@@ -192,7 +360,7 @@ void main() {
 
     expect(repository.requestedPersonId, 'child-person');
     expect(repository.requestedResponsibleId, 'owner-person');
-    expect(find.text('Caderneta digital'), findsOneWidget);
+    expect(find.text('Carteira Digital de Vacinação'), findsOneWidget);
   });
 
   testWidgets(
@@ -243,7 +411,7 @@ void main() {
 
     expect(repository.requestedPersonId, 'child-person');
     expect(repository.requestedResponsibleId, 'owner-person');
-    expect(find.text('Visualizando: Criança Teste'), findsOneWidget);
+    expect(find.textContaining('Visualizando:'), findsNothing);
   });
 
   testWidgets('Notifications queries the selected patientId', (tester) async {
@@ -360,9 +528,10 @@ class _PeopleFake implements PeopleRepository {
 }
 
 class _VaccinationFake implements VaccinationRepository {
-  _VaccinationFake({this.records = const []});
+  _VaccinationFake({this.records = const [], this.vaccines = const []});
 
   final List<VaccinationRecord> records;
+  final List<Vaccine> vaccines;
   String? requestedPersonId;
   String? requestedResponsibleId;
 
@@ -382,7 +551,7 @@ class _VaccinationFake implements VaccinationRepository {
   ) async => records;
 
   @override
-  Future<List<Vaccine>> getVaccines() async => const [];
+  Future<List<Vaccine>> getVaccines() async => vaccines;
 
   @override
   Stream<List<VaccinationRecord>> watchRecordsByPerson({

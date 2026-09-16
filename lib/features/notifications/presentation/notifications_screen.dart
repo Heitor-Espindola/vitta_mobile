@@ -64,6 +64,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (user == null) throw StateError('Sessão não encontrada.');
       _wallet.bindCurrentPerson(user);
       final selected = _wallet.selectedPerson ?? user;
+      await _notificationReadController.ensureLoaded(
+        selected.effectivePersonId,
+      );
       if (!mounted) return;
       setState(() {
         _selectedPersonId = selected.effectivePersonId;
@@ -94,31 +97,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     body: SafeArea(
       child: DependentWalletBackground(
         enabled: _isViewingDependent,
-        child: Stack(
-          fit: StackFit.expand,
+        child: Column(
           children: [
-            Column(
-              children: [
-                AppPageHeader(
-                  title: 'Notificações',
-                  subtitle: _isViewingDependent
-                      ? 'Novidades da carteira de ${_selectedPersonName ?? 'seu dependente'}'
-                      : 'Atualizações da sua carteira',
-                  showBack: true,
-                  backgroundColor: _isViewingDependent
-                      ? DependentWalletColors.sky
-                      : AppColors.primarySoft,
-                ),
-                Expanded(child: _body()),
-              ],
+            AppPageHeader(
+              title: 'Notificações',
+              subtitle: _isViewingDependent
+                  ? 'Novidades da carteira de ${_selectedPersonName ?? 'seu dependente'}'
+                  : 'Atualizações da sua carteira',
+              showBack: true,
+              backgroundColor: _isViewingDependent
+                  ? DependentWalletColors.sky
+                  : AppColors.primarySoft,
             ),
-            const Positioned(
-              left: 0,
-              bottom: 8,
-              child: MuuniEntranceAnimation(
-                key: Key('muuni-notification-animation'),
-              ),
-            ),
+            Expanded(child: _body()),
           ],
         ),
       ),
@@ -145,14 +136,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         final records = snapshot.data ?? const <VaccinationRecord>[];
         final items = DemoPresentation.notificationsForPresentation(records);
         _markVisibleNotificationsAsViewed(items);
-        if (items.isEmpty) {
-          return const _NotificationEmptyState();
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 132),
-          itemCount: items.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
-          itemBuilder: (_, index) => _NotificationCard(item: items[index]),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final peek = items.length >= 3 || constraints.maxHeight < 340;
+            return Column(
+              children: [
+                Expanded(
+                  child: items.isEmpty
+                      ? const _NotificationEmptyState()
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                          itemCount: items.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (_, index) =>
+                              _NotificationCard(item: items[index]),
+                        ),
+                ),
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: SizedBox(
+                    key: Key(peek ? 'muuni-peek' : 'muuni-full'),
+                    height: peek ? 46 : 114,
+                    width: 114,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: MuuniEntranceAnimation(
+                          key: const Key('muuni-notification-animation'),
+                          fadeOut: false,
+                          size: 110,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );

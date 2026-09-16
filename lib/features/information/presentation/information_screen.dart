@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/data/news_repository.dart';
-import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/all_educational_content_screen.dart';
 import 'package:vitta_mobile/features/information/presentation/all_news_screen.dart';
@@ -93,11 +92,6 @@ class _InformationScreenState extends State<InformationScreen> {
     MaterialPageRoute(builder: (_) => AllNewsScreen(controller: _controller)),
   );
 
-  Future<void> _showAllNews() async {
-    _searchController.clear();
-    await _controller.showAllNews();
-  }
-
   @override
   void dispose() {
     _wallet.removeListener(_onWalletChanged);
@@ -113,9 +107,6 @@ class _InformationScreenState extends State<InformationScreen> {
     title: 'Conteúdo',
     currentTab: VittaTab.content,
     showTopBar: false,
-    bottomNavigationOverlay: _isViewingDependent
-        ? const MuuniSeatedNavMascot()
-        : null,
     body: DependentWalletBackground(
       key: Key(
         _isViewingDependent
@@ -175,7 +166,7 @@ class _InformationScreenState extends State<InformationScreen> {
             ),
             const SizedBox(height: 20),
             _SectionHeader(
-              title: 'Notícias recentes',
+              title: 'Notícias e atualizações',
               actionLabel: 'Ver todas ›',
               actionKey: const Key('show-all-news'),
               onAction: _openAllNews,
@@ -220,54 +211,21 @@ class _InformationScreenState extends State<InformationScreen> {
       return NewsEmptyState(
         hasSearch: _controller.currentQuery.isNotEmpty,
         onClearSearch: _controller.currentQuery.isEmpty ? null : _clearSearch,
-        onShowAllNews:
-            _controller.selectedCategory == NewsCategory.forYou ||
-                _controller.currentQuery.isNotEmpty
-            ? null
-            : _showAllNews,
+        onLoadMore: _controller.hasMore && _controller.currentQuery.isEmpty
+            ? _controller.loadMore
+            : null,
       );
     }
+    final featured = _controller.articles.take(5).toList(growable: false);
     return SizedBox(
       height: 278,
       child: ListView.separated(
+        key: const Key('featured-news-list'),
         scrollDirection: Axis.horizontal,
-        itemCount:
-            _controller.articles.length +
-            (_controller.hasMore || _controller.state == NewsState.error
-                ? 1
-                : 0),
+        itemCount: featured.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          if (index < _controller.articles.length) {
-            return NewsArticleCard(
-              article: _controller.articles[index],
-              horizontal: true,
-            );
-          }
-          return SizedBox(
-            width: 180,
-            child: Center(
-              child: OutlinedButton.icon(
-                onPressed: _controller.isLoadingMore
-                    ? null
-                    : _controller.state == NewsState.error
-                    ? _controller.retry
-                    : _controller.loadMore,
-                icon: _controller.isLoadingMore
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.arrow_forward_rounded),
-                label: Text(
-                  _controller.state == NewsState.error
-                      ? 'Tentar novamente'
-                      : 'Mais notícias',
-                ),
-              ),
-            ),
-          );
-        },
+        itemBuilder: (context, index) =>
+            NewsArticleCard(article: featured[index], horizontal: true),
       ),
     );
   }
@@ -289,10 +247,8 @@ class _InformationHero extends StatelessWidget {
         width: width,
         padding: const EdgeInsets.fromLTRB(18, 17, 16, 16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: dependent
-                ? const [DependentWalletColors.lavender, Color(0xFFFFF7E8)]
-                : const [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -327,12 +283,19 @@ class _InformationHero extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const CircleAvatar(
-              radius: 22,
-              backgroundColor: Color(0xFFDDEFFC),
-              foregroundColor: AppColors.primaryDark,
-              child: Icon(Icons.menu_book_outlined, size: 22),
-            ),
+            if (dependent)
+              const SizedBox(
+                width: 70,
+                height: 78,
+                child: MuuniSpriteFrame(frame: 9, size: 70),
+              )
+            else
+              const CircleAvatar(
+                radius: 22,
+                backgroundColor: Color(0xFFDDEFFC),
+                foregroundColor: AppColors.primaryDark,
+                child: Icon(Icons.menu_book_outlined, size: 22),
+              ),
           ],
         ),
       ),

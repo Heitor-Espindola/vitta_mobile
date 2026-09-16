@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/core/config/app_preferences.dart';
 
 const _muuniSpriteAsset = 'assets/images/muuni/muuni_notification_sprite.png';
 const _muuniSeatedAsset = 'assets/images/muuni/muuni_seated_nav.png';
@@ -83,10 +84,12 @@ class MuuniEntranceAnimation extends StatefulWidget {
     super.key,
     this.size = 124,
     this.fadeOut = true,
+    this.preferences,
   });
 
   final double size;
   final bool fadeOut;
+  final AppPreferences? preferences;
 
   @override
   State<MuuniEntranceAnimation> createState() => _MuuniEntranceAnimationState();
@@ -94,11 +97,30 @@ class MuuniEntranceAnimation extends StatefulWidget {
 
 class _MuuniEntranceAnimationState extends State<MuuniEntranceAnimation>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  );
+  late final AnimationController _controller;
   bool _preparing = false;
+  AppPreferences get _preferences =>
+      widget.preferences ?? AppPreferences.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _preferences.addListener(_onPreferencesChanged);
+  }
+
+  void _onPreferencesChanged() {
+    if (!mounted) return;
+    if (_preferences.animationsEnabled) {
+      _controller.forward(from: 0);
+    } else {
+      _controller.stop();
+    }
+    setState(() {});
+  }
 
   @override
   void didChangeDependencies() {
@@ -114,46 +136,51 @@ class _MuuniEntranceAnimationState extends State<MuuniEntranceAnimation>
     } catch (_) {
       // A animação ainda pode tentar renderizar o asset normalmente.
     }
-    if (mounted) _controller.forward(from: 0);
+    if (mounted && _preferences.animationsEnabled) _controller.forward(from: 0);
   }
 
   @override
   void dispose() {
+    _preferences.removeListener(_onPreferencesChanged);
     _controller.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final value = _controller.value;
-        final motionProgress = (value / .78).clamp(0.0, 1.0);
-        final slideProgress = Curves.easeOutCubic.transform(motionProgress);
-        final frame = math.min(
-          _spriteFrameCount - 1,
-          (motionProgress * _spriteFrameCount).floor(),
-        );
-        final fadeOutProgress = ((value - .88) / .12).clamp(0.0, 1.0);
-        final opacity = value < .08
-            ? Curves.easeOut.transform(value / .08)
-            : widget.fadeOut && value > .88
-            ? 1 - Curves.easeIn.transform(fadeOutProgress)
-            : 1.0;
+  Widget build(BuildContext context) => !_preferences.animationsEnabled
+      ? MuuniSpriteFrame(frame: 11, size: widget.size)
+      : IgnorePointer(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final value = _controller.value;
+              final motionProgress = (value / .78).clamp(0.0, 1.0);
+              final slideProgress = Curves.easeOutCubic.transform(
+                motionProgress,
+              );
+              final frame = math.min(
+                _spriteFrameCount - 1,
+                (motionProgress * _spriteFrameCount).floor(),
+              );
+              final fadeOutProgress = ((value - .88) / .12).clamp(0.0, 1.0);
+              final opacity = value < .08
+                  ? Curves.easeOut.transform(value / .08)
+                  : widget.fadeOut && value > .88
+                  ? 1 - Curves.easeIn.transform(fadeOutProgress)
+                  : 1.0;
 
-        return Opacity(
-          opacity: opacity.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(-10 * (1 - slideProgress), 0),
-            child: MuuniSpriteFrame(
-              key: const Key('muuni-animated-sprite'),
-              frame: frame,
-              size: widget.size,
-            ),
+              return Opacity(
+                opacity: opacity.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(-10 * (1 - slideProgress), 0),
+                  child: MuuniSpriteFrame(
+                    key: const Key('muuni-animated-sprite'),
+                    frame: frame,
+                    size: widget.size,
+                  ),
+                ),
+              );
+            },
           ),
         );
-      },
-    ),
-  );
 }

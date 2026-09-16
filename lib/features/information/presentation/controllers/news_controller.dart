@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/core/errors/news_exception.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
-import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 
 enum NewsState { initial, loading, success, empty, error, loadingMore }
@@ -17,41 +16,21 @@ class NewsController extends ChangeNotifier {
   bool hasMore = true;
   int currentPage = 0;
   String currentQuery = '';
-  NewsCategory selectedCategory = NewsCategory.forYou;
 
   bool get isLoading => state == NewsState.loading;
   bool get isLoadingMore => state == NewsState.loadingMore;
-
-  String get effectiveQuery {
-    final categoryQuery = selectedCategory.query;
-    if (categoryQuery.isEmpty) return currentQuery;
-    if (currentQuery.isEmpty) return categoryQuery;
-    return '$categoryQuery AND "${currentQuery.replaceAll('"', '')}"';
-  }
 
   Future<void> loadInitialNews() => _load(reset: true);
 
   Future<void> searchNews(String term) async {
     final normalized = term.trim().replaceAll(RegExp(r'\s+'), ' ');
-    if (normalized.isEmpty) return;
+    if (normalized.isEmpty) return clearSearch();
     currentQuery = normalized;
-    await _load(reset: true);
-  }
-
-  Future<void> selectCategory(NewsCategory category) async {
-    if (selectedCategory == category && state != NewsState.initial) return;
-    selectedCategory = category;
     await _load(reset: true);
   }
 
   Future<void> clearSearch() async {
     if (currentQuery.isEmpty) return;
-    currentQuery = '';
-    await _load(reset: true);
-  }
-
-  Future<void> showAllNews() async {
-    selectedCategory = NewsCategory.forYou;
     currentQuery = '';
     await _load(reset: true);
   }
@@ -76,7 +55,7 @@ class NewsController extends ChangeNotifier {
     try {
       final nextPage = currentPage + 1;
       final response = await _repository.getNews(
-        query: effectiveQuery,
+        query: currentQuery,
         page: nextPage,
         forceRefresh: forceRefresh,
       );
@@ -85,10 +64,17 @@ class NewsController extends ChangeNotifier {
       for (final article in response.articles) {
         if (knownUrls.add(article.url)) combined.add(article);
       }
+      combined.sort((a, b) {
+        final first = a.publishedAt;
+        final second = b.publishedAt;
+        if (first == null) return second == null ? 0 : 1;
+        if (second == null) return -1;
+        return second.compareTo(first);
+      });
       articles = combined;
       currentPage = nextPage;
       hasMore =
-          response.articles.length >= 20 &&
+          (response.fetchedCount ?? response.articles.length) >= 20 &&
           currentPage * 20 < response.totalResults;
       state = articles.isEmpty ? NewsState.empty : NewsState.success;
     } on NewsException catch (error) {

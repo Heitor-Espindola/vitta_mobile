@@ -19,6 +19,17 @@ class NewsArticle {
   final DateTime? publishedAt;
   final String? content;
 
+  NewsArticle withSourceName(String name) => NewsArticle(
+    sourceName: name,
+    title: title,
+    url: url,
+    author: author,
+    description: description,
+    imageUrl: imageUrl,
+    publishedAt: publishedAt,
+    content: content,
+  );
+
   static NewsArticle? fromJson(Map<String, dynamic> json) {
     final title = (json['title'] as String?)?.trim() ?? '';
     final url = (json['url'] as String?)?.trim() ?? '';

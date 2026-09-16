@@ -100,9 +100,38 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('share-wallet-button')));
       await tester.pump();
-      expect(sharedText, 'Minha carteira de vacinação está no Vitta.');
+      expect(sharedText, walletShareMessage());
+      expect(sharedText, contains('Acompanhe vacinas, próximas doses'));
+      expect(sharedText, isNot(contains('123.456.789')));
+      expect(sharedText, isNot(contains('personId')));
+      expect(sharedText, isNot(contains('BCG')));
+      expect(sharedText, isNot(contains('https://')));
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  testWidgets('Compartilhar shows only a friendly error when share fails', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authRepository: _FakeAuthRepository(),
+          peopleRepository: _FakePeopleRepository(),
+          vaccinationRepository: _FakeVaccinationRepository(),
+          shareText: (_) async => throw StateError('unavailable'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('share-wallet-button')));
+    await tester.pump();
+    expect(
+      find.text('Não foi possível abrir o compartilhamento.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Minha carteira digital'), findsNothing);
+  });
 
   testWidgets('Login, registration and profile fit a small viewport', (
     tester,
@@ -329,6 +358,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Muuni remains full after animation with few notifications', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationsScreen(
+          authRepository: _FakeAuthRepository(),
+          vaccinationRepository: _FakeVaccinationRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('muuni-full')), findsOneWidget);
+    expect(
+      find.byKey(const Key('muuni-notification-animation')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('muuni-animated-sprite')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Muuni peeks in its own reserved area when the list is full', (
+    tester,
+  ) async {
+    final records = [
+      for (var day = 1; day <= 4; day++)
+        VaccinationRecord(
+          id: 'dose-$day',
+          patientId: 'uid',
+          vaccineName: 'BCG',
+          doseLabel: 'Dose $day',
+          appliedAt: DateTime.now().subtract(Duration(days: day)),
+        ),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationsScreen(
+          authRepository: _FakeAuthRepository(),
+          vaccinationRepository: _FakeVaccinationRepository(records: records),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('muuni-peek')), findsOneWidget);
+    final mascot = tester.getRect(find.byKey(const Key('muuni-peek')));
+    final list = tester.getRect(find.byType(ListView).first);
+    expect(mascot.top, greaterThanOrEqualTo(list.bottom));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('profile exposes functional settings and support pages', (
     tester,
   ) async {
@@ -456,7 +535,9 @@ void main() {
       MaterialApp(home: ProfileScreen(authRepository: repository)),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Editar'));
+    await tester.tap(
+      find.textContaining('Dados pessoais', findRichText: true).first,
+    );
     await tester.pumpAndSettle();
     final nameField = find.widgetWithText(TextFormField, 'Nome completo');
     await tester.enterText(nameField, 'Maria Souza');

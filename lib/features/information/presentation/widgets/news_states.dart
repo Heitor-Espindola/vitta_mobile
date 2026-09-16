@@ -43,13 +43,13 @@ class NewsEmptyState extends StatelessWidget {
   const NewsEmptyState({
     required this.hasSearch,
     this.onClearSearch,
-    this.onShowAllNews,
+    this.onLoadMore,
     super.key,
   });
 
   final bool hasSearch;
   final VoidCallback? onClearSearch;
-  final VoidCallback? onShowAllNews;
+  final VoidCallback? onLoadMore;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -59,8 +59,8 @@ class NewsEmptyState extends StatelessWidget {
         children: [
           Text(
             hasSearch
-                ? 'Nenhum resultado encontrado'
-                : 'Sem novidades por aqui',
+                ? 'Nenhuma notícia encontrada'
+                : 'Novas atualizações em breve',
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
@@ -68,7 +68,7 @@ class NewsEmptyState extends StatelessWidget {
           Text(
             hasSearch
                 ? 'Tente outro termo ou limpe a pesquisa.'
-                : 'Não encontramos notícias recentes sobre este tema.',
+                : 'Enquanto isso, consulte nossos conteúdos educativos e os canais oficiais de saúde.',
             textAlign: TextAlign.center,
           ),
           if (hasSearch && onClearSearch != null) ...[
@@ -76,15 +76,14 @@ class NewsEmptyState extends StatelessWidget {
             TextButton.icon(
               onPressed: onClearSearch,
               icon: const Icon(Icons.close),
-              label: const Text('Limpar busca'),
+              label: const Text('Limpar pesquisa'),
             ),
-          ] else if (onShowAllNews != null) ...[
+          ] else if (!hasSearch && onLoadMore != null) ...[
             const SizedBox(height: 10),
             TextButton.icon(
-              key: const Key('empty-show-all-news'),
-              onPressed: onShowAllNews,
-              icon: const Icon(Icons.article_outlined),
-              label: const Text('Ver todas as notícias'),
+              onPressed: onLoadMore,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Carregar mais'),
             ),
           ],
         ],

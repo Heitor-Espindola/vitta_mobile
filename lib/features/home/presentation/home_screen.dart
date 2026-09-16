@@ -26,6 +26,13 @@ import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
 
 typedef ShareTextCallback = Future<void> Function(String text);
 
+String walletShareMessage({Uri? publicUrl}) {
+  const message =
+      'Minha carteira digital de vacinação está no Vitta 💙\n'
+      'Acompanhe vacinas, próximas doses e sua caderneta em um só lugar.';
+  return publicUrl == null ? message : '$message\n$publicUrl';
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -88,6 +95,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleWalletSelection() {
     if (!mounted) return;
+    final selectedId = _wallet.selectedPersonId;
+    if (selectedId != null) {
+      _notificationReadController.ensureLoaded(selectedId);
+    }
     setState(() {
       _recordsStreamPersonId = null;
       _recordsStream = null;
@@ -102,6 +113,18 @@ class _HomeScreenState extends State<HomeScreen> {
       final members = await _peopleRepository.getFamilyMembers(
         user.effectivePersonId,
       );
+      await _wallet.restoreSelection(
+        members
+            .where(
+              (member) => member.canViewVaccination(
+                currentPersonId: user.effectivePersonId,
+              ),
+            )
+            .map((member) => member.person),
+      );
+      await _notificationReadController.ensureLoaded(
+        _wallet.selectedPersonId ?? user.effectivePersonId,
+      );
       return _HomeData(
         user: user,
         familyMembers: members.isEmpty
@@ -109,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
             : members,
       );
     } catch (_) {
+      await _notificationReadController.ensureLoaded(user.effectivePersonId);
       return _HomeData(
         user: user,
         familyMembers: [FamilyMember(person: user, isCurrent: true)],
@@ -123,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
   });
 
   Future<void> _shareWallet() async {
-    const text = 'Minha carteira de vacinação está no Vitta.';
+    final text = walletShareMessage();
     try {
       if (widget.shareText != null) {
         await widget.shareText!(text);
@@ -567,7 +591,16 @@ class _WalletsSection extends StatelessWidget {
       Row(
         children: [
           const Expanded(child: _SectionHeader(title: 'Minha família')),
-          TextButton(onPressed: onOpenFamily, child: const Text('Gerenciar')),
+          OutlinedButton.icon(
+            key: const Key('manage-family-button'),
+            onPressed: onOpenFamily,
+            icon: const Icon(Icons.group_outlined, size: 17),
+            label: const Text('Gerenciar'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
         ],
       ),
       const SizedBox(height: 12),
@@ -597,7 +630,7 @@ class _WalletsSection extends StatelessWidget {
                   detail: canOpen
                       ? 'Carteira disponível'
                       : 'Acesso indisponível',
-                  color: const Color(0xFFFFF4E6),
+                  color: familyWalletCardColor(member.person.birthDate),
                   icon: Icons.family_restroom_outlined,
                   selected: selectedPersonId == member.person.effectivePersonId,
                   onTap: canOpen ? () => onSelect(member.person) : onOpenFamily,
@@ -704,6 +737,19 @@ class _WalletPersonCard extends StatelessWidget {
   );
 }
 
+Color familyWalletCardColor(DateTime? birthDate, {DateTime? now}) {
+  if (birthDate == null) return const Color(0xFFE9F5FD);
+  final today = now ?? DateTime.now();
+  var age = today.year - birthDate.year;
+  if (today.month < birthDate.month ||
+      (today.month == birthDate.month && today.day < birthDate.day)) {
+    age--;
+  }
+  return age >= 12 && age < 18
+      ? const Color(0xFFE4F5EC)
+      : const Color(0xFFE9F5FD);
+}
+
 class _AddDependentCard extends StatelessWidget {
   const _AddDependentCard({required this.onTap});
 
@@ -772,54 +818,15 @@ class _DoseTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    children: List.generate(records.length, (index) {
-      final record = records[index];
+    children: records.map((record) {
       final overdue =
           VaccinationRecordInsights.situation(record) ==
           VaccinationRecordSituation.overdue;
-      return IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: 24,
-              child: Column(
-                children: [
-                  Container(
-                    width: 13,
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: overdue
-                          ? const Color(0xFFE85B61)
-                          : const Color(0xFF4C9ED5),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x22000000), blurRadius: 4),
-                      ],
-                    ),
-                  ),
-                  if (index < records.length - 1)
-                    Expanded(
-                      child: Container(
-                        width: 2,
-                        color: const Color(0xFFDCE8F0),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _UpcomingDoseCard(record: record, overdue: overdue),
-              ),
-            ),
-          ],
-        ),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _UpcomingDoseCard(record: record, overdue: overdue),
       );
-    }),
+    }).toList(),
   );
 }
 
@@ -896,12 +903,10 @@ class _RecentVaccineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+    key: const Key('recent-vaccine-surface'),
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF4F9FC),
-      borderRadius: BorderRadius.circular(AppRadius.card),
-    ),
+    decoration: AppCardStyle.decoration(color: Colors.white),
     child: Row(
       children: [
         Container(

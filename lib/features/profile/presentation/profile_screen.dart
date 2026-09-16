@@ -11,7 +11,6 @@ import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.d
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/profile/presentation/profile_detail_screens.dart';
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
-import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -105,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) {
       return;
     }
+    _wallet.reset();
     Navigator.of(
       context,
     ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
@@ -150,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _openSettings() {
-    _openPage(const ProfileSettingsScreen());
+    _openPage(ProfileSettingsScreen(walletController: _wallet));
   }
 
   void _openSecurity() {
@@ -211,13 +211,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       backgroundColor: _isViewingDependent
                           ? DependentWalletColors.sky
                           : AppColors.primarySoft,
-                      center: _isViewingDependent
-                          ? const MuuniSpriteFrame(frame: 9, size: 44)
-                          : null,
-                      action: TextButton(
-                        onPressed: () => _editProfile(_ProfileSection.personal),
-                        child: const Text('Editar'),
-                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -303,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _SettingsRow(
                                 icon: Icons.tune_rounded,
                                 title: 'Configurações',
-                                subtitle: 'Idioma, aparência e sessão',
+                                subtitle: 'Preferências deste dispositivo',
                                 onTap: _openSettings,
                               ),
                             ],
@@ -380,14 +373,6 @@ class _ProfileEditor extends StatefulWidget {
 class _ProfileEditorState extends State<_ProfileEditor> {
   final _formKey = GlobalKey<FormState>();
   late final _nameController = TextEditingController(text: widget.user.name);
-  late final _cpfController = TextEditingController(
-    text: widget.user.cpf ?? '',
-  );
-  late final _birthDateController = TextEditingController(
-    text: widget.user.birthDate == null
-        ? ''
-        : formatBrazilianDate(widget.user.birthDate),
-  );
   late final _phoneController = TextEditingController(
     text: widget.user.phone ?? '',
   );
@@ -406,8 +391,6 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   @override
   void dispose() {
     _nameController.dispose();
-    _cpfController.dispose();
-    _birthDateController.dispose();
     _phoneController.dispose();
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
@@ -500,22 +483,16 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     validator: validateFullName,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _cpfController,
-                    enabled: false,
-                    decoration: const InputDecoration(
-                      labelText: 'CPF',
-                      helperText: 'O CPF não pode ser alterado.',
-                    ),
+                  _ProtectedDetail(
+                    label: 'CPF',
+                    value: widget.user.cpf ?? 'Não informado',
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _birthDateController,
-                    enabled: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Data de nascimento',
-                      helperText: 'A data de nascimento é protegida.',
-                    ),
+                  _ProtectedDetail(
+                    label: 'Data de nascimento',
+                    value: widget.user.birthDate == null
+                        ? 'Não informada'
+                        : formatBrazilianDate(widget.user.birthDate),
                   ),
                 ] else ...[
                   TextFormField(
@@ -595,6 +572,37 @@ class _ProfileEditorState extends State<_ProfileEditor> {
       ),
     );
   }
+}
+
+class _ProtectedDetail extends StatelessWidget {
+  const _ProtectedDetail({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(AppSpacing.md),
+    decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: AppTypography.caption),
+              const SizedBox(height: AppSpacing.xs),
+              Text(value, style: AppTypography.body),
+            ],
+          ),
+        ),
+        const Icon(
+          Icons.lock_outline_rounded,
+          size: 18,
+          color: AppColors.primaryDark,
+        ),
+      ],
+    ),
+  );
 }
 
 class _Label extends StatelessWidget {

@@ -86,19 +86,27 @@ class EducationalContentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            content.title,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+          SizedBox(
+            height: 28,
+            child: Center(
+              child: Text(
+                content.title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
           AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             width: 108,
-            height: selected ? 4 : 0,
+            height: 4,
             margin: const EdgeInsets.only(top: 3),
-            color: vittaDarkBlue,
+            color: selected ? vittaDarkBlue : Colors.transparent,
           ),
         ],
       ),

@@ -20,7 +20,6 @@ class VittaMobileShell extends StatelessWidget {
     this.showGreetingHeader = false,
     this.showTopBar = true,
     this.appBarHeight = 58,
-    this.bottomNavigationOverlay,
   });
 
   final String title;
@@ -29,7 +28,6 @@ class VittaMobileShell extends StatelessWidget {
   final bool showGreetingHeader;
   final bool showTopBar;
   final double appBarHeight;
-  final Widget? bottomNavigationOverlay;
 
   @override
   Widget build(BuildContext context) {
@@ -47,18 +45,7 @@ class VittaMobileShell extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          VittaBottomNav(currentTab: currentTab),
-          if (bottomNavigationOverlay != null)
-            Positioned(
-              right: 24,
-              top: -64,
-              child: IgnorePointer(child: bottomNavigationOverlay!),
-            ),
-        ],
-      ),
+      bottomNavigationBar: VittaBottomNav(currentTab: currentTab),
     );
   }
 }
@@ -252,7 +239,6 @@ class AppPageHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.showBack = false,
-    this.center,
     this.action,
     this.backgroundColor = AppColors.primarySoft,
   });
@@ -260,7 +246,6 @@ class AppPageHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final bool showBack;
-  final Widget? center;
   final Widget? action;
   final Color backgroundColor;
 
@@ -274,37 +259,30 @@ class AppPageHeader extends StatelessWidget {
       AppSpacing.normal,
       AppSpacing.md,
     ),
-    child: Stack(
-      alignment: Alignment.topCenter,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showBack) ...[
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Voltar',
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded, size: 22),
-              ),
-              const SizedBox(width: AppSpacing.xs),
+        if (showBack) ...[
+          IconButton(
+            tooltip: 'Voltar',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.pageTitle),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle!, style: AppTypography.caption),
+              ],
             ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: AppTypography.pageTitle),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(subtitle!, style: AppTypography.caption),
-                  ],
-                ],
-              ),
-            ),
-            ?action,
-          ],
+          ),
         ),
-        if (center != null) IgnorePointer(child: center),
+        ?action,
       ],
     ),
   );

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
-import 'package:vitta_mobile/features/information/presentation/widgets/news_category_selector.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_states.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
@@ -29,11 +27,6 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
     _searchController.clear();
     FocusScope.of(context).unfocus();
     await widget.controller.clearSearch();
-  }
-
-  Future<void> _showAllNews() async {
-    _searchController.clear();
-    await widget.controller.showAllNews();
   }
 
   @override
@@ -69,12 +62,6 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
                   label: Text('Limpar: ${widget.controller.currentQuery}'),
                 ),
               ),
-            const SizedBox(height: 8),
-            NewsCategorySelector(
-              selectedCategory: widget.controller.selectedCategory,
-              enabled: !widget.controller.isLoading,
-              onSelected: widget.controller.selectCategory,
-            ),
             const SizedBox(height: 16),
             const Text(
               'Seleção editorial de notícias sobre vacinação. Consulte sempre os canais oficiais de saúde.',
@@ -103,9 +90,9 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
       return NewsEmptyState(
         hasSearch: controller.currentQuery.isNotEmpty,
         onClearSearch: controller.currentQuery.isEmpty ? null : _clearSearch,
-        onShowAllNews: controller.selectedCategory == NewsCategory.forYou
-            ? null
-            : _showAllNews,
+        onLoadMore: controller.hasMore && controller.currentQuery.isEmpty
+            ? controller.loadMore
+            : null,
       );
     }
     return Column(

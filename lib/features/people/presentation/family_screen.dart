@@ -10,11 +10,7 @@ import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/models/relationship.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
 import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
-import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
-import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
-import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
-import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_card_screen.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class FamilyScreen extends StatefulWidget {
@@ -42,8 +38,6 @@ class _FamilyScreenState extends State<FamilyScreen> {
       widget.authRepository ?? FirebaseAuthRepository();
   late final PeopleRepository _people =
       widget.peopleRepository ?? FirebasePeopleRepository();
-  late final VaccinationRepository _vaccinations =
-      widget.vaccinationRepository ?? FirebaseVaccinationRepository();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
   List<FamilyMember> _members = const [];
@@ -118,21 +112,19 @@ class _FamilyScreenState extends State<FamilyScreen> {
     }
   }
 
-  Future<void> _openMember(FamilyMember member) async {
+  void _openMember(FamilyMember member) {
     final current = _current;
     if (current == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => _FamilyMemberScreen(
-          member: member,
-          current: current,
-          vaccinationRepository: _vaccinations,
-          authRepository: _auth,
-          walletController: _wallet,
-          demoEnabled: _demoEnabled,
-        ),
-      ),
-    );
+    if (!member.canViewVaccination(
+      currentPersonId: current.effectivePersonId,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Acesso indisponível para este vínculo.')),
+      );
+      return;
+    }
+    _wallet.selectPerson(member.person);
+    Navigator.of(context).pop();
   }
 
   @override
@@ -170,7 +162,10 @@ class _FamilyScreenState extends State<FamilyScreen> {
               _wallet.selectedPersonId ==
               currentMember.person.effectivePersonId,
           canOpen: true,
-          onTap: () => _wallet.selectCurrentPerson(),
+          onTap: () {
+            _wallet.selectCurrentPerson();
+            Navigator.of(context).pop();
+          },
         ),
         const SizedBox(height: AppSpacing.lg),
         const Text('Familiares', style: AppTypography.sectionTitle),
@@ -297,197 +292,6 @@ class _FamilyCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _FamilyMemberScreen extends StatelessWidget {
-  const _FamilyMemberScreen({
-    required this.member,
-    required this.current,
-    required this.vaccinationRepository,
-    required this.authRepository,
-    required this.walletController,
-    required this.demoEnabled,
-  });
-
-  final FamilyMember member;
-  final AppUser current;
-  final VaccinationRepository vaccinationRepository;
-  final AuthRepository authRepository;
-  final WalletSelectionController walletController;
-  final bool demoEnabled;
-
-  bool get _canOpen =>
-      member.canViewVaccination(currentPersonId: current.effectivePersonId);
-
-  Stream<List<VaccinationRecord>> get _records =>
-      vaccinationRepository.watchRecordsByPerson(
-        personId: member.person.effectivePersonId,
-        responsibleId: current.effectivePersonId,
-      );
-
-  void _select(BuildContext context) {
-    walletController.selectPerson(member.person);
-    Navigator.of(context).pop();
-  }
-
-  void _openWallet(BuildContext context, {required bool booklet}) {
-    walletController.selectPerson(member.person);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VaccinationCardScreen(
-          authRepository: authRepository,
-          vaccinationRepository: vaccinationRepository,
-          walletController: walletController,
-          initialShowBooklet: booklet,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
-    body: SafeArea(
-      child: Column(
-        children: [
-          AppPageHeader(
-            title: member.person.name,
-            subtitle: [
-              _relationshipLabel(member),
-              ?_ageText(member.person.birthDate),
-            ].join(' • '),
-            showBack: true,
-          ),
-          Expanded(
-            child: _canOpen
-                ? StreamBuilder<List<VaccinationRecord>>(
-                    stream: _records,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !demoEnabled) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError && !demoEnabled) {
-                        return const _FamilyMessage(
-                          message:
-                              'A autorização atual não permite abrir esta carteira.',
-                        );
-                      }
-                      final records = DemoPresentation.recordsForPresentation(
-                        snapshot.data ?? const <VaccinationRecord>[],
-                        enabled: demoEnabled,
-                      );
-                      return _MemberSummary(
-                        records: records,
-                        onSelect: () => _select(context),
-                        onWallet: () => _openWallet(context, booklet: false),
-                        onBooklet: () => _openWallet(context, booklet: true),
-                      );
-                    },
-                  )
-                : const _FamilyMessage(
-                    message:
-                        'Não foi possível acessar esta carteira vinculada.',
-                  ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _MemberSummary extends StatelessWidget {
-  const _MemberSummary({
-    required this.records,
-    required this.onSelect,
-    required this.onWallet,
-    required this.onBooklet,
-  });
-
-  final List<VaccinationRecord> records;
-  final VoidCallback onSelect;
-  final VoidCallback onWallet;
-  final VoidCallback onBooklet;
-
-  @override
-  Widget build(BuildContext context) {
-    final applied = VaccinationRecordInsights.appliedCount(records);
-    final next = VaccinationRecordInsights.nextDoses(records);
-    final overdue = next
-        .where(
-          (record) =>
-              VaccinationRecordInsights.situation(record) ==
-              VaccinationRecordSituation.overdue,
-        )
-        .length;
-    final upcoming = next.length - overdue;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
-      children: [
-        const Text('Resumo da carteira', style: AppTypography.sectionTitle),
-        const SizedBox(height: AppSpacing.sm),
-        if (records.isEmpty)
-          const _FamilyMessage(
-            message:
-                'Nenhuma aplicação registrada nesta carteira. Quando houver um registro, ele aparecerá aqui.',
-          )
-        else
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.normal),
-            decoration: AppCardStyle.decoration(),
-            child: Row(
-              children: [
-                _SummaryValue(value: applied, label: 'aplicadas'),
-                _SummaryValue(value: upcoming, label: 'próximas'),
-                _SummaryValue(value: overdue, label: 'atrasadas'),
-              ],
-            ),
-          ),
-        const SizedBox(height: AppSpacing.lg),
-        FilledButton.icon(
-          onPressed: onSelect,
-          icon: const Icon(Icons.switch_account_outlined),
-          label: const Text('Selecionar carteira'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: onWallet,
-          icon: const Icon(Icons.article_outlined),
-          label: const Text('Ver carteira'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: onBooklet,
-          icon: const Icon(Icons.auto_stories_outlined),
-          label: const Text('Ver caderneta'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SummaryValue extends StatelessWidget {
-  const _SummaryValue({required this.value, required this.label});
-
-  final int value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Column(
-      children: [
-        Text(
-          '$value',
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: AppColors.primaryDark,
-          ),
-        ),
-        Text(label, style: AppTypography.caption),
-      ],
-    ),
-  );
 }
 
 class _FamilyMessage extends StatelessWidget {

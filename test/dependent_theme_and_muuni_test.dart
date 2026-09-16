@@ -58,8 +58,8 @@ void main() {
       find.byKey(const Key('information-dependent-theme')),
       findsOneWidget,
     );
-    expect(find.byType(MuuniSeatedNavMascot), findsOneWidget);
-    expect(find.byKey(const Key('muuni-seated-nav')), findsOneWidget);
+    expect(find.byType(MuuniSeatedNavMascot), findsNothing);
+    expect(find.byType(MuuniSpriteFrame), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -115,10 +115,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('profile-dependent-theme')), findsOneWidget);
-    expect(find.byType(MuuniSpriteFrame), findsOneWidget);
-    final profileWidth = tester.getSize(find.byType(ProfileScreen)).width;
-    final muuniCenter = tester.getCenter(find.byType(MuuniSpriteFrame)).dx;
-    expect(muuniCenter, closeTo(profileWidth / 2, .1));
+    expect(find.byType(MuuniSpriteFrame), findsNothing);
+    expect(find.text('Editar'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

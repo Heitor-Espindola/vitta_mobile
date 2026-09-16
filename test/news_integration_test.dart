@@ -10,8 +10,8 @@ import 'package:vitta_mobile/features/information/data/news_api_service.dart';
 import 'package:vitta_mobile/features/information/data/news_repository.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
-import 'package:vitta_mobile/features/information/domain/models/news_category.dart';
 import 'package:vitta_mobile/features/information/domain/services/news_relevance_filter.dart';
+import 'package:vitta_mobile/features/information/domain/services/trusted_news_sources.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
@@ -22,7 +22,7 @@ const articleJson = {
   'author': 'Autora',
   'title': 'Campanha de vacinação começa hoje',
   'description': 'Postos estão preparados para atender a população.',
-  'url': 'https://example.com/noticia-1',
+  'url': 'https://www.gov.br/saude/pt-br/assuntos/noticias/noticia-1',
   'urlToImage': 'https://example.com/image.jpg',
   'publishedAt': '2026-08-05T12:30:00Z',
   'content': 'Conteúdo truncado',
@@ -123,11 +123,56 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Epidemia de Ebola alastra-se pela região',
+            description: 'O texto também cita uma vacina em estudo.',
+            url: 'https://www.gov.br/saude/pt-br/ebola',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NewsRelevanceFilter.isRelevant(
+          const NewsArticle(
+            sourceName: 'Fonte',
+            title: 'Nova ação começa nesta semana',
+            description: 'Campanha de vacinação infantil amplia atendimento.',
+            url: 'https://www.gov.br/saude/pt-br/campanha',
+          ),
+        ),
+        isTrue,
+      );
     });
 
-    test('categories use vaccine-specific queries', () {
-      expect(NewsCategory.hpv.query, contains('HPV'));
-      expect(NewsCategory.influenza.query, contains('influenza'));
+    test('allowlist uses exact URL hosts, not the API source label', () {
+      expect(
+        TrustedNewsSources.nameForUrl('https://www.gov.br/saude/pt-br/abc'),
+        'Ministério da Saúde',
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://agencia.fiocruz.br/noticia'),
+        'Fiocruz',
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://www.butantan.gov.br/noticias/x'),
+        'Instituto Butantan',
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://www.paho.org/pt/noticias/x'),
+        'OPAS',
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://www.gov.br/economia/noticias/x'),
+        isNull,
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://fiocruz.br.evil.com/x'),
+        isNull,
+      );
+      expect(TrustedNewsSources.nameForUrl('http://fiocruz.br/x'), isNull);
     });
 
     test('parses a valid response and encodes query parameters', () async {
@@ -153,12 +198,122 @@ void main() {
         now: () => DateTime.utc(2026, 8, 31),
       ).fetch(page: 1, searchTerm: 'febre amarela');
       expect(response.articles, hasLength(1));
+      expect(response.articles.single.sourceName, 'Ministério da Saúde');
       expect(requestedUri.host, 'newsapi.org');
       expect(requestedUri.queryParameters['q'], contains('febre amarela'));
       expect(requestedUri.queryParameters['pageSize'], '20');
       expect(requestedUri.queryParameters['searchIn'], 'title,description');
-      expect(requestedUri.queryParameters['from'], '2026-08-01');
+      expect(requestedUri.queryParameters['sortBy'], 'publishedAt');
+      expect(requestedUri.queryParameters['domains'], contains('fiocruz.br'));
+      expect(requestedUri.queryParameters['from'], '2026-06-02');
     });
+
+    test(
+      'retries within the plan window after NewsAPI rejects older dates',
+      () async {
+        final requestedDates = <String?>[];
+        final client = MockClient((request) async {
+          requestedDates.add(request.url.queryParameters['from']);
+          if (requestedDates.length == 1) {
+            return http.Response(
+              jsonEncode({
+                'status': 'error',
+                'code': 'parameterInvalid',
+                'message':
+                    'You are trying to request results too far in the past.',
+              }),
+              426,
+            );
+          }
+          return http.Response(
+            jsonEncode({'status': 'ok', 'totalResults': 0, 'articles': []}),
+            200,
+          );
+        });
+        final service = NewsApiService(
+          client: client,
+          apiKey: 'test-key',
+          now: () => DateTime.utc(2026, 9, 16),
+        );
+        final result = await service.fetch(page: 1);
+        expect(result.articles, isEmpty);
+        expect(requestedDates, ['2026-06-18', '2026-08-18']);
+        await service.fetch(page: 2);
+        expect(requestedDates.last, '2026-08-18');
+        expect(requestedDates, hasLength(3));
+      },
+    );
+
+    test('does not retry unrelated invalid NewsAPI parameters', () async {
+      var calls = 0;
+      final client = MockClient((_) async {
+        calls++;
+        return http.Response(
+          jsonEncode({
+            'status': 'error',
+            'code': 'parameterInvalid',
+            'message': 'Another parameter is invalid.',
+          }),
+          426,
+        );
+      });
+      final service = NewsApiService(client: client, apiKey: 'test-key');
+      await expectLater(service.fetch(page: 1), throwsA(isA<NewsException>()));
+      expect(calls, 1);
+    });
+
+    test(
+      'allows only trusted, vaccination-focused articles and deduplicates URLs',
+      () async {
+        Map<String, dynamic> item(String title, String url, String date) => {
+          ...articleJson,
+          'title': title,
+          'url': url,
+          'publishedAt': date,
+          'source': {'name': 'Fiocruz'},
+        };
+        final trusted = 'https://www.gov.br/saude/pt-br/noticias/vacina';
+        final response = await serviceReturning(200, {
+          'status': 'ok',
+          'totalResults': 7,
+          'articles': [
+            item('Campanha de vacinação', trusted, '2026-08-01T10:00:00Z'),
+            item(
+              'Nova vacina contra HPV',
+              'https://agenciabrasil.ebc.com.br/saude/1',
+              '2026-08-10T10:00:00Z',
+            ),
+            item(
+              'Vacinação no município',
+              'https://qualquer-site.com/saude/1',
+              '2026-08-11T10:00:00Z',
+            ),
+            item(
+              'Epidemia de Ebola alastra-se',
+              'https://www.gov.br/saude/pt-br/ebola',
+              '2026-08-12T10:00:00Z',
+            ),
+            item(
+              'Saúde e economia em debate',
+              'https://www.butantan.gov.br/noticias/saude',
+              '2026-08-13T10:00:00Z',
+            ),
+            item(
+              'Congresso vota reforma partidária',
+              'https://www.gov.br/saude/pt-br/politica',
+              '2026-08-14T10:00:00Z',
+            ),
+            item('Campanha de vacinação', trusted, '2026-08-01T10:00:00Z'),
+          ],
+        }).fetch(page: 1);
+        expect(response.fetchedCount, 7);
+        expect(response.articles.map((article) => article.sourceName), [
+          'Agência Brasil',
+          'Ministério da Saúde',
+        ]);
+        expect(response.articles.first.title, 'Nova vacina contra HPV');
+      },
+    );
 
     test('parses an empty response', () async {
       final response = await serviceReturning(200, {
@@ -279,22 +434,28 @@ void main() {
       expect(repository.lastQuery, 'febre amarela');
     });
 
-    test('combines search with category and clearing keeps category', () async {
+    test('clearing search restores the single editorial feed', () async {
       final repository = RecordingRepository(nextResponse([article('1')]));
       final controller = NewsController(repository: repository);
-
-      await controller.selectCategory(NewsCategory.hpv);
       await controller.searchNews('adolescente');
-
-      expect(controller.selectedCategory, NewsCategory.hpv);
-      expect(repository.queries.last, contains(NewsCategory.hpv.query));
-      expect(repository.queries.last, contains('"adolescente"'));
+      expect(repository.queries.last, 'adolescente');
 
       await controller.clearSearch();
-      expect(controller.selectedCategory, NewsCategory.hpv);
       expect(controller.currentQuery, isEmpty);
-      expect(repository.queries.last, NewsCategory.hpv.query);
+      expect(repository.queries.last, '');
     });
+
+    test(
+      'submitting an empty search also restores the complete feed',
+      () async {
+        final repository = RecordingRepository(nextResponse([article('1')]));
+        final controller = NewsController(repository: repository);
+        await controller.searchNews('influenza');
+        await controller.searchNews('   ');
+        expect(controller.currentQuery, isEmpty);
+        expect(repository.queries, ['influenza', '']);
+      },
+    );
 
     test('pagination removes duplicate URLs', () async {
       final repository = QueueRepository([
@@ -307,6 +468,35 @@ void main() {
       expect(controller.currentPage, 2);
       expect(controller.articles, hasLength(21));
     });
+
+    test(
+      'pagination uses raw API count after editorial filtering and orders newest first',
+      () async {
+        final older = NewsArticle(
+          sourceName: 'Fiocruz',
+          title: 'Vacinação de rotina',
+          url: 'https://fiocruz.br/older',
+          publishedAt: DateTime(2026, 7, 1),
+        );
+        final newer = NewsArticle(
+          sourceName: 'Fiocruz',
+          title: 'Vacina infantil',
+          url: 'https://fiocruz.br/newer',
+          publishedAt: DateTime(2026, 8, 1),
+        );
+        final controller = NewsController(
+          repository: QueueRepository([
+            NewsResponse(articles: [older], totalResults: 40, fetchedCount: 20),
+            NewsResponse(articles: [newer], totalResults: 40, fetchedCount: 20),
+          ]),
+        );
+        await controller.loadInitialNews();
+        expect(controller.hasMore, isTrue);
+        await controller.loadMore();
+        expect(controller.articles, [newer, older]);
+        expect(controller.hasMore, isFalse);
+      },
+    );
 
     test('reports empty and error states', () async {
       final empty = NewsController(
@@ -344,7 +534,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Notícias recentes'), findsOneWidget);
+    expect(find.text('Notícias e atualizações'), findsOneWidget);
     expect(find.text('Agência Saúde · Data não informada'), findsOneWidget);
     expect(find.text('Campanha nacional de vacinação'), findsOneWidget);
     expect(find.text('Ler notícia'), findsOneWidget);
@@ -366,9 +556,8 @@ void main() {
 
     final search = find.byKey(const ValueKey('collapsed-search'));
     expect(find.byType(ChoiceChip), findsNothing);
-    for (final category in NewsCategory.values) {
-      expect(find.byKey(Key('news-category-${category.name}')), findsNothing);
-    }
+    expect(find.text('Para você'), findsNothing);
+    expect(find.text('Campanhas'), findsNothing);
     expect(tester.getTopLeft(search).dx, lessThan(40));
     expect(
       tester.getSize(find.byKey(const Key('information-header-band'))).width,
@@ -460,9 +649,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Nenhum resultado encontrado'), findsOneWidget);
+    expect(find.text('Nenhuma notícia encontrada'), findsOneWidget);
     expect(find.text('Tente outro termo ou limpe a pesquisa.'), findsOneWidget);
-    await tester.tap(find.text('Limpar busca'));
+    await tester.tap(find.text('Limpar pesquisa'));
     await tester.pumpAndSettle();
     expect(find.text('Notícia feed'), findsOneWidget);
   });
@@ -491,6 +680,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Notícias e atualizações'), findsOneWidget);
     expect(find.text('Notícia 1'), findsOneWidget);
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.text('Para você'), findsNothing);
+    expect(find.text('HPV'), findsNothing);
+    expect(find.text('Gestantes'), findsNothing);
+  });
+
+  testWidgets('full news search clears back to the unfiltered feed', (
+    tester,
+  ) async {
+    final repository = CallbackRepository(
+      (query) =>
+          query.isEmpty ? nextResponse([article('feed')]) : nextResponse([]),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('show-all-news')));
+    await tester.tap(find.byKey(const Key('show-all-news')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip), findsNothing);
+    await tester.tap(find.byTooltip('Pesquisar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('expandable-search-field')),
+      'termo inexistente',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma notícia encontrada'), findsOneWidget);
+    await tester.tap(find.text('Limpar pesquisa'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notícia feed'), findsOneWidget);
+    expect(repository.queries.last, '');
+    expect(find.byType(ChoiceChip), findsNothing);
+  });
+
+  testWidgets('empty API keeps educational content and shows the global state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: InformationScreen(
+          newsRepository: ImmediateRepository(nextResponse([])),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Conteúdos educativos'), findsOneWidget);
+    expect(find.text('Novas atualizações em breve'), findsOneWidget);
+    expect(
+      find.text(
+        'Enquanto isso, consulte nossos conteúdos educativos e os canais oficiais de saúde.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Sem novidades por aqui'), findsNothing);
+  });
+
+  testWidgets('Conteúdo features no more than five stories', (tester) async {
+    final repository = ImmediateRepository(
+      nextResponse(List.generate(8, (index) => article('$index'))),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+    final featured = tester.widget<ListView>(
+      find.byKey(const Key('featured-news-list')),
+    );
+    // ListView.separated counts the four separators alongside five articles.
+    expect(featured.childrenDelegate.estimatedChildCount, 9);
+    expect(find.byKey(const Key('show-all-news')), findsOneWidget);
   });
 
   testWidgets('API error keeps educational content visible and retry works', (
@@ -540,10 +804,8 @@ void main() {
   });
 
   test('formats news dates in Brazilian Portuguese', () {
-    expect(
-      formatNewsDate(DateTime(2026, 8, 31), now: DateTime(2026, 9, 5)),
-      '31 ago. 2026',
-    );
+    expect(formatNewsDate(DateTime(2026, 8, 31)), '31 ago. 2026');
+    expect(formatNewsDate(DateTime.now()), contains('${DateTime.now().year}'));
   });
 }
 
@@ -551,7 +813,8 @@ NewsApiService serviceReturning(int statusCode, Map<String, dynamic> body) =>
     NewsApiService(
       apiKey: 'test-key',
       client: MockClient(
-        (_) async => http.Response(jsonEncode(body), statusCode),
+        (_) async =>
+            http.Response.bytes(utf8.encode(jsonEncode(body)), statusCode),
       ),
     );
 

@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
+import 'package:vitta_mobile/core/config/app_preferences.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 
 class WalletSelectionController extends ChangeNotifier {
-  WalletSelectionController();
+  WalletSelectionController({AppPreferences? preferences})
+    : _preferences = preferences ?? AppPreferences.instance;
 
   static final WalletSelectionController instance = WalletSelectionController();
+  final AppPreferences _preferences;
 
   AppUser? _currentPerson;
   AppUser? _selectedPerson;
@@ -37,6 +40,7 @@ class WalletSelectionController extends ChangeNotifier {
     if (_selectedPerson?.effectivePersonId == person.effectivePersonId) return;
     _selectedPerson = person;
     notifyListeners();
+    _saveSelection();
   }
 
   void selectCurrentPerson() {
@@ -44,6 +48,30 @@ class WalletSelectionController extends ChangeNotifier {
     if (current == null || isViewingCurrent) return;
     _selectedPerson = current;
     notifyListeners();
+    _saveSelection();
+  }
+
+  Future<void> restoreSelection(Iterable<AppUser> availablePeople) async {
+    final ownerId = currentPersonId;
+    if (ownerId == null || !isViewingCurrent) return;
+    final savedId = await _preferences.lastWalletFor(ownerId);
+    if (currentPersonId != ownerId || !isViewingCurrent || savedId == null) {
+      return;
+    }
+    for (final person in availablePeople) {
+      if (person.effectivePersonId == savedId) {
+        selectPerson(person);
+        return;
+      }
+    }
+  }
+
+  void _saveSelection() {
+    final ownerId = currentPersonId;
+    final selectedId = selectedPersonId;
+    if (ownerId != null && selectedId != null) {
+      _preferences.saveWallet(ownerId, selectedId);
+    }
   }
 
   void reset() {

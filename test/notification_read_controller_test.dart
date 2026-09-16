@@ -5,7 +5,7 @@ import 'package:vitta_mobile/features/notifications/domain/models/vaccination_no
 void main() {
   test(
     'viewed notifications stay read and a new notification becomes unread',
-    () {
+    () async {
       final controller = NotificationReadController();
       final first = VaccinationNotification(
         id: 'upcoming-record-1',
@@ -19,7 +19,10 @@ void main() {
         controller.hasUnread(personId: 'person-1', notifications: [first]),
         isTrue,
       );
-      controller.markAsViewed(personId: 'person-1', notifications: [first]);
+      await controller.markAsViewed(
+        personId: 'person-1',
+        notifications: [first],
+      );
       expect(
         controller.hasUnread(personId: 'person-1', notifications: [first]),
         isFalse,
@@ -46,7 +49,7 @@ void main() {
     },
   );
 
-  test('a changed notification kind becomes unread again', () {
+  test('a changed notification kind becomes unread again', () async {
     final controller = NotificationReadController();
     final original = VaccinationNotification(
       id: 'upcoming-record-1',
@@ -55,7 +58,10 @@ void main() {
       message: 'BCG prevista para daqui 2 dias.',
       date: DateTime(2026, 9, 4),
     );
-    controller.markAsViewed(personId: 'person-1', notifications: [original]);
+    await controller.markAsViewed(
+      personId: 'person-1',
+      notifications: [original],
+    );
 
     final updated = VaccinationNotification(
       id: original.id,

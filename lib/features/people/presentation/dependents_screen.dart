@@ -207,41 +207,54 @@ class _DependentsScreenState extends State<DependentsScreen> {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.lg),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _saving
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                          ),
-                          child: const Text('Cancelar'),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cancel = OutlinedButton(
+                        key: const Key('cancel-add-family'),
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: _saving
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.person_add_alt_1_rounded),
-                          label: Text(
-                            _saving ? 'Salvando...' : 'Adicionar familiar',
-                          ),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                          ),
+                        child: const Text('Cancelar'),
+                      );
+                      final add = FilledButton.icon(
+                        key: const Key('confirm-add-family'),
+                        onPressed: _saving ? null : _save,
+                        icon: _saving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.person_add_alt_1_rounded),
+                        label: Text(
+                          _saving ? 'Salvando...' : 'Adicionar familiar',
                         ),
-                      ),
-                    ],
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                      );
+                      if (constraints.maxWidth < 360) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            cancel,
+                            const SizedBox(height: AppSpacing.sm),
+                            add,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: cancel),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(flex: 2, child: add),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

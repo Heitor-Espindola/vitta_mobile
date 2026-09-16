@@ -205,15 +205,8 @@ class _ArticleImage extends StatelessWidget {
   }
 }
 
-String formatNewsDate(DateTime? date, {DateTime? now}) {
+String formatNewsDate(DateTime? date) {
   if (date == null) return 'Data não informada';
-  final reference = now ?? DateTime.now();
-  final today = DateTime(reference.year, reference.month, reference.day);
-  final value = DateTime(date.year, date.month, date.day);
-  if (value == today) {
-    return 'Hoje, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-  if (value == today.subtract(const Duration(days: 1))) return 'Ontem';
   const months = [
     'jan.',
     'fev.',
