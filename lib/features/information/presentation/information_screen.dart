@@ -15,6 +15,8 @@ import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
+const _primaryEducationalContentCount = 9;
+
 class InformationScreen extends StatefulWidget {
   const InformationScreen({
     super.key,
@@ -148,11 +150,15 @@ class _InformationScreenState extends State<InformationScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: List.generate(educationalContents.length, (index) {
+                children: List.generate(_primaryEducationalContentCount, (
+                  index,
+                ) {
                   final content = educationalContents[index];
                   return Padding(
                     padding: EdgeInsets.only(
-                      right: index == educationalContents.length - 1 ? 0 : 10,
+                      right: index == _primaryEducationalContentCount - 1
+                          ? 0
+                          : 10,
                     ),
                     child: EducationalContentCard(
                       key: Key('educational-content-$index'),
@@ -191,6 +197,25 @@ class _InformationScreenState extends State<InformationScreen> {
             ),
             const SizedBox(height: 12),
             _newsBody(),
+            const SizedBox(height: 24),
+            _SectionHeader(
+              title: 'Guias para cada fase',
+              actionLabel: 'Ver todos ›',
+              onAction: _openAllEducationalContents,
+            ),
+            const SizedBox(height: 8),
+            ...List.generate(
+              educationalContents.length - _primaryEducationalContentCount,
+              (offset) {
+                final index = offset + _primaryEducationalContentCount;
+                return EducationalContentCard(
+                  key: Key('life-stage-content-$offset'),
+                  content: educationalContents[index],
+                  compact: false,
+                  onTap: () => _openEducationalContent(index),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -217,6 +242,9 @@ class _InformationScreenState extends State<InformationScreen> {
       );
     }
     final featured = _controller.articles.take(5).toList(growable: false);
+    if (featured.length == 1) {
+      return NewsArticleCard(article: featured.single);
+    }
     return SizedBox(
       height: 278,
       child: ListView.separated(

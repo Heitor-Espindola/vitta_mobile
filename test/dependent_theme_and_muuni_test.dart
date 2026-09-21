@@ -80,6 +80,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('muuni-card-animation')), findsOneWidget);
+    expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

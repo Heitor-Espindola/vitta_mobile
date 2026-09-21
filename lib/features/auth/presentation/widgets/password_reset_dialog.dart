@@ -3,9 +3,14 @@ import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dar
 import 'package:vitta_mobile/features/auth/presentation/controllers/password_reset_controller.dart';
 
 class PasswordResetDialog extends StatefulWidget {
-  const PasswordResetDialog({required this.controller, super.key});
+  const PasswordResetDialog({
+    required this.controller,
+    this.initialEmail = '',
+    super.key,
+  });
 
   final PasswordResetController controller;
+  final String initialEmail;
 
   @override
   State<PasswordResetDialog> createState() => _PasswordResetDialogState();
@@ -13,11 +18,12 @@ class PasswordResetDialog extends StatefulWidget {
 
 class _PasswordResetDialogState extends State<PasswordResetDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail.trim());
     widget.controller.addListener(_refresh);
   }
 

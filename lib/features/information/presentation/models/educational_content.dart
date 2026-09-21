@@ -162,4 +162,64 @@ const educationalContents = [
     icon: Icons.wb_sunny_outlined,
     iconColor: Color(0xFF9A7900),
   ),
+  EducationalContent(
+    title: 'Vacinação na Gestação',
+    searchTerm: 'vacinação gestantes gravidez',
+    introduction:
+        'A vacinação durante a gestação protege a pessoa gestante e pode contribuir para a proteção do bebê nos primeiros meses de vida.',
+    topics: [
+      'Leve a carteira de vacinação às consultas de pré-natal.',
+      'O calendário considera a idade gestacional e o histórico de doses.',
+      'Nem toda vacina é indicada durante a gestação.',
+      'Confirme cada dose com a equipe responsável pelo pré-natal.',
+    ],
+    color: Color(0xFFF7ECF5),
+    icon: Icons.pregnant_woman_outlined,
+    iconColor: Color(0xFF9A4F88),
+  ),
+  EducationalContent(
+    title: 'Vacinação na Adolescência',
+    searchTerm: 'vacinação adolescentes',
+    introduction:
+        'A adolescência é uma oportunidade importante para conferir doses anteriores e completar a proteção recomendada para essa fase.',
+    topics: [
+      'Confira se o esquema iniciado na infância está completo.',
+      'Observe as recomendações oficiais para HPV e meningocócica.',
+      'Leve a carteira em consultas, campanhas e atendimentos escolares.',
+      'Doses atrasadas devem ser avaliadas pela unidade de saúde.',
+    ],
+    color: Color(0xFFEAF7EF),
+    icon: Icons.groups_2_outlined,
+    iconColor: Color(0xFF398250),
+  ),
+  EducationalContent(
+    title: 'Vacinação da Pessoa Idosa',
+    searchTerm: 'vacinação pessoa idosa',
+    introduction:
+        'Manter a vacinação atualizada ajuda a reduzir complicações de doenças que podem ser mais graves com o avanço da idade.',
+    topics: [
+      'Leve a carteira para revisão nas consultas de rotina.',
+      'Campanhas sazonais podem ter públicos e períodos específicos.',
+      'Condições clínicas devem ser informadas ao profissional de saúde.',
+      'A unidade de saúde pode orientar doses e reforços recomendados.',
+    ],
+    color: Color(0xFFEAF3FB),
+    icon: Icons.elderly_outlined,
+    iconColor: Color(0xFF3B7198),
+  ),
+  EducationalContent(
+    title: 'Vacinação e Viagens',
+    searchTerm: 'vacinação viagem viajantes',
+    introduction:
+        'Alguns destinos exigem planejamento prévio da vacinação e podem ter recomendações específicas para viajantes.',
+    topics: [
+      'Consulte as orientações oficiais sobre o destino com antecedência.',
+      'Verifique a validade dos registros e certificados necessários.',
+      'Não deixe a atualização da carteira para a véspera da viagem.',
+      'Procure orientação profissional em situações de saúde específicas.',
+    ],
+    color: Color(0xFFFFF4E8),
+    icon: Icons.luggage_outlined,
+    iconColor: Color(0xFFA86421),
+  ),
 ];

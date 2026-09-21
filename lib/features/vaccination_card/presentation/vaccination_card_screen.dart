@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
@@ -26,6 +26,9 @@ import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 enum _VaccineFilter { all, late, next, done }
 
+typedef ShareBookletCallback =
+    Future<void> Function(Uint8List bytes, String fileName);
+
 class VaccinationCardScreen extends StatefulWidget {
   const VaccinationCardScreen({
     super.key,
@@ -34,6 +37,7 @@ class VaccinationCardScreen extends StatefulWidget {
     this.selectedPerson,
     this.walletController,
     this.initialShowBooklet = false,
+    this.shareBooklet,
   });
 
   final AuthRepository? authRepository;
@@ -41,6 +45,7 @@ class VaccinationCardScreen extends StatefulWidget {
   final AppUser? selectedPerson;
   final WalletSelectionController? walletController;
   final bool initialShowBooklet;
+  final ShareBookletCallback? shareBooklet;
 
   @override
   State<VaccinationCardScreen> createState() => _VaccinationCardScreenState();
@@ -61,6 +66,7 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   List<Vaccine> _vaccines = const [];
   _VaccineFilter _filter = _VaccineFilter.all;
   late bool _showBooklet;
+  bool _sharingBooklet = false;
   bool _loading = true;
   String? _error;
 
@@ -199,23 +205,53 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SafeArea(
-        top: false,
-        child: _VaccineDetails(
-          record: record,
-          vaccine: _vaccineFor(record),
-          occurrence: occurrence,
-        ),
+      builder: (_) => _VaccineDetails(
+        record: record,
+        vaccine: _vaccineFor(record),
+        occurrence: occurrence,
       ),
     );
   }
 
-  Future<void> _exportPdf() async {
-    final bytes = await _buildPdf(person: _person, records: _records);
-    await Printing.layoutPdf(
-      name: 'carteira-vacinal-${_person?.uid ?? 'vitta'}.pdf',
-      onLayout: (_) async => bytes,
-    );
+  Future<void> _sharePdf() async {
+    if (_sharingBooklet) return;
+    setState(() => _sharingBooklet = true);
+    try {
+      final bytes = await buildVaccinationBookletPdf(
+        person: _person,
+        records: _records,
+      );
+      final fileName = vaccinationBookletFileName();
+      if (widget.shareBooklet != null) {
+        await widget.shareBooklet!(bytes, fileName);
+      } else {
+        if (!mounted) return;
+        final box = context.findRenderObject() as RenderBox?;
+        await SharePlus.instance.share(
+          ShareParams(
+            title: 'Carteira Digital de Vacinação',
+            subject: 'Carteira Digital de Vacinação — Vitta',
+            text: 'Carteira Digital de Vacinação gerada pelo Vitta.',
+            files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+            fileNameOverrides: [fileName],
+            sharePositionOrigin: box == null
+                ? null
+                : box.localToGlobal(Offset.zero) & box.size,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível gerar a caderneta agora. Tente novamente.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sharingBooklet = false);
+    }
   }
 
   bool get _isViewingDependent =>
@@ -268,7 +304,8 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
                 person: _person,
                 records: _records,
                 onRecordTap: (record) => _openDetails(record),
-                onExport: _exportPdf,
+                onExport: _sharePdf,
+                sharing: _sharingBooklet,
               )
             else ...[
               _Filters(
@@ -322,18 +359,12 @@ class _VaccinationCardHeader extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: dependent
-                ? const [DependentWalletColors.sky, Color(0xFFFFF7E8)]
+                ? const [DependentWalletColors.sky, Color(0xFFF3FAFD)]
                 : const [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(
-            bottom: BorderSide(
-              color: dependent
-                  ? DependentWalletColors.border
-                  : const Color(0xFFDCEBF4),
-            ),
-          ),
+          border: const Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,10 +468,8 @@ class _PersonHeader extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            isOwner ? Icons.verified_user_outlined : Icons.auto_awesome_rounded,
-            color: isOwner ? vittaBlue : const Color(0xFFB56F3C),
-          ),
+          if (isOwner)
+            const Icon(Icons.verified_user_outlined, color: vittaBlue),
         ],
       ),
     );
@@ -679,11 +708,13 @@ class _DigitalBooklet extends StatelessWidget {
     required this.records,
     required this.onRecordTap,
     required this.onExport,
+    required this.sharing,
   });
   final AppUser? person;
   final List<VaccinationRecord> records;
   final ValueChanged<VaccinationRecord> onRecordTap;
   final VoidCallback onExport;
+  final bool sharing;
 
   @override
   Widget build(BuildContext context) {
@@ -720,9 +751,14 @@ class _DigitalBooklet extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: onExport,
-                    tooltip: 'Exportar PDF',
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    onPressed: sharing ? null : onExport,
+                    tooltip: 'Compartilhar ou baixar caderneta',
+                    icon: sharing
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.ios_share_rounded),
                   ),
                 ],
               ),
@@ -801,16 +837,7 @@ class _BookletGroup extends StatelessWidget {
               _present(record.vaccineName, 'Vacina'),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            subtitle: Text(
-              [
-                if (record.dose.trim().isNotEmpty) record.dose,
-                if (record.applicationDate != null)
-                  'Aplicada em ${formatBrazilianDate(record.applicationDate)}',
-                if (record.applicationDate == null &&
-                    record.nextDoseDate != null)
-                  'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
-              ].join(' • '),
-            ),
+            subtitle: Text(vaccinationBookletRecordDetails(record).join('\n')),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => onRecordTap(record),
           ),
@@ -867,6 +894,7 @@ class _VaccineDetails extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: ListView(
+          key: const Key('vaccination-detail-scroll'),
           controller: controller,
           padding: EdgeInsets.fromLTRB(
             24,
@@ -1192,54 +1220,165 @@ String _scheduleText(Object? value) {
   return '';
 }
 
-Future<Uint8List> _buildPdf({
+String vaccinationBookletFileName() => 'carteira-digital-vitta.pdf';
+
+List<String> vaccinationBookletRecordDetails(VaccinationRecord record) => [
+  if (record.dose.trim().isNotEmpty) 'Dose: ${record.dose}',
+  if (record.applicationDate != null)
+    'Aplicada em ${formatBrazilianDate(record.applicationDate)}'
+  else if (record.nextDoseDate != null)
+    'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
+  if ((record.batchNumber ?? '').trim().isNotEmpty)
+    'Lote: ${record.batchNumber!.trim()}',
+  if ((record.manufacturer ?? '').trim().isNotEmpty)
+    'Fabricante: ${record.manufacturer!.trim()}',
+  if ((record.healthUnit ?? '').trim().isNotEmpty)
+    'Unidade de saúde: ${record.healthUnit!.trim()}',
+];
+
+Future<Uint8List> buildVaccinationBookletPdf({
   required AppUser? person,
   required List<VaccinationRecord> records,
+  DateTime? generatedAt,
+  Uint8List? logoBytes,
 }) async {
+  final logoData = logoBytes == null
+      ? await rootBundle.load('assets/images/vitta_logo.png')
+      : null;
+  final effectiveLogoBytes =
+      logoBytes ??
+      logoData!.buffer.asUint8List(
+        logoData.offsetInBytes,
+        logoData.lengthInBytes,
+      );
+  final regularFontData = await rootBundle.load(
+    'assets/fonts/Roboto-Regular.ttf',
+  );
+  final boldFontData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+  final generated = generatedAt ?? DateTime.now();
+  final logo = pw.MemoryImage(effectiveLogoBytes);
+  final regularFont = pw.Font.ttf(regularFontData);
+  final boldFont = pw.Font.ttf(boldFontData);
   final document = pw.Document();
   document.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(32),
+      theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+      footer: (context) => pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('Vitta', style: const pw.TextStyle(fontSize: 8)),
+          pw.Text(
+            'Página ${context.pageNumber} de ${context.pagesCount}',
+            style: const pw.TextStyle(fontSize: 8),
+          ),
+        ],
+      ),
       build: (_) => [
-        pw.Text(
-          'Carteira Digital de Vacinação',
-          style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Image(logo, width: 52, height: 52),
+            pw.SizedBox(width: 14),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Vitta',
+                    style: pw.TextStyle(
+                      fontSize: 12,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColor.fromHex('#256B9B'),
+                    ),
+                  ),
+                  pw.Text(
+                    'Carteira Digital de Vacinação',
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        pw.SizedBox(height: 8),
-        pw.Text('Pessoa: ${_present(person?.name, 'Usuário')}'),
-        if (person?.birthDate != null)
-          pw.Text('Nascimento: ${formatBrazilianDate(person!.birthDate)}'),
         pw.SizedBox(height: 18),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(14),
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromHex('#EDF7FC'),
+            borderRadius: pw.BorderRadius.circular(10),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                _present(person?.name, 'Usuário'),
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              if (person?.birthDate != null)
+                pw.Text(
+                  'Nascimento: ${formatBrazilianDate(person!.birthDate)}',
+                ),
+              if ((person?.cpf ?? '').trim().isNotEmpty)
+                pw.Text('CPF: ${_maskedCpf(person!.cpf!)}'),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 20),
+        pw.Text(
+          'Histórico de aplicações',
+          style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 10),
         if (records.isEmpty)
           pw.Text('Nenhum registro disponível.')
         else
-          pw.TableHelper.fromTextArray(
-            headers: const [
-              'Vacina',
-              'Dose',
-              'Situação',
-              'Aplicação',
-              'Próxima dose',
-              'Unidade',
-              'Lote',
-            ],
-            data: records
-                .map(
-                  (record) => [
-                    record.vaccineName,
-                    record.dose,
-                    _statusLabel(record),
-                    formatBrazilianDate(record.applicationDate),
-                    formatBrazilianDate(record.nextDoseDate),
-                    record.healthUnit ?? '',
-                    record.batchNumber ?? '',
-                  ],
-                )
-                .toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            cellStyle: const pw.TextStyle(fontSize: 8),
+          ...records.map(
+            (record) => pw.Container(
+              width: double.infinity,
+              margin: const pw.EdgeInsets.only(bottom: 8),
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColor.fromHex('#DCE8F0')),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    _present(record.vaccineName, 'Vacina'),
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  ...vaccinationBookletRecordDetails(record).map(
+                    (detail) => pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 2),
+                      child: pw.Text(
+                        detail,
+                        style: const pw.TextStyle(fontSize: 9),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
+        pw.SizedBox(height: 16),
+        pw.Text(
+          'Gerado em ${formatBrazilianDate(generated)} pelo Vitta.',
+          style: pw.TextStyle(fontSize: 8, color: PdfColor.fromHex('#54758A')),
+        ),
       ],
     ),
   );

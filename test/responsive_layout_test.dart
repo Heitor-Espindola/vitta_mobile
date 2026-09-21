@@ -53,14 +53,80 @@ void main() {
     });
   }
 
+  testWidgets('Vitta bottom navigation includes the Android system inset', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(bottom: 48);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VittaMobileShell(
+          title: 'Início',
+          currentTab: VittaTab.home,
+          body: Center(
+            key: Key('content-above-vitta-nav'),
+            child: Text('Conteúdo protegido'),
+          ),
+        ),
+      ),
+    );
+
+    final safePadding = tester.widget<Padding>(
+      find.byKey(const Key('vitta-bottom-nav-safe-padding')),
+    );
+    expect((safePadding.padding as EdgeInsets).bottom, 60);
+    final navSurface = tester.getRect(
+      find.byKey(const Key('vitta-bottom-nav-surface')),
+    );
+    final body = tester.getRect(
+      find.byKey(const Key('content-above-vitta-nav')),
+    );
+    expect(navSurface.bottom, lessThanOrEqualTo(508));
+    expect(body.bottom, lessThanOrEqualTo(navSurface.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Vitta bottom navigation keeps base spacing with gestures', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VittaMobileShell(
+          title: 'Início',
+          currentTab: VittaTab.home,
+          body: Center(child: Text('Navegação por gestos')),
+        ),
+      ),
+    );
+
+    final safePadding = tester.widget<Padding>(
+      find.byKey(const Key('vitta-bottom-nav-safe-padding')),
+    );
+    expect((safePadding.padding as EdgeInsets).bottom, 12);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'Home uses the official logo, full-width header and native share callback',
+    'Home uses the official logo and shares the current booklet PDF',
     (tester) async {
       tester.view.physicalSize = const Size(412, 915);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      String? sharedText;
+      List<int>? sharedBytes;
+      String? sharedName;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -68,7 +134,10 @@ void main() {
             authRepository: _FakeAuthRepository(),
             peopleRepository: _FakePeopleRepository(),
             vaccinationRepository: _FakeVaccinationRepository(),
-            shareText: (text) async => sharedText = text,
+            shareBooklet: (bytes, fileName) async {
+              sharedBytes = bytes;
+              sharedName = fileName;
+            },
           ),
         ),
       );
@@ -99,13 +168,9 @@ void main() {
         findsNothing,
       );
       await tester.tap(find.byKey(const Key('share-wallet-button')));
-      await tester.pump();
-      expect(sharedText, walletShareMessage());
-      expect(sharedText, contains('Acompanhe vacinas, próximas doses'));
-      expect(sharedText, isNot(contains('123.456.789')));
-      expect(sharedText, isNot(contains('personId')));
-      expect(sharedText, isNot(contains('BCG')));
-      expect(sharedText, isNot(contains('https://')));
+      await tester.pumpAndSettle();
+      expect(sharedName, 'carteira-digital-vitta.pdf');
+      expect(String.fromCharCodes(sharedBytes!.take(5)), '%PDF-');
       expect(find.byType(SnackBar), findsNothing);
     },
   );
@@ -119,7 +184,7 @@ void main() {
           authRepository: _FakeAuthRepository(),
           peopleRepository: _FakePeopleRepository(),
           vaccinationRepository: _FakeVaccinationRepository(),
-          shareText: (_) async => throw StateError('unavailable'),
+          shareBooklet: (_, _) async => throw StateError('unavailable'),
         ),
       ),
     );
@@ -127,10 +192,10 @@ void main() {
     await tester.tap(find.byKey(const Key('share-wallet-button')));
     await tester.pump();
     expect(
-      find.text('Não foi possível abrir o compartilhamento.'),
+      find.text('Não foi possível gerar ou compartilhar sua caderneta.'),
       findsOneWidget,
     );
-    expect(find.textContaining('Minha carteira digital'), findsNothing);
+    expect(find.textContaining('StateError'), findsNothing);
   });
 
   testWidgets('Login, registration and profile fit a small viewport', (
@@ -471,17 +536,21 @@ void main() {
     await tester.tap(contactEntry);
     await tester.pumpAndSettle();
 
+    final saveButton = find.widgetWithText(FilledButton, 'Salvar dados');
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    expect(tester.getBottomRight(saveButton).dy, lessThanOrEqualTo(544));
+
     final phoneField = find.byKey(const Key('profile-phone-field'));
     await tester.ensureVisible(phoneField);
     await tester.tap(phoneField);
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
     await tester.pumpAndSettle();
 
-    final saveButton = find.widgetWithText(FilledButton, 'Salvar dados');
     await tester.ensureVisible(saveButton);
     await tester.pumpAndSettle();
     expect(saveButton, findsOneWidget);
-    expect(tester.getBottomRight(saveButton).dy, lessThanOrEqualTo(544));
+    expect(tester.getBottomRight(saveButton).dy, lessThanOrEqualTo(308));
     expect(tester.takeException(), isNull);
   });
 

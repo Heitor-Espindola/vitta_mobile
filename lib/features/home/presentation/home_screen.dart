@@ -19,19 +19,11 @@ import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebas
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
+import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_card_screen.dart';
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
-
-typedef ShareTextCallback = Future<void> Function(String text);
-
-String walletShareMessage({Uri? publicUrl}) {
-  const message =
-      'Minha carteira digital de vacinação está no Vitta 💙\n'
-      'Acompanhe vacinas, próximas doses e sua caderneta em um só lugar.';
-  return publicUrl == null ? message : '$message\n$publicUrl';
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -41,7 +33,7 @@ class HomeScreen extends StatefulWidget {
     this.peopleRepository,
     this.walletController,
     this.demoModeEnabled,
-    this.shareText,
+    this.shareBooklet,
     this.notificationReadController,
   });
 
@@ -50,7 +42,7 @@ class HomeScreen extends StatefulWidget {
   final PeopleRepository? peopleRepository;
   final WalletSelectionController? walletController;
   final bool? demoModeEnabled;
-  final ShareTextCallback? shareText;
+  final ShareBookletCallback? shareBooklet;
   final NotificationReadController? notificationReadController;
 
   @override
@@ -71,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<_HomeData> _data;
   String? _recordsStreamPersonId;
   Stream<List<VaccinationRecord>>? _recordsStream;
+  bool _sharingBooklet = false;
 
   bool get _demoEnabled => widget.demoModeEnabled ?? DemoPresentation.isEnabled;
 
@@ -146,21 +139,44 @@ class _HomeScreenState extends State<HomeScreen> {
     _data = _loadData();
   });
 
-  Future<void> _shareWallet() async {
-    final text = walletShareMessage();
+  Future<void> _shareWallet(_HomeData data) async {
+    if (_sharingBooklet) return;
+    setState(() => _sharingBooklet = true);
     try {
-      if (widget.shareText != null) {
-        await widget.shareText!(text);
+      final bytes = await buildVaccinationBookletPdf(
+        person: data.selectedPerson ?? data.user,
+        records: data.records,
+      );
+      final fileName = vaccinationBookletFileName();
+      if (widget.shareBooklet != null) {
+        await widget.shareBooklet!(bytes, fileName);
       } else {
-        await SharePlus.instance.share(ShareParams(text: text));
+        if (!mounted) return;
+        final box = context.findRenderObject() as RenderBox?;
+        await SharePlus.instance.share(
+          ShareParams(
+            title: 'Carteira Digital de Vacinação',
+            subject: 'Carteira Digital de Vacinação — Vitta',
+            text: 'Carteira Digital de Vacinação gerada pelo Vitta.',
+            files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+            fileNameOverrides: [fileName],
+            sharePositionOrigin: box == null
+                ? null
+                : box.localToGlobal(Offset.zero) & box.size,
+          ),
+        );
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Não foi possível abrir o compartilhamento.'),
+          content: Text(
+            'Não foi possível gerar ou compartilhar sua caderneta.',
+          ),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _sharingBooklet = false);
     }
   }
 
@@ -298,7 +314,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _SummaryCard(
                   appliedCount: data.appliedCount,
                   message: data.summaryMessage,
-                  onShare: _shareWallet,
+                  onShare: () => _shareWallet(data),
+                  sharing: _sharingBooklet,
                   isDependent: !data.isViewingCurrent,
                 ),
                 const SizedBox(height: 20),
@@ -446,12 +463,14 @@ class _SummaryCard extends StatelessWidget {
     required this.appliedCount,
     required this.message,
     required this.onShare,
+    required this.sharing,
     required this.isDependent,
   });
 
   final int appliedCount;
   final String message;
   final VoidCallback onShare;
+  final bool sharing;
   final bool isDependent;
 
   @override
@@ -513,14 +532,24 @@ class _SummaryCard extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
             key: const Key('share-wallet-button'),
-            onPressed: onShare,
+            onPressed: sharing ? null : onShare,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: BorderSide(color: Colors.white.withValues(alpha: 0.72)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             ),
-            icon: const Icon(Icons.share_outlined, size: 18),
-            label: const Text('Compartilhar'),
+            icon: sharing
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.ios_share_rounded, size: 18),
+            label: Text(
+              sharing ? 'Gerando caderneta...' : 'Compartilhar caderneta',
+            ),
           ),
         ),
       ],

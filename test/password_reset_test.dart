@@ -94,6 +94,28 @@ void main() {
   });
 
   group('Password reset dialog', () {
+    testWidgets('prefills the Gmail already entered on Login', (tester) async {
+      final repository = FakeAuthRepository();
+      await tester.pumpWidget(
+        MaterialApp(home: LoginScreen(authRepository: repository)),
+      );
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'pessoa@gmail.com',
+      );
+      await tester.tap(find.text('Esqueci minha senha'));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextFormField>(
+        find.byKey(const Key('password-reset-email')),
+      );
+      expect(field.controller?.text, 'pessoa@gmail.com');
+      await tester.tap(find.byKey(const Key('password-reset-submit')));
+      await tester.pumpAndSettle();
+      expect(repository.lastResetEmail, 'pessoa@gmail.com');
+    });
+
     testWidgets('closes after success and shows neutral message', (
       tester,
     ) async {

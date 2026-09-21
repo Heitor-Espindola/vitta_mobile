@@ -50,6 +50,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('E-mail não verificado'), findsOneWidget);
+    expect(find.text('Autenticação'), findsNothing);
+    expect(find.text('Sessão protegida pelo Firebase'), findsNothing);
     await tester.tap(find.text('Reenviar e-mail de verificação'));
     await tester.pump();
     expect(resends, 1);

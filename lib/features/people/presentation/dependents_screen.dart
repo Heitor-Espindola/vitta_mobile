@@ -179,6 +179,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.normal),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: _relationship,
                     decoration: const InputDecoration(
                       labelText: 'Tipo de vínculo',

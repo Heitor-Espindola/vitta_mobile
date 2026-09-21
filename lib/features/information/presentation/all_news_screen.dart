@@ -39,37 +39,42 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF7FAFC),
     appBar: AppBar(title: const Text('Notícias e atualizações')),
-    body: AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) => RefreshIndicator(
-        onRefresh: widget.controller.refreshNews,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            ExpandableSearch(
-              controller: _searchController,
-              hint: 'Pesquisar notícias',
-              onSubmitted: _search,
-              onClosed: _clearSearch,
-            ),
-            if (widget.controller.currentQuery.isNotEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: widget.controller.isLoading ? null : _clearSearch,
-                  icon: const Icon(Icons.close, size: 16),
-                  label: Text('Limpar: ${widget.controller.currentQuery}'),
-                ),
+    body: SafeArea(
+      top: false,
+      child: AnimatedBuilder(
+        animation: widget.controller,
+        builder: (context, _) => RefreshIndicator(
+          onRefresh: widget.controller.refreshNews,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              ExpandableSearch(
+                controller: _searchController,
+                hint: 'Pesquisar notícias',
+                onSubmitted: _search,
+                onClosed: _clearSearch,
               ),
-            const SizedBox(height: 16),
-            const Text(
-              'Seleção editorial de notícias sobre vacinação. Consulte sempre os canais oficiais de saúde.',
-              style: TextStyle(fontSize: 11, color: Color(0xFF566D7A)),
-            ),
-            const SizedBox(height: 14),
-            _body(),
-          ],
+              if (widget.controller.currentQuery.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: widget.controller.isLoading
+                        ? null
+                        : _clearSearch,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: Text('Limpar: ${widget.controller.currentQuery}'),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              const Text(
+                'Seleção editorial de notícias sobre vacinação. Consulte sempre os canais oficiais de saúde.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF566D7A)),
+              ),
+              const SizedBox(height: 14),
+              _body(),
+            ],
+          ),
         ),
       ),
     ),

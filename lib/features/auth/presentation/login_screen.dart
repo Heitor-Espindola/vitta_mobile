@@ -78,7 +78,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final sent = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => PasswordResetDialog(controller: controller),
+      builder: (_) => PasswordResetDialog(
+        controller: controller,
+        initialEmail: _emailController.text,
+      ),
     );
     controller.dispose();
     if (sent == true && mounted) {

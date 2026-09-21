@@ -210,11 +210,6 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
             title: 'Verificação',
             value: _verificationLabel,
           ),
-          const _DetailRow(
-            icon: Icons.lock_clock_outlined,
-            title: 'Autenticação',
-            value: 'Sessão protegida pelo Firebase',
-          ),
         ],
       ),
       if (_verified == false) ...[
@@ -306,24 +301,34 @@ class TermsPrivacyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ProfileDetailPage(
     title: 'Termos e privacidade',
-    intro: 'Resumo informativo sobre o uso responsável de dados no Vitta.',
+    intro: 'Entenda de forma simples como o Vitta cuida das suas informações.',
     children: [
+      _NoticeCard(
+        icon: Icons.privacy_tip_outlined,
+        text:
+            'Seus dados são utilizados apenas para viabilizar os recursos do aplicativo e o acompanhamento autorizado da vacinação.',
+      ),
+      SizedBox(height: AppSpacing.md),
       _TextSection(
+        icon: Icons.assignment_ind_outlined,
         title: 'Finalidade dos dados',
         text:
             'As informações são utilizadas para identificar a pessoa, organizar a carteira de vacinação e apresentar lembretes relacionados à saúde.',
       ),
       _TextSection(
+        icon: Icons.security_outlined,
         title: 'Proteção e autenticação',
         text:
             'O acesso exige autenticação. As permissões limitam quais pessoas e profissionais podem consultar informações da carteira.',
       ),
       _TextSection(
+        icon: Icons.vaccines_outlined,
         title: 'Dados de vacinação',
         text:
             'Registros de aplicação são tratados como informações sensíveis e exibidos somente nos fluxos autorizados do aplicativo.',
       ),
       _TextSection(
+        icon: Icons.policy_outlined,
         title: 'Privacidade e LGPD',
         text:
             'O projeto adota privacidade, necessidade e controle de acesso como princípios alinhados à LGPD.',
@@ -506,25 +511,45 @@ class _QuestionCard extends StatelessWidget {
 }
 
 class _TextSection extends StatelessWidget {
-  const _TextSection({required this.title, required this.text});
+  const _TextSection({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
 
+  final IconData icon;
   final String title;
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Column(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.normal),
+      decoration: AppCardStyle.decoration(),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTypography.sectionTitle),
-          const SizedBox(height: AppSpacing.sm),
-          Text(text, style: AppTypography.body),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: AppColors.primarySoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 21, color: AppColors.primaryDark),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTypography.sectionTitle),
+                const SizedBox(height: AppSpacing.sm),
+                Text(text, style: AppTypography.body),
+              ],
+            ),
+          ),
         ],
       ),
     );

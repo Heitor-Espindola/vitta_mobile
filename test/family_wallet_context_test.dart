@@ -151,6 +151,12 @@ void main() {
             name: 'BCG',
             sourceName: 'Calendário Nacional de Vacinação / PNI',
             description: 'Protege contra formas graves de tuberculose.',
+            prevents: ['Formas graves de tuberculose'],
+            targetGroups: ['Crianças ao nascer'],
+            doseSchedule: ['Dose única ao nascer'],
+            expectedReactions: ['Dor leve no local da aplicação'],
+            warningSigns: ['Reação intensa ou persistente'],
+            contraindications: ['Avaliar condições clínicas específicas'],
           ),
         ],
         records: [
@@ -185,6 +191,15 @@ void main() {
       await tester.tap(find.text('BCG').first);
       await tester.pumpAndSettle();
       expect(find.text(uid), findsNothing);
+      expect(find.text('Registrado pelo Portal Vitta'), findsOneWidget);
+      final audience = find.text('Público/faixa etária');
+      await tester.dragUntilVisible(
+        audience,
+        find.byKey(const Key('vaccination-detail-scroll')),
+        const Offset(0, -150),
+      );
+      await tester.pumpAndSettle();
+      expect(audience, findsOneWidget);
       final source = find.textContaining(
         'Fonte: Calendário Nacional de Vacinação / PNI',
       );
@@ -194,12 +209,49 @@ void main() {
         const Offset(0, -150),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Registrado pelo Portal Vitta'), findsOneWidget);
       expect(source, findsOneWidget);
       expect(tester.getBottomRight(source).dy, lessThanOrEqualTo(538));
+      final detailScroll = tester.widget<ListView>(
+        find.byKey(const Key('vaccination-detail-scroll')),
+      );
+      expect((detailScroll.padding! as EdgeInsets).bottom, 62);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Adicionar familiar stays above a 48px Android navigation bar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(bottom: 48);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DependentsScreen(
+          authRepository: _AuthFake(),
+          peopleRepository: _PeopleFake(),
+          demoModeEnabled: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final addButton = find.byKey(const Key('confirm-add-family'));
+    await tester.dragUntilVisible(
+      addButton,
+      find.byType(ListView),
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getBottomRight(addButton).dy, lessThanOrEqualTo(520));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Applied, upcoming and overdue cards match their own occurrence',
@@ -362,6 +414,78 @@ void main() {
     expect(repository.requestedResponsibleId, 'owner-person');
     expect(find.text('Carteira Digital de Vacinação'), findsOneWidget);
   });
+
+  testWidgets(
+    'Caderneta exposes complete Vitta PDF through its primary action',
+    (tester) async {
+      final person = AppUser(
+        uid: 'owner-person',
+        personId: 'owner-person',
+        name: 'Pessoa Titular',
+        email: 'titular@example.com',
+        cpf: '12345678909',
+        birthDate: DateTime(1990, 4, 12),
+        role: 'responsible',
+      );
+      final repository = _VaccinationFake(
+        records: [
+          VaccinationRecord(
+            id: 'record-complete',
+            patientId: 'owner-person',
+            vaccineName: 'BCG',
+            doseLabel: 'Dose única',
+            appliedAt: DateTime(2026, 9, 14),
+            lot: 'LOTE-123',
+            manufacturer: 'Instituto Teste',
+            facilityName: 'UBS Central',
+          ),
+        ],
+      );
+      List<int>? sharedBytes;
+      String? sharedName;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VaccinationCardScreen(
+            authRepository: _AuthFake(),
+            vaccinationRepository: repository,
+            selectedPerson: person,
+            initialShowBooklet: true,
+            shareBooklet: (bytes, fileName) async {
+              sharedBytes = bytes;
+              sharedName = fileName;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Carteira Digital de Vacinação'), findsOneWidget);
+      expect(find.text('CPF: ***.***.789-**'), findsOneWidget);
+      expect(find.textContaining('Lote: LOTE-123'), findsOneWidget);
+      expect(
+        find.textContaining('Fabricante: Instituto Teste'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Unidade de saúde: UBS Central'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('Compartilhar ou baixar caderneta'));
+      await tester.pumpAndSettle();
+      expect(sharedName, 'carteira-digital-vitta.pdf');
+      expect(String.fromCharCodes(sharedBytes!.take(5)), '%PDF-');
+
+      await tester.tap(find.text('Vacinas').first);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('share-booklet-context-action')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Home follows selectedPersonId and identifies the family wallet',

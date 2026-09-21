@@ -13,8 +13,11 @@ import 'package:vitta_mobile/features/information/domain/models/news_response.da
 import 'package:vitta_mobile/features/information/domain/services/news_relevance_filter.dart';
 import 'package:vitta_mobile/features/information/domain/services/trusted_news_sources.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
+import 'package:vitta_mobile/features/information/presentation/all_educational_content_screen.dart';
+import 'package:vitta_mobile/features/information/presentation/all_news_screen.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
+import 'package:vitta_mobile/features/information/presentation/models/educational_content.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
 
 const articleJson = {
@@ -618,6 +621,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Conteúdo includes additional life-stage guides', (tester) async {
+    final repository = ImmediateRepository(nextResponse([article('1')]));
+    await tester.pumpWidget(
+      MaterialApp(home: InformationScreen(newsRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is ListView && widget.scrollDirection == Axis.vertical,
+          )
+          .first,
+      const Offset(0, -650),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Guias para cada fase'), findsOneWidget);
+    expect(find.text('Vacinação na Gestação'), findsOneWidget);
+    expect(
+      educationalContents.map((content) => content.title),
+      containsAll([
+        'Vacinação na Gestação',
+        'Vacinação na Adolescência',
+        'Vacinação da Pessoa Idosa',
+        'Vacinação e Viagens',
+      ]),
+    );
+    await tester.ensureVisible(find.byKey(const Key('life-stage-content-0')));
+    await tester.tap(find.byKey(const Key('life-stage-content-0')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('protege a pessoa gestante'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('empty search has its own state and can be cleared', (
     tester,
   ) async {
@@ -684,6 +722,37 @@ void main() {
     expect(find.text('Para você'), findsNothing);
     expect(find.text('HPV'), findsNothing);
     expect(find.text('Gestantes'), findsNothing);
+  });
+
+  testWidgets('full content lists respect a 48px Android navigation bar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(bottom: 48);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+
+    final repository = ImmediateRepository(nextResponse([article('1')]));
+    final controller = NewsController(repository: repository);
+    addTearDown(controller.dispose);
+    await controller.loadInitialNews();
+
+    await tester.pumpWidget(
+      const MaterialApp(home: AllEducationalContentScreen()),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getBottomRight(find.byType(ListView)).dy, 520);
+
+    await tester.pumpWidget(
+      MaterialApp(home: AllNewsScreen(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getBottomRight(find.byType(ListView)).dy, 520);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('full news search clears back to the unfiltered feed', (

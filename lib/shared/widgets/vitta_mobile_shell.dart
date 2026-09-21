@@ -93,8 +93,10 @@ class VittaBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Padding(
+      key: const Key('vitta-bottom-nav-safe-padding'),
       padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottomInset),
       child: Container(
+        key: const Key('vitta-bottom-nav-surface'),
         height: 62,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
