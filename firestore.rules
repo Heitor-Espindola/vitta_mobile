@@ -794,6 +794,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Notícias editoriais são publicadas apenas pelo sincronizador
+    // administrativo. O aplicativo autenticado possui acesso somente de leitura.
+    match /news_articles/{articleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

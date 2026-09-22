@@ -161,9 +161,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: ClipRect(
                       child: Align(
                         alignment: Alignment.topLeft,
-                        child: MuuniEntranceAnimation(
+                        child: MuuniTimedPresence(
                           key: const Key('muuni-notification-animation'),
-                          fadeOut: false,
                           size: 110,
                         ),
                       ),

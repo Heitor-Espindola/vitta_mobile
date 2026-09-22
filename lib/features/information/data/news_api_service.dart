@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitta_mobile/core/config/app_environment.dart';
 import 'package:vitta_mobile/core/errors/news_exception.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
+import 'package:vitta_mobile/features/information/domain/repositories/news_provider.dart';
 import 'package:vitta_mobile/features/information/domain/services/news_relevance_filter.dart';
 import 'package:vitta_mobile/features/information/domain/services/trusted_news_sources.dart';
 
-class NewsApiService {
+class NewsApiService implements NewsProvider {
   NewsApiService({
     http.Client? client,
     String? apiKey,
@@ -31,13 +32,36 @@ class NewsApiService {
   final DateTime Function() _now;
   bool _limitedHistory = false;
 
+  @override
+  String get providerName => 'newsapi';
+
+  @override
+  int get pageSizeHint => 20;
+
+  @override
+  bool get isConfigured => _apiKey.trim().isNotEmpty;
+
   Future<NewsResponse> fetch({
     required int page,
     int pageSize = 20,
     String searchTerm = '',
   }) async {
+    final raw = await fetchRaw(
+      page: page,
+      pageSize: pageSize,
+      searchTerm: searchTerm,
+    );
+    return _applyEditorialFilters(raw);
+  }
+
+  @override
+  Future<NewsResponse> fetchRaw({
+    required int page,
+    int pageSize = 20,
+    String searchTerm = '',
+  }) async {
     if (_apiKey.trim().isEmpty) {
-      debugPrint('NEWS_API_KEY não configurada.');
+      developer.log('NEWS_API_KEY não configurada.', name: 'vitta.news');
       throw const NewsException(NewsErrorType.apiKeyMissing);
     }
     final normalized = searchTerm.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -85,40 +109,47 @@ class NewsApiService {
       if (decoded is! Map<String, dynamic> || decoded['status'] != 'ok') {
         throw const NewsException(NewsErrorType.invalidResponse);
       }
-      final parsed = NewsResponse.fromJson(decoded);
-      final seenUrls = <String>{};
-      final articles = <NewsArticle>[];
-      for (final article in parsed.articles) {
-        final trustedName = TrustedNewsSources.nameForUrl(article.url);
-        if (trustedName == null ||
-            !NewsRelevanceFilter.isRelevant(article) ||
-            !seenUrls.add(article.url)) {
-          continue;
-        }
-        articles.add(article.withSourceName(trustedName));
-      }
-      articles.sort((a, b) {
-        final first = a.publishedAt;
-        final second = b.publishedAt;
-        if (first == null) return second == null ? 0 : 1;
-        if (second == null) return -1;
-        return second.compareTo(first);
-      });
-      return NewsResponse(
-        articles: articles,
-        totalResults: parsed.totalResults,
-        fetchedCount: parsed.fetchedCount,
-      );
+      return NewsResponse.fromJson(decoded);
     } on TimeoutException {
       throw const NewsException(NewsErrorType.timeout);
     } on http.ClientException {
       throw const NewsException(NewsErrorType.network);
     } on FormatException catch (error) {
-      debugPrint('Resposta de notícias inválida: ${error.message}');
+      developer.log(
+        'Resposta de notícias inválida: ${error.message}',
+        name: 'vitta.news',
+      );
       throw const NewsException(NewsErrorType.invalidResponse);
     }
   }
 
+  static NewsResponse _applyEditorialFilters(NewsResponse raw) {
+    final seenUrls = <String>{};
+    final articles = <NewsArticle>[];
+    for (final article in raw.articles) {
+      final trustedName = TrustedNewsSources.nameForUrl(article.url);
+      if (trustedName == null ||
+          !NewsRelevanceFilter.isRelevant(article) ||
+          !seenUrls.add(article.url)) {
+        continue;
+      }
+      articles.add(article.withSourceName(trustedName));
+    }
+    articles.sort((a, b) {
+      final first = a.publishedAt;
+      final second = b.publishedAt;
+      if (first == null) return second == null ? 0 : 1;
+      if (second == null) return -1;
+      return second.compareTo(first);
+    });
+    return NewsResponse(
+      articles: articles,
+      totalResults: raw.totalResults,
+      fetchedCount: raw.fetchedCount,
+    );
+  }
+
+  @override
   void dispose() {
     if (_ownsClient) _client.close();
   }

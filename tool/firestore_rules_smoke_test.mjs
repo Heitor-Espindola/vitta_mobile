@@ -159,6 +159,32 @@ async function queryProfessionalRecords(token, professionalUid) {
   });
 }
 
+async function queryNewsArticles(token, cutoff) {
+  return fetch(`${apiRoot}/documents:runQuery`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'news_articles' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'publishedAt' },
+            op: 'GREATER_THAN_OR_EQUAL',
+            value: dateTimestamp(cutoff),
+          },
+        },
+        orderBy: [
+          { field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' },
+        ],
+        limit: 20,
+      },
+    }),
+  });
+}
+
 async function adminRead(path) {
   return fetch(`${apiRoot}/documents/${path}`, {
     headers: { authorization: 'Bearer owner' },
@@ -341,6 +367,35 @@ function vaccineCatalogCreateWrite(vaccineId) {
       { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
     ],
     currentDocument: { exists: false },
+  };
+}
+
+function newsArticleWrite(articleId, { exists = false } = {}) {
+  const publishedAt = '2026-09-20T12:00:00.000Z';
+  return {
+    update: {
+      name: documentName(`news_articles/${articleId}`),
+      fields: {
+        id: string(articleId),
+        title: string('Campanha nacional de vacinação'),
+        description: string('Postos ampliam a imunização.'),
+        url: string('https://www.gov.br/saude/pt-br/noticias/vacina'),
+        imageUrl: { nullValue: null },
+        sourceName: string('Ministério da Saúde'),
+        sourceDomain: string('gov.br'),
+        publishedAt: dateTimestamp(publishedAt),
+        fetchedAt: timestamp(),
+        expiresAt: dateTimestamp('2026-10-20T12:00:00.000Z'),
+        provider: string('newsapi'),
+        providers: strings(['newsapi']),
+        language: string('pt'),
+        country: string('br'),
+        dedupeKey: string('dedupe-test'),
+        createdAt: timestamp(),
+        updatedAt: timestamp(),
+      },
+    },
+    currentDocument: { exists },
   };
 }
 
@@ -1070,6 +1125,37 @@ await commit(
   403,
 );
 
+const newsArticleId = 'news-rules-test';
+await adminCommit([newsArticleWrite(newsArticleId)]);
+assert(
+  (await read(guardian.token, `news_articles/${newsArticleId}`)).status === 200,
+  'Usuário autenticado não conseguiu ler news_articles.',
+);
+assert(
+  (
+    await queryNewsArticles(
+      guardian.token,
+      '2026-08-23T00:00:00.000Z',
+    )
+  ).status === 200,
+  'Consulta autenticada por publishedAt DESC foi negada.',
+);
+await commit(
+  guardian.token,
+  [newsArticleWrite('news-client-create')],
+  403,
+);
+await commit(
+  guardian.token,
+  [newsArticleWrite(newsArticleId, { exists: true })],
+  403,
+);
+await commit(
+  guardian.token,
+  [{ delete: documentName(`news_articles/${newsArticleId}`) }],
+  403,
+);
+
 const recordId = 'vaccination-valid';
 await commit(professional.token, [
   vaccinationCreateWrite(recordId, {
@@ -1383,5 +1469,5 @@ await commit(
 );
 
 console.log(
-  'Firestore Rules: cenários A-P, dependente acadêmico atômico, CPF existente, grant direto, bloqueio de spoof/list/transitividade e rollback aprovados.',
+  'Firestore Rules: cenários A-P e regras médicas aprovados; news_articles permite read/query autenticado e bloqueia create/update/delete do cliente.',
 );

@@ -25,5 +25,11 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "news_articles",
+      "fieldPath": "expiresAt",
+      "indexes": []
+    }
+  ]
 }

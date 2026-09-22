@@ -18,18 +18,29 @@ class AppPreferences extends ChangeNotifier {
     }
   }
 
-  bool animationsEnabled = true;
+  bool darkModeEnabled = false;
+  double textScale = 1;
   bool rememberLastWallet = false;
 
   Future<void> load() async {
-    animationsEnabled = await _storage?.getBool('muuni_animations') ?? true;
+    darkModeEnabled = await _storage?.getBool('dark_mode') ?? false;
+    textScale = _validatedTextScale(
+      await _storage?.getDouble('text_scale') ?? 1,
+    );
     rememberLastWallet = await _storage?.getBool('remember_wallet') ?? false;
     notifyListeners();
   }
 
-  Future<void> setAnimationsEnabled(bool value) async {
-    await _storage?.setBool('muuni_animations', value);
-    animationsEnabled = value;
+  Future<void> setDarkModeEnabled(bool value) async {
+    await _storage?.setBool('dark_mode', value);
+    darkModeEnabled = value;
+    notifyListeners();
+  }
+
+  Future<void> setTextScale(double value) async {
+    final validValue = _validatedTextScale(value);
+    await _storage?.setDouble('text_scale', validValue);
+    textScale = validValue;
     notifyListeners();
   }
 
@@ -50,5 +61,10 @@ class AppPreferences extends ChangeNotifier {
   Future<void> saveWallet(String ownerId, String selectedId) async {
     if (!rememberLastWallet) return;
     await _storage?.setString('selected_wallet_$ownerId', selectedId);
+  }
+
+  static double _validatedTextScale(double value) {
+    const options = <double>[.9, 1, 1.15, 1.3];
+    return options.contains(value) ? value : 1;
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:vitta_mobile/app/design_system.dart';
-import 'package:vitta_mobile/features/information/data/news_repository.dart';
+import 'package:vitta_mobile/features/information/data/firestore_news_repository.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/all_educational_content_screen.dart';
 import 'package:vitta_mobile/features/information/presentation/all_news_screen.dart';
@@ -35,7 +35,7 @@ class _InformationScreenState extends State<InformationScreen> {
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
   late final NewsController _controller = NewsController(
-    repository: widget.newsRepository ?? ApiNewsRepository(),
+    repository: widget.newsRepository ?? FirestoreNewsRepository(),
   )..addListener(_onChanged);
   final _searchController = TextEditingController();
   int? _selectedContentIndex;
@@ -280,13 +280,6 @@ class _InformationHero extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(
-            bottom: BorderSide(
-              color: dependent
-                  ? DependentWalletColors.border
-                  : const Color(0xFFDCEBF4),
-            ),
-          ),
         ),
         child: Row(
           children: [
@@ -315,7 +308,7 @@ class _InformationHero extends StatelessWidget {
               const SizedBox(
                 width: 70,
                 height: 78,
-                child: MuuniSpriteFrame(frame: 9, size: 70),
+                child: MuuniTimedPresence(frame: 9, size: 70),
               )
             else
               const CircleAvatar(

@@ -213,6 +213,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openWallet(AppUser person) {
+    _wallet.selectPerson(person);
+    Navigator.of(context).pushReplacementNamed(AppRoutes.vaccinationCard);
+  }
+
   Stream<List<VaccinationRecord>> _recordsFor(_HomeData data) {
     final user = data.user;
     final selected = _wallet.selectedPerson ?? user;
@@ -326,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   demoEnabled: _demoEnabled,
                   onOpenFamily: _openFamily,
                   onAddFamily: _addFamilyMember,
-                  onSelect: _wallet.selectPerson,
+                  onSelect: _openWallet,
                 ),
                 const SizedBox(height: 22),
                 const _SectionHeader(title: 'Próximas doses'),
@@ -574,7 +579,7 @@ class _ViewingWalletBanner extends StatelessWidget {
     ).copyWith(border: Border.all(color: DependentWalletColors.border)),
     child: Row(
       children: [
-        const MuuniSpriteFrame(frame: 11, size: 44),
+        const MuuniTimedPresence(frame: 11, size: 44),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -588,7 +593,19 @@ class _ViewingWalletBanner extends StatelessWidget {
             ),
           ),
         ),
-        TextButton(onPressed: onReturn, child: const Text('Minha carteira')),
+        OutlinedButton.icon(
+          key: const Key('return-to-own-wallet-button'),
+          onPressed: onReturn,
+          icon: const Icon(Icons.person_outline_rounded, size: 16),
+          label: const Text('Minha carteira'),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: .88),
+            foregroundColor: AppColors.primaryDark,
+            side: const BorderSide(color: AppColors.primary),
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+        ),
       ],
     ),
   );

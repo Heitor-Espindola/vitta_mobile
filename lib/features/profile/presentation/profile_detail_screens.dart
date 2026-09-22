@@ -50,10 +50,39 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       _DetailCard(
         children: [
           SwitchListTile.adaptive(
-            secondary: const Icon(Icons.animation_rounded),
-            title: const Text('Animações da Muuni'),
-            value: _preferences.animationsEnabled,
-            onChanged: _preferences.setAnimationsEnabled,
+            key: const Key('dark-theme-switch'),
+            secondary: Icon(
+              _preferences.darkModeEnabled
+                  ? Icons.dark_mode_outlined
+                  : Icons.light_mode_outlined,
+            ),
+            title: const Text('Tema escuro'),
+            subtitle: Text(
+              _preferences.darkModeEnabled
+                  ? 'Usando o tema noturno'
+                  : 'Usando o tema claro padrão',
+            ),
+            value: _preferences.darkModeEnabled,
+            onChanged: _preferences.setDarkModeEnabled,
+          ),
+          ListTile(
+            leading: const Icon(Icons.text_fields_rounded),
+            title: const Text('Tamanho do texto'),
+            subtitle: const Text('Ajuste a leitura em todo o aplicativo'),
+            trailing: DropdownButton<double>(
+              key: const Key('text-scale-dropdown'),
+              value: _preferences.textScale,
+              underline: const SizedBox.shrink(),
+              onChanged: (value) {
+                if (value != null) _preferences.setTextScale(value);
+              },
+              items: const [
+                DropdownMenuItem(value: .9, child: Text('Menor')),
+                DropdownMenuItem(value: 1, child: Text('Padrão')),
+                DropdownMenuItem(value: 1.15, child: Text('Grande')),
+                DropdownMenuItem(value: 1.3, child: Text('Maior')),
+              ],
+            ),
           ),
           SwitchListTile.adaptive(
             secondary: const Icon(Icons.wallet_outlined),
@@ -371,7 +400,7 @@ class _ProfileDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.xl),
@@ -392,7 +421,12 @@ class _ProfileDetailPage extends StatelessWidget {
                 children: [
                   Padding(
                     padding: introPadding,
-                    child: Text(intro, style: AppTypography.body),
+                    child: Text(
+                      intro,
+                      style: AppTypography.body.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   ...children,
@@ -414,7 +448,9 @@ class _DetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: AppCardStyle.decoration(),
+      decoration: AppCardStyle.decoration(
+        color: Theme.of(context).colorScheme.surface,
+      ),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.card),

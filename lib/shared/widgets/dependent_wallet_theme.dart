@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 abstract final class DependentWalletColors {
-  static const background = Color(0xFFFFFAF0);
+  static const background = Color(0xFFF2FAFF);
   static const sky = Color(0xFFDDF3FC);
   static const mint = Color(0xFFDDF4EA);
-  static const peach = Color(0xFFFFE5C7);
+  static const peach = Color(0xFFE3F4FE);
   static const lavender = Color(0xFFE9E2F7);
-  static const ink = Color(0xFF3F302B);
-  static const spot = Color(0xFF4A342B);
-  static const border = Color(0xFFE8D7C4);
+  static const ink = Color(0xFF173B52);
+  static const spot = Color(0xFF2E607E);
+  static const border = Color(0xFFCDE7F5);
 }
 
 class DependentWalletBackground extends StatelessWidget {
@@ -43,7 +43,7 @@ class _CowSpotsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = DependentWalletColors.spot.withValues(alpha: .075);
+      ..color = DependentWalletColors.spot.withValues(alpha: .055);
     canvas.drawOval(
       Rect.fromLTWH(-size.width * .12, size.height * .08, 118, 72),
       paint,

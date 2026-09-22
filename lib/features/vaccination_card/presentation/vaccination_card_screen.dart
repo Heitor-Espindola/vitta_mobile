@@ -396,10 +396,9 @@ class _VaccinationCardHeader extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (dependent)
-              const MuuniEntranceAnimation(
+              const MuuniTimedPresence(
                 key: Key('muuni-card-animation'),
                 size: 54,
-                fadeOut: false,
               )
             else
               Container(

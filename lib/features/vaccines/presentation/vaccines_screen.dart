@@ -256,13 +256,6 @@ class _VaccinesHeader extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(
-            bottom: BorderSide(
-              color: dependent
-                  ? DependentWalletColors.border
-                  : const Color(0xFFDCEBF4),
-            ),
-          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +290,7 @@ class _VaccinesHeader extends StatelessWidget {
               const SizedBox(
                 width: 76,
                 height: 76,
-                child: MuuniSpriteFrame(frame: 11, size: 76),
+                child: MuuniTimedPresence(frame: 11, size: 76),
               )
             else
               Container(

@@ -101,13 +101,6 @@ class EducationalContentCard extends StatelessWidget {
               ),
             ),
           ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 108,
-            height: 4,
-            margin: const EdgeInsets.only(top: 3),
-            color: selected ? vittaDarkBlue : Colors.transparent,
-          ),
         ],
       ),
     );

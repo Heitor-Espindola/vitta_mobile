@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,22 +12,35 @@ void main() {
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, isNot(contains('android:label="vitta_mobile"')));
 
-    for (final density in ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(pubspec, contains('image_path: assets/images/logoapp.jpg'));
+    expect(File('assets/images/logoapp.jpg').existsSync(), isTrue);
+
+    const expectedSizes = {
+      'mdpi': 48,
+      'hdpi': 72,
+      'xhdpi': 96,
+      'xxhdpi': 144,
+      'xxxhdpi': 192,
+    };
+    for (final entry in expectedSizes.entries) {
       final icon = File(
-        'android/app/src/main/res/mipmap-$density/ic_launcher.png',
+        'android/app/src/main/res/mipmap-${entry.key}/ic_launcher.png',
       );
-      expect(icon.existsSync(), isTrue, reason: 'ícone ausente em $density');
-      expect(icon.lengthSync(), greaterThan(3000));
-      expect(icon.readAsBytesSync().take(8).toList(), [
-        137,
-        80,
-        78,
-        71,
-        13,
-        10,
-        26,
-        10,
-      ]);
+      expect(
+        icon.existsSync(),
+        isTrue,
+        reason: 'ícone ausente em ${entry.key}',
+      );
+      final bytes = icon.readAsBytesSync();
+      expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
+      final data = ByteData.sublistView(Uint8List.fromList(bytes));
+      expect(
+        data.getUint32(16),
+        entry.value,
+        reason: 'largura em ${entry.key}',
+      );
+      expect(data.getUint32(20), entry.value, reason: 'altura em ${entry.key}');
     }
   });
 }

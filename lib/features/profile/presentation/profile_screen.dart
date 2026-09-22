@@ -191,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: _isViewingDependent
           ? DependentWalletColors.background
-          : vittaSurface,
+          : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: DependentWalletBackground(
           key: Key(
@@ -210,18 +210,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       showBack: true,
                       backgroundColor: _isViewingDependent
                           ? DependentWalletColors.sky
-                          : AppColors.primarySoft,
+                          : null,
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.normal,
+                      key: const Key('profile-summary-spacing'),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.normal,
+                        AppSpacing.xl,
+                        AppSpacing.normal,
+                        0,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.normal),
-                            decoration: AppCardStyle.decoration(),
+                            decoration: AppCardStyle.decoration(
+                              color: Theme.of(context).colorScheme.surface,
+                            ),
                             child: Row(
                               children: [
                                 CircleAvatar(
@@ -632,9 +638,11 @@ class _SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E5EA)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: .35),
+        ),
       ),
       child: Column(
         children: [
@@ -671,24 +679,27 @@ class _SettingsRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: vittaDarkBlue),
+            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Text.rich(
                 TextSpan(
                   text: title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   children: [
                     if (subtitle != null)
                       TextSpan(
                         text: '\n$subtitle',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w400,
-                          color: Colors.black54,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: .65),
                         ),
                       ),
                   ],

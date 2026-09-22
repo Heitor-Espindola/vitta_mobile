@@ -32,10 +32,9 @@ void main() {
         tester.getSize(cards.first).height,
         tester.getSize(cards.last).height,
       );
-      final markers = find.byType(AnimatedContainer);
       expect(
-        tester.getTopLeft(markers.first).dy,
-        tester.getTopLeft(markers.last).dy,
+        tester.getBottomLeft(cards.first).dy,
+        tester.getBottomLeft(cards.last).dy,
       );
       expect(
         tester.getTopLeft(cards.first).dy,

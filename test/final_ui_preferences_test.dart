@@ -12,7 +12,6 @@ import 'package:vitta_mobile/features/people/application/wallet_selection_contro
 import 'package:vitta_mobile/features/profile/presentation/profile_detail_screens.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/presentation/models/vaccination_occurrence.dart';
-import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 
 void main() {
   late SharedPreferencesAsync storage;
@@ -135,36 +134,32 @@ void main() {
     },
   );
 
-  testWidgets(
-    'settings contains only functional switches and Muuni respects toggle',
-    (tester) async {
-      final preferences = AppPreferences(storage: storage);
-      await preferences.load();
-      await tester.pumpWidget(
-        MaterialApp(home: ProfileSettingsScreen(preferences: preferences)),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(SwitchListTile), findsNWidgets(2));
-      expect(find.text('Idioma'), findsNothing);
-      expect(find.text('Aparência'), findsNothing);
-      expect(find.text('Sessão'), findsNothing);
-      await tester.tap(find.text('Animações da Muuni'));
-      await tester.pumpAndSettle();
-      expect(preferences.animationsEnabled, isFalse);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MuuniEntranceAnimation(preferences: preferences),
-          ),
-        ),
-      );
-      expect(find.byType(MuuniSpriteFrame), findsOneWidget);
-      expect(
-        tester.widget<MuuniSpriteFrame>(find.byType(MuuniSpriteFrame)).frame,
-        11,
-      );
-    },
-  );
+  testWidgets('settings persists functional theme and typography controls', (
+    tester,
+  ) async {
+    final preferences = AppPreferences(storage: storage);
+    await preferences.load();
+    await tester.pumpWidget(
+      MaterialApp(home: ProfileSettingsScreen(preferences: preferences)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SwitchListTile), findsNWidgets(2));
+    expect(find.text('Idioma'), findsNothing);
+    expect(find.text('Sessão'), findsNothing);
+    expect(find.text('Animações da Muuni'), findsNothing);
+    await tester.tap(find.text('Tema escuro'));
+    await tester.pumpAndSettle();
+    expect(preferences.darkModeEnabled, isTrue);
+    await tester.tap(find.byKey(const Key('text-scale-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Grande').last);
+    await tester.pumpAndSettle();
+    expect(preferences.textScale, 1.15);
+    final restarted = AppPreferences(storage: storage);
+    await restarted.load();
+    expect(restarted.darkModeEnabled, isTrue);
+    expect(restarted.textScale, 1.15);
+  });
 }
 
 const owner = AppUser(

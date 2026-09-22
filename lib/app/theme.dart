@@ -46,4 +46,55 @@ abstract final class AppTheme {
       ),
     );
   }
+
+  static ThemeData get dark {
+    const scheme = ColorScheme.dark(
+      primary: Color(0xFF82C8F0),
+      onPrimary: Color(0xFF06283A),
+      secondary: Color(0xFF9ED8F6),
+      surface: Color(0xFF17242C),
+      onSurface: Color(0xFFE7F2F8),
+      outline: Color(0xFF536873),
+      error: Color(0xFFFFB4AB),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFF0F1B22),
+      appBarTheme: const AppBarTheme(
+        centerTitle: false,
+        elevation: 0,
+        backgroundColor: Color(0xFF0F1B22),
+        foregroundColor: Color(0xFFE7F2F8),
+        surfaceTintColor: Colors.transparent,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: scheme.surface,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          side: const BorderSide(color: Color(0xFF354A55)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF17242C),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          borderSide: const BorderSide(color: Color(0xFF536873)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          borderSide: const BorderSide(color: Color(0xFF536873)),
+        ),
+      ),
+    );
+  }
 }

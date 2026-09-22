@@ -32,7 +32,7 @@ class VittaMobileShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: vittaSurface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -58,15 +58,22 @@ class VittaTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: height,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
+          colors: dark
+              ? const [Color(0xFF182B36), Color(0xFF12212A)]
+              : const [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border(bottom: BorderSide(color: Color(0xFFE8F0F5))),
+        border: Border(
+          bottom: BorderSide(
+            color: dark ? const Color(0xFF354A55) : const Color(0xFFE8F0F5),
+          ),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -76,7 +83,9 @@ class VittaTopBar extends StatelessWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.pageTitle,
+            style: AppTypography.pageTitle.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -92,6 +101,7 @@ class VittaBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       key: const Key('vitta-bottom-nav-safe-padding'),
       padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottomInset),
@@ -100,9 +110,9 @@ class VittaBottomNav extends StatelessWidget {
         height: 62,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.large),
-          border: Border.all(color: const Color(0xFFE8EDF0)),
+          border: Border.all(color: scheme.outline.withValues(alpha: .35)),
           boxShadow: const [
             BoxShadow(
               color: Color(0x180C527E),
@@ -176,7 +186,10 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = currentTab == tab;
-    final color = selected ? vittaDarkBlue : const Color(0xFF849199);
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected
+        ? scheme.primary
+        : scheme.onSurface.withValues(alpha: .58);
 
     return Expanded(
       child: InkWell(
@@ -194,37 +207,20 @@ class _NavItem extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           height: double.infinity,
           decoration: const BoxDecoration(color: Colors.transparent),
-          child: Stack(
-            alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: color, size: selected ? 22 : 21),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 9,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              Positioned(
-                bottom: 1,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: selected ? 5 : 0,
-                  height: selected ? 5 : 0,
-                  decoration: const BoxDecoration(
-                    color: vittaDarkBlue,
-                    shape: BoxShape.circle,
-                  ),
+              Icon(icon, color: color, size: selected ? 22 : 21),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                 ),
               ),
             ],
@@ -242,7 +238,7 @@ class AppPageHeader extends StatelessWidget {
     this.subtitle,
     this.showBack = false,
     this.action,
-    this.backgroundColor = AppColors.primarySoft,
+    this.backgroundColor,
     this.titleOffset = Offset.zero,
   });
 
@@ -250,13 +246,17 @@ class AppPageHeader extends StatelessWidget {
   final String? subtitle;
   final bool showBack;
   final Widget? action;
-  final Color backgroundColor;
+  final Color? backgroundColor;
   final Offset titleOffset;
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    color: backgroundColor,
+    color:
+        backgroundColor ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surface
+            : AppColors.primarySoft),
     padding: const EdgeInsets.fromLTRB(
       AppSpacing.normal,
       AppSpacing.sm,
@@ -280,11 +280,23 @@ class AppPageHeader extends StatelessWidget {
             children: [
               Transform.translate(
                 offset: titleOffset,
-                child: Text(title, style: AppTypography.pageTitle),
+                child: Text(
+                  title,
+                  style: AppTypography.pageTitle.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xs),
-                Text(subtitle!, style: AppTypography.caption),
+                Text(
+                  subtitle!,
+                  style: AppTypography.caption.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: .7),
+                  ),
+                ),
               ],
             ],
           ),

@@ -15,30 +15,45 @@ import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 
 void main() {
-  testWidgets('Muuni advances through multiple sprite frames', (tester) async {
+  testWidgets('Muuni uses one static pose, hides and returns', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: MuuniEntranceAnimation())),
+      const MaterialApp(
+        home: Scaffold(
+          body: MuuniTimedPresence(
+            visibleDuration: Duration(milliseconds: 200),
+            hiddenDuration: Duration(milliseconds: 300),
+          ),
+        ),
+      ),
     );
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 120)),
+    expect(
+      tester
+          .widget<Visibility>(find.byKey(const Key('muuni-timed-presence')))
+          .visible,
+      isTrue,
     );
-    await tester.pump();
-
-    final observedFrames = <int>{};
-    for (var index = 0; index < 6; index++) {
-      await tester.pump(const Duration(milliseconds: 360));
-      observedFrames.add(
-        tester
-            .widget<MuuniSpriteFrame>(
-              find.byKey(const Key('muuni-animated-sprite')),
-            )
-            .frame,
-      );
-    }
-
-    expect(observedFrames.length, greaterThan(2));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+    expect(
+      tester
+          .widget<MuuniSpriteFrame>(
+            find.byKey(const Key('muuni-static-sprite')),
+          )
+          .frame,
+      11,
+    );
+    await tester.pump(const Duration(milliseconds: 210));
+    expect(
+      tester
+          .widget<Visibility>(find.byKey(const Key('muuni-timed-presence')))
+          .visible,
+      isFalse,
+    );
+    await tester.pump(const Duration(milliseconds: 310));
+    expect(
+      tester
+          .widget<Visibility>(find.byKey(const Key('muuni-timed-presence')))
+          .visible,
+      isTrue,
+    );
   });
 
   testWidgets('Conteúdo keeps the dependent visual context', (tester) async {
@@ -63,7 +78,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Carteira starts the Muuni animation for a dependent', (
+  testWidgets('Carteira shows the timed Muuni presence for a dependent', (
     tester,
   ) async {
     final wallet = _dependentWallet();

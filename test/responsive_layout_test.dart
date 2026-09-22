@@ -440,7 +440,7 @@ void main() {
       find.byKey(const Key('muuni-notification-animation')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('muuni-animated-sprite')), findsOneWidget);
+    expect(find.byKey(const Key('muuni-static-sprite')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

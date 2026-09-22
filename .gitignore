@@ -32,9 +32,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/tmp/
 
 # Local API keys
 /config/news_api.json
+/config/news_data.json
 
 # Symbolication related
 app.*.symbols
