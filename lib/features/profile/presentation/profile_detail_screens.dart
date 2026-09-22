@@ -43,7 +43,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Configurações',
-    contentTopSpacing: 23,
+    contentTopSpacing: 18,
     introPadding: const EdgeInsets.only(left: AppSpacing.md),
     intro: 'Escolha como o Vitta funciona neste dispositivo.',
     children: [
@@ -198,7 +198,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Segurança da conta',
-    contentTopSpacing: 23,
+    contentTopSpacing: 18,
     introPadding: const EdgeInsets.only(left: AppSpacing.md),
     intro: 'Informações e ações para proteger o acesso ao Vitta.',
     children: [
@@ -289,7 +289,7 @@ class HelpCenterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Central de ajuda',
-    contentTopSpacing: AppSpacing.xl,
+    contentTopSpacing: 18,
     introPadding: const EdgeInsets.only(left: AppSpacing.md),
     headerTitleOffset: const Offset(0, 1),
     intro: 'Respostas rápidas sobre os principais recursos do Vitta.',
@@ -308,7 +308,7 @@ class TermsPrivacyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ProfileDetailPage(
     title: 'Termos e privacidade',
-    contentTopSpacing: 23,
+    contentTopSpacing: 18,
     introPadding: EdgeInsets.only(left: AppSpacing.md),
     intro: 'Entenda de forma simples como o Vitta cuida das suas informações.',
     children: [
