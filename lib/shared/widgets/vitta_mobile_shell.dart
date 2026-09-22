@@ -243,6 +243,7 @@ class AppPageHeader extends StatelessWidget {
     this.showBack = false,
     this.action,
     this.backgroundColor = AppColors.primarySoft,
+    this.titleOffset = Offset.zero,
   });
 
   final String title;
@@ -250,6 +251,7 @@ class AppPageHeader extends StatelessWidget {
   final bool showBack;
   final Widget? action;
   final Color backgroundColor;
+  final Offset titleOffset;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -276,7 +278,10 @@ class AppPageHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: AppTypography.pageTitle),
+              Transform.translate(
+                offset: titleOffset,
+                child: Text(title, style: AppTypography.pageTitle),
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(subtitle!, style: AppTypography.caption),

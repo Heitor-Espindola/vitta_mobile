@@ -43,6 +43,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Configurações',
+    contentTopSpacing: 23,
+    introPadding: const EdgeInsets.only(left: AppSpacing.md),
     intro: 'Escolha como o Vitta funciona neste dispositivo.',
     children: [
       _DetailCard(
@@ -196,6 +198,8 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Segurança da conta',
+    contentTopSpacing: 23,
+    introPadding: const EdgeInsets.only(left: AppSpacing.md),
     intro: 'Informações e ações para proteger o acesso ao Vitta.',
     children: [
       _DetailCard(
@@ -285,6 +289,9 @@ class HelpCenterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _ProfileDetailPage(
     title: 'Central de ajuda',
+    contentTopSpacing: AppSpacing.xl,
+    introPadding: const EdgeInsets.only(left: AppSpacing.md),
+    headerTitleOffset: const Offset(0, 1),
     intro: 'Respostas rápidas sobre os principais recursos do Vitta.',
     children: [
       for (final question in _questions) ...[
@@ -301,6 +308,8 @@ class TermsPrivacyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ProfileDetailPage(
     title: 'Termos e privacidade',
+    contentTopSpacing: 23,
+    introPadding: EdgeInsets.only(left: AppSpacing.md),
     intro: 'Entenda de forma simples como o Vitta cuida das suas informações.',
     children: [
       _NoticeCard(
@@ -347,11 +356,17 @@ class _ProfileDetailPage extends StatelessWidget {
     required this.title,
     required this.intro,
     required this.children,
+    this.contentTopSpacing = 0,
+    this.introPadding = EdgeInsets.zero,
+    this.headerTitleOffset = Offset.zero,
   });
 
   final String title;
   final String intro;
   final List<Widget> children;
+  final double contentTopSpacing;
+  final EdgeInsetsGeometry introPadding;
+  final Offset headerTitleOffset;
 
   @override
   Widget build(BuildContext context) {
@@ -361,15 +376,24 @@ class _ProfileDetailPage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.xl),
           children: [
-            AppPageHeader(title: title, showBack: true),
+            AppPageHeader(
+              title: title,
+              showBack: true,
+              titleOffset: headerTitleOffset,
+            ),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.normal,
+              padding: EdgeInsets.only(
+                left: AppSpacing.normal,
+                top: contentTopSpacing,
+                right: AppSpacing.normal,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(intro, style: AppTypography.body),
+                  Padding(
+                    padding: introPadding,
+                    child: Text(intro, style: AppTypography.body),
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                   ...children,
                 ],
