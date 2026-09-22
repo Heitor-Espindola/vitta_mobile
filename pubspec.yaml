@@ -62,7 +62,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: assets/images/vitta_logo.png
+  image_path: assets/images/logoapp.jpg
   min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
