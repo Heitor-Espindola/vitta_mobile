@@ -1,0 +1,37 @@
+query AuditPatients {
+  patients {
+    id
+    user {
+      id
+      cpf
+    }
+  }
+}
+
+query AuditApplications {
+  applications {
+    id
+    patient {
+      id
+      user {
+        cpf
+      }
+    }
+    vaccine {
+      id
+      name
+    }
+    batch {
+      batchCode
+    }
+    applicationDate
+    doseNumber
+  }
+}
+
+query AuditVaccines {
+  vaccines {
+    id
+    name
+  }
+}

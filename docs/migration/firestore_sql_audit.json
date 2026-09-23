@@ -1,0 +1,92 @@
+{
+  "generatedAt": "2026-09-23T01:07:28.928840Z",
+  "mode": "read-only",
+  "projectId": "vitta-5ec1e",
+  "sqlConnect": {
+    "serviceId": "vitta-5ec1e-service",
+    "connectorId": "example",
+    "location": "southamerica-east1",
+    "counts": {
+      "patients": 4,
+      "applications": 9,
+      "vaccines": 19
+    }
+  },
+  "firestore": {
+    "counts": {
+      "users": 16,
+      "auth_links": 4,
+      "cpf_registry": 10,
+      "relationships": 7,
+      "access_grants": 7,
+      "vaccines": 19,
+      "vaccination_records": 3,
+      "vaccination_schedules": 0,
+      "children": 1,
+      "professional_patient_access": 3,
+      "information_posts": 0,
+      "news_articles": 1,
+      "users/*/private/emergency_contact": 3
+    },
+    "activeAfterMigration": [
+      "news_articles"
+    ],
+    "legacyBackupOnly": [
+      "users",
+      "auth_links",
+      "cpf_registry",
+      "relationships",
+      "access_grants",
+      "vaccines",
+      "vaccination_records",
+      "vaccination_schedules",
+      "children",
+      "professional_patient_access",
+      "information_posts"
+    ]
+  },
+  "matching": {
+    "patients": {
+      "key": "normalized CPF (audit only; no CPF is emitted)",
+      "matchedByCpf": 3,
+      "firestoreOnly": 8,
+      "sqlOnly": 1
+    },
+    "vaccines": {
+      "key": "normalized vaccine name",
+      "matchedNames": 12,
+      "firestoreOnlyNames": 7,
+      "sqlOnlyNames": 7
+    },
+    "vaccinationRecords": {
+      "key": "patient CPF + vaccine name + application date + dose + batch",
+      "heuristicMatches": 0,
+      "unmatched": 3,
+      "unmatchedRecordHashes": [
+        "d3c13575d2ac3d3e",
+        "3d6aa8c588fbd019",
+        "29c6531e4b752477"
+      ],
+      "warning": "A durable legacyRecordId is required before applying migration."
+    }
+  },
+  "destinations": {
+    "users": "User + Patient",
+    "auth_links": "User.authUid (schema extension required)",
+    "cpf_registry": "User.cpf unique constraint; exact lookup must be server-restricted",
+    "relationships": "FamilyRelationship (new table required)",
+    "access_grants": "PatientAccess (new table required)",
+    "vaccines": "Vaccine",
+    "vaccination_records": "Application",
+    "users/*/private/emergency_contact": "EmergencyContact (new table required)",
+    "news_articles": "Firestore/news_articles (unchanged)"
+  },
+  "conflicts": {
+    "schemaMissingAuthUid": true,
+    "schemaMissingFamilyAccess": true,
+    "schemaMissingEmergencyContact": true,
+    "schemaMissingApplicationLegacyId": true,
+    "schemaMissingNextDoseAt": true,
+    "existingConnectorUsesAuthLevelOnly": true
+  }
+}
