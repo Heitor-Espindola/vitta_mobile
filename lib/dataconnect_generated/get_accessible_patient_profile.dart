@@ -4,16 +4,38 @@ class GetAccessiblePatientProfileVariablesBuilder {
   String patientId;
 
   final FirebaseDataConnect _dataConnect;
-  GetAccessiblePatientProfileVariablesBuilder(this._dataConnect, {required  this.patientId,});
-  Deserializer<GetAccessiblePatientProfileData> dataDeserializer = (dynamic json)  => GetAccessiblePatientProfileData.fromJson(jsonDecode(json));
-  Serializer<GetAccessiblePatientProfileVariables> varsSerializer = (GetAccessiblePatientProfileVariables vars) => jsonEncode(vars.toJson());
-  Future<QueryResult<GetAccessiblePatientProfileData, GetAccessiblePatientProfileVariables>> execute({QueryFetchPolicy fetchPolicy = QueryFetchPolicy.preferCache}) {
+  GetAccessiblePatientProfileVariablesBuilder(
+    this._dataConnect, {
+    required this.patientId,
+  });
+  Deserializer<GetAccessiblePatientProfileData> dataDeserializer =
+      (dynamic json) =>
+          GetAccessiblePatientProfileData.fromJson(jsonDecode(json));
+  Serializer<GetAccessiblePatientProfileVariables> varsSerializer =
+      (GetAccessiblePatientProfileVariables vars) => jsonEncode(vars.toJson());
+  Future<
+    QueryResult<
+      GetAccessiblePatientProfileData,
+      GetAccessiblePatientProfileVariables
+    >
+  >
+  execute({QueryFetchPolicy fetchPolicy = QueryFetchPolicy.preferCache}) {
     return ref().execute(fetchPolicy: fetchPolicy);
   }
 
-  QueryRef<GetAccessiblePatientProfileData, GetAccessiblePatientProfileVariables> ref() {
-    GetAccessiblePatientProfileVariables vars= GetAccessiblePatientProfileVariables(patientId: patientId,);
-    return _dataConnect.query("GetAccessiblePatientProfile", dataDeserializer, varsSerializer, vars);
+  QueryRef<
+    GetAccessiblePatientProfileData,
+    GetAccessiblePatientProfileVariables
+  >
+  ref() {
+    GetAccessiblePatientProfileVariables vars =
+        GetAccessiblePatientProfileVariables(patientId: patientId);
+    return _dataConnect.query(
+      "GetAccessiblePatientProfile",
+      dataDeserializer,
+      varsSerializer,
+      vars,
+    );
   }
 }
 
@@ -24,41 +46,46 @@ class GetAccessiblePatientProfilePatient {
   final EnumValue<PatientType> patientType;
   final String? legacyPersonId;
   final GetAccessiblePatientProfilePatientUser user;
-  GetAccessiblePatientProfilePatient.fromJson(dynamic json):
-  
-  id = nativeFromJson<String>(json['id']),
-  active = nativeFromJson<bool>(json['active']),
-  patientType = patientTypeDeserializer(json['patientType']),
-  legacyPersonId = json['legacyPersonId'] == null ? null : nativeFromJson<String>(json['legacyPersonId']),
-  user = GetAccessiblePatientProfilePatientUser.fromJson(json['user']);
+  GetAccessiblePatientProfilePatient.fromJson(dynamic json)
+    : id = nativeFromJson<String>(json['id']),
+      active = nativeFromJson<bool>(json['active']),
+      patientType = patientTypeDeserializer(json['patientType']),
+      legacyPersonId = json['legacyPersonId'] == null
+          ? null
+          : nativeFromJson<String>(json['legacyPersonId']),
+      user = GetAccessiblePatientProfilePatientUser.fromJson(json['user']);
   @override
   bool operator ==(Object other) {
-    if(identical(this, other)) {
+    if (identical(this, other)) {
       return true;
     }
-    if(other.runtimeType != runtimeType) {
+    if (other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetAccessiblePatientProfilePatient otherTyped = other as GetAccessiblePatientProfilePatient;
-    return id == otherTyped.id && 
-    active == otherTyped.active && 
-    patientType == otherTyped.patientType && 
-    legacyPersonId == otherTyped.legacyPersonId && 
-    user == otherTyped.user;
-    
+    final GetAccessiblePatientProfilePatient otherTyped =
+        other as GetAccessiblePatientProfilePatient;
+    return id == otherTyped.id &&
+        active == otherTyped.active &&
+        patientType == otherTyped.patientType &&
+        legacyPersonId == otherTyped.legacyPersonId &&
+        user == otherTyped.user;
   }
+
   @override
-  int get hashCode => Object.hashAll([id.hashCode, active.hashCode, patientType.hashCode, legacyPersonId.hashCode, user.hashCode]);
-  
+  int get hashCode => Object.hashAll([
+    id.hashCode,
+    active.hashCode,
+    patientType.hashCode,
+    legacyPersonId.hashCode,
+    user.hashCode,
+  ]);
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
     json['id'] = nativeToJson<String>(id);
     json['active'] = nativeToJson<bool>(active);
-    json['patientType'] = 
-    patientTypeSerializer(patientType)
-    ;
+    json['patientType'] = patientTypeSerializer(patientType);
     if (legacyPersonId != null) {
       json['legacyPersonId'] = nativeToJson<String?>(legacyPersonId);
     }
@@ -86,41 +113,56 @@ class GetAccessiblePatientProfilePatientUser {
   final String? sex;
   final String? phone;
   final String? photoUrl;
-  GetAccessiblePatientProfilePatientUser.fromJson(dynamic json):
-  
-  id = nativeFromJson<String>(json['id']),
-  name = nativeFromJson<String>(json['name']),
-  birthDate = nativeFromJson<DateTime>(json['birthDate']),
-  email = json['email'] == null ? null : nativeFromJson<String>(json['email']),
-  status = userStatusDeserializer(json['status']),
-  cpf = nativeFromJson<String>(json['cpf']),
-  sex = json['sex'] == null ? null : nativeFromJson<String>(json['sex']),
-  phone = json['phone'] == null ? null : nativeFromJson<String>(json['phone']),
-  photoUrl = json['photoUrl'] == null ? null : nativeFromJson<String>(json['photoUrl']);
+  GetAccessiblePatientProfilePatientUser.fromJson(dynamic json)
+    : id = nativeFromJson<String>(json['id']),
+      name = nativeFromJson<String>(json['name']),
+      birthDate = nativeFromJson<DateTime>(json['birthDate']),
+      email = json['email'] == null
+          ? null
+          : nativeFromJson<String>(json['email']),
+      status = userStatusDeserializer(json['status']),
+      cpf = nativeFromJson<String>(json['cpf']),
+      sex = json['sex'] == null ? null : nativeFromJson<String>(json['sex']),
+      phone = json['phone'] == null
+          ? null
+          : nativeFromJson<String>(json['phone']),
+      photoUrl = json['photoUrl'] == null
+          ? null
+          : nativeFromJson<String>(json['photoUrl']);
   @override
   bool operator ==(Object other) {
-    if(identical(this, other)) {
+    if (identical(this, other)) {
       return true;
     }
-    if(other.runtimeType != runtimeType) {
+    if (other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetAccessiblePatientProfilePatientUser otherTyped = other as GetAccessiblePatientProfilePatientUser;
-    return id == otherTyped.id && 
-    name == otherTyped.name && 
-    birthDate == otherTyped.birthDate && 
-    email == otherTyped.email && 
-    status == otherTyped.status && 
-    cpf == otherTyped.cpf && 
-    sex == otherTyped.sex && 
-    phone == otherTyped.phone && 
-    photoUrl == otherTyped.photoUrl;
-    
+    final GetAccessiblePatientProfilePatientUser otherTyped =
+        other as GetAccessiblePatientProfilePatientUser;
+    return id == otherTyped.id &&
+        name == otherTyped.name &&
+        birthDate == otherTyped.birthDate &&
+        email == otherTyped.email &&
+        status == otherTyped.status &&
+        cpf == otherTyped.cpf &&
+        sex == otherTyped.sex &&
+        phone == otherTyped.phone &&
+        photoUrl == otherTyped.photoUrl;
   }
+
   @override
-  int get hashCode => Object.hashAll([id.hashCode, name.hashCode, birthDate.hashCode, email.hashCode, status.hashCode, cpf.hashCode, sex.hashCode, phone.hashCode, photoUrl.hashCode]);
-  
+  int get hashCode => Object.hashAll([
+    id.hashCode,
+    name.hashCode,
+    birthDate.hashCode,
+    email.hashCode,
+    status.hashCode,
+    cpf.hashCode,
+    sex.hashCode,
+    phone.hashCode,
+    photoUrl.hashCode,
+  ]);
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -130,9 +172,7 @@ class GetAccessiblePatientProfilePatientUser {
     if (email != null) {
       json['email'] = nativeToJson<String?>(email);
     }
-    json['status'] = 
-    userStatusSerializer(status)
-    ;
+    json['status'] = userStatusSerializer(status);
     json['cpf'] = nativeToJson<String>(cpf);
     if (sex != null) {
       json['sex'] = nativeToJson<String?>(sex);
@@ -162,25 +202,26 @@ class GetAccessiblePatientProfilePatientUser {
 @immutable
 class GetAccessiblePatientProfileData {
   final GetAccessiblePatientProfilePatient? patient;
-  GetAccessiblePatientProfileData.fromJson(dynamic json):
-  
-  patient = json['patient'] == null ? null : GetAccessiblePatientProfilePatient.fromJson(json['patient']);
+  GetAccessiblePatientProfileData.fromJson(dynamic json)
+    : patient = json['patient'] == null
+          ? null
+          : GetAccessiblePatientProfilePatient.fromJson(json['patient']);
   @override
   bool operator ==(Object other) {
-    if(identical(this, other)) {
+    if (identical(this, other)) {
       return true;
     }
-    if(other.runtimeType != runtimeType) {
+    if (other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetAccessiblePatientProfileData otherTyped = other as GetAccessiblePatientProfileData;
+    final GetAccessiblePatientProfileData otherTyped =
+        other as GetAccessiblePatientProfileData;
     return patient == otherTyped.patient;
-    
   }
+
   @override
   int get hashCode => patient.hashCode;
-  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -190,34 +231,33 @@ class GetAccessiblePatientProfileData {
     return json;
   }
 
-  GetAccessiblePatientProfileData({
-    this.patient,
-  });
+  GetAccessiblePatientProfileData({this.patient});
 }
 
 @immutable
 class GetAccessiblePatientProfileVariables {
   final String patientId;
-  @Deprecated('fromJson is deprecated for Variable classes as they are no longer required for deserialization.')
-  GetAccessiblePatientProfileVariables.fromJson(Map<String, dynamic> json):
-  
-  patientId = nativeFromJson<String>(json['patientId']);
+  @Deprecated(
+    'fromJson is deprecated for Variable classes as they are no longer required for deserialization.',
+  )
+  GetAccessiblePatientProfileVariables.fromJson(Map<String, dynamic> json)
+    : patientId = nativeFromJson<String>(json['patientId']);
   @override
   bool operator ==(Object other) {
-    if(identical(this, other)) {
+    if (identical(this, other)) {
       return true;
     }
-    if(other.runtimeType != runtimeType) {
+    if (other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetAccessiblePatientProfileVariables otherTyped = other as GetAccessiblePatientProfileVariables;
+    final GetAccessiblePatientProfileVariables otherTyped =
+        other as GetAccessiblePatientProfileVariables;
     return patientId == otherTyped.patientId;
-    
   }
+
   @override
   int get hashCode => patientId.hashCode;
-  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -225,8 +265,5 @@ class GetAccessiblePatientProfileVariables {
     return json;
   }
 
-  GetAccessiblePatientProfileVariables({
-    required this.patientId,
-  });
+  GetAccessiblePatientProfileVariables({required this.patientId});
 }
-
