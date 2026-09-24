@@ -16,13 +16,10 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
-include: package:flutter_lints/flutter.yaml
-
-analyzer:
-  exclude:
     # Código produzido pelo gerador oficial do Firebase Data Connect.
     # A compilação é coberta pelo smoke test; não corrigir lints manualmente aqui.
     - lib/dataconnect_generated/**
+include: package:flutter_lints/flutter.yaml
 
 linter:
   # The lint rules applied to this project can be customized in the

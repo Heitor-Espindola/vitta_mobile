@@ -8,9 +8,9 @@ Os textos foram revisados em linguagem simples para quem utiliza o SUS. A idade 
 
 O catálogo local de `vaccines_screen.dart` contém 15 entradas, incluindo repetições por categoria. Todas têm orientação específica: BCG, hepatite B (infantil e gestantes), pentavalente, poliomielite, pneumocócica 10v, rotavírus, HPV, meningocócica ACWY, dT, dTpa, influenza (gestantes e idosos), covid-19 e febre amarela.
 
-O catálogo exibido normalmente é carregado da coleção `vaccines` do Firestore. A implementação também reconhece DTP e hepatite A, visíveis nas imagens fornecidas, além de meningocócica C, tríplice viral, varicela, dengue DNG4 e VSR. Nomes, siglas e IDs conhecidos são associados em `VaccineAudienceGuidance`; não se usa correspondência parcial que possa confundir produtos distintos.
+O catálogo exibido em produção é carregado pelo repositório de domínio do Firebase SQL Connect. O Firestore permanece apenas nos fluxos explicitamente legados e no sistema de notícias, fora deste catálogo. A implementação também reconhece DTP e hepatite A, visíveis nas imagens fornecidas, além de meningocócica C, tríplice viral, varicela, dengue DNG4 e VSR. Nomes, siglas e IDs conhecidos são associados em `VaccineAudienceGuidance`; não se usa correspondência parcial que possa confundir produtos distintos.
 
-Não foi possível inventariar a coleção remota nesta sessão, pois a leitura exige autenticação. Para entradas ainda não reconhecidas, a tela preserva `recommendedAge` do cadastro, sem atribuir esse conteúdo à pesquisa oficial; se a idade estiver ausente, informa explicitamente essa ausência. Novas vacinas precisam de revisão e associação próprias.
+Para entradas ainda não reconhecidas, a tela preserva `recommendedAge` do cadastro SQL, sem atribuir esse conteúdo à pesquisa oficial; se a idade estiver ausente, informa explicitamente essa ausência. Novas vacinas precisam de revisão e associação próprias.
 
 ## Referências
 
