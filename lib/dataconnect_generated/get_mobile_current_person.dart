@@ -174,10 +174,12 @@ class GetMobileCurrentPersonUsers {
 @immutable
 class GetMobileCurrentPersonUsersPatientOnUser {
   final String id;
+  final bool active;
   final EnumValue<PatientType> patientType;
   final String? legacyPersonId;
   GetMobileCurrentPersonUsersPatientOnUser.fromJson(dynamic json)
     : id = nativeFromJson<String>(json['id']),
+      active = nativeFromJson<bool>(json['active']),
       patientType = patientTypeDeserializer(json['patientType']),
       legacyPersonId = json['legacyPersonId'] == null
           ? null
@@ -194,6 +196,7 @@ class GetMobileCurrentPersonUsersPatientOnUser {
     final GetMobileCurrentPersonUsersPatientOnUser otherTyped =
         other as GetMobileCurrentPersonUsersPatientOnUser;
     return id == otherTyped.id &&
+        active == otherTyped.active &&
         patientType == otherTyped.patientType &&
         legacyPersonId == otherTyped.legacyPersonId;
   }
@@ -201,6 +204,7 @@ class GetMobileCurrentPersonUsersPatientOnUser {
   @override
   int get hashCode => Object.hashAll([
     id.hashCode,
+    active.hashCode,
     patientType.hashCode,
     legacyPersonId.hashCode,
   ]);
@@ -208,6 +212,7 @@ class GetMobileCurrentPersonUsersPatientOnUser {
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
     json['id'] = nativeToJson<String>(id);
+    json['active'] = nativeToJson<bool>(active);
     json['patientType'] = patientTypeSerializer(patientType);
     if (legacyPersonId != null) {
       json['legacyPersonId'] = nativeToJson<String?>(legacyPersonId);
@@ -217,6 +222,7 @@ class GetMobileCurrentPersonUsersPatientOnUser {
 
   GetMobileCurrentPersonUsersPatientOnUser({
     required this.id,
+    required this.active,
     required this.patientType,
     this.legacyPersonId,
   });

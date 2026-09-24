@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
@@ -15,7 +15,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   late final AuthRepository _repository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
 
   @override
   Widget build(BuildContext context) => StreamBuilder<AppUser?>(

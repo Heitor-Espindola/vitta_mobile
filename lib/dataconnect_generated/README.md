@@ -421,6 +421,66 @@ ref.execute();
 ```
 
 
+### UpdateMobileProfile
+#### Required Arguments
+```dart
+String name = ...;
+MobileConnectorConnector.instance.updateMobileProfile(
+  name: name,
+).execute();
+```
+
+#### Optional Arguments
+We return a builder for each query. For UpdateMobileProfile, we created `UpdateMobileProfileBuilder`. For queries and mutations with optional parameters, we return a builder class.
+The builder pattern allows Data Connect to distinguish between fields that haven't been set and fields that have been set to null. A field can be set by calling its respective setter method like below:
+```dart
+class UpdateMobileProfileVariablesBuilder {
+  ...
+   UpdateMobileProfileVariablesBuilder phone(String? t) {
+   _phone.value = t;
+   return this;
+  }
+
+  ...
+}
+MobileConnectorConnector.instance.updateMobileProfile(
+  name: name,
+)
+.phone(phone)
+.execute();
+```
+
+#### Return Type
+`execute()` returns a `OperationResult<UpdateMobileProfileData, UpdateMobileProfileVariables>`
+```dart
+/// Result of an Operation Request (query/mutation).
+class OperationResult<Data, Variables> {
+  OperationResult(this.dataConnect, this.data, this.ref);
+  Data data;
+  OperationRef<Data, Variables> ref;
+  FirebaseDataConnect dataConnect;
+}
+
+final result = await MobileConnectorConnector.instance.updateMobileProfile(
+  name: name,
+);
+UpdateMobileProfileData data = result.data;
+final ref = result.ref;
+```
+
+#### Getting the Ref
+Each builder returns an `execute` function, which is a helper function that creates a `Ref` object, and executes the underlying operation.
+An example of how to use the `Ref` object is shown below:
+```dart
+String name = ...;
+
+final ref = MobileConnectorConnector.instance.updateMobileProfile(
+  name: name,
+).ref();
+ref.execute();
+```
+
+
 ### CreateMobileDependent
 #### Required Arguments
 ```dart

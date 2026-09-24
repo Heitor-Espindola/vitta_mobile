@@ -3,6 +3,7 @@
 ```dart
 MobileConnectorConnector.instance.CompleteMobileRegistration(completeMobileRegistrationVariables).execute();
 MobileConnectorConnector.instance.UpdateMobilePhone(updateMobilePhoneVariables).execute();
+MobileConnectorConnector.instance.UpdateMobileProfile(updateMobileProfileVariables).execute();
 MobileConnectorConnector.instance.CreateMobileDependent(createMobileDependentVariables).execute();
 MobileConnectorConnector.instance.UpsertAccessibleEmergencyContact(upsertAccessibleEmergencyContactVariables).execute();
 MobileConnectorConnector.instance.GetMobileCurrentPerson().execute();
@@ -10,7 +11,6 @@ MobileConnectorConnector.instance.GetAccessibleFamilyMembers().execute();
 MobileConnectorConnector.instance.GetAccessiblePatientProfile(getAccessiblePatientProfileVariables).execute();
 MobileConnectorConnector.instance.GetAccessiblePatientVaccinations(getAccessiblePatientVaccinationsVariables).execute();
 MobileConnectorConnector.instance.GetMobileVaccines().execute();
-MobileConnectorConnector.instance.GetAccessibleEmergencyContact(getAccessibleEmergencyContactVariables).execute();
 
 ```
 

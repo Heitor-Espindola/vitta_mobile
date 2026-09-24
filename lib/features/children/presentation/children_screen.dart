@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/children/data/repositories/firebase_children_repository.dart';
@@ -23,7 +23,7 @@ class ChildrenScreen extends StatefulWidget {
 
 class _ChildrenScreenState extends State<ChildrenScreen> {
   late final AuthRepository _authRepository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final ChildrenRepository _childrenRepository =
       widget.childrenRepository ?? FirebaseChildrenRepository();
 

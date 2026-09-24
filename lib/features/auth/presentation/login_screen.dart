@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/routes.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dart';
 import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
 
   AuthRepository get _authRepository =>
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
 
   @override
   void initState() {

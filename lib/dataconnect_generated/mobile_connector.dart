@@ -9,6 +9,8 @@ part 'complete_mobile_registration.dart';
 
 part 'update_mobile_phone.dart';
 
+part 'update_mobile_profile.dart';
+
 part 'create_mobile_dependent.dart';
 
 part 'upsert_accessible_emergency_contact.dart';
@@ -183,6 +185,12 @@ class MobileConnectorConnector {
 
   UpdateMobilePhoneVariablesBuilder updateMobilePhone() {
     return UpdateMobilePhoneVariablesBuilder(dataConnect);
+  }
+
+  UpdateMobileProfileVariablesBuilder updateMobileProfile({
+    required String name,
+  }) {
+    return UpdateMobileProfileVariablesBuilder(dataConnect, name: name);
   }
 
   CreateMobileDependentVariablesBuilder createMobileDependent({

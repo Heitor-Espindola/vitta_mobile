@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/app/design_system.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
-import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/models/relationship.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
@@ -35,9 +34,9 @@ class FamilyScreen extends StatefulWidget {
 
 class _FamilyScreenState extends State<FamilyScreen> {
   late final AuthRepository _auth =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final PeopleRepository _people =
-      widget.peopleRepository ?? FirebasePeopleRepository();
+      widget.peopleRepository ?? DomainRepositoryFactory.people();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
   List<FamilyMember> _members = const [];

@@ -42,7 +42,7 @@ class GetMobileVaccinesVaccines {
   final String? sourceUrl;
   final Timestamp? sourceUpdatedAt;
   final String? calendarVersion;
-  final bool? active;
+  final bool active;
   GetMobileVaccinesVaccines.fromJson(dynamic json)
     : id = nativeFromJson<String>(json['id']),
       legacyVaccineId = json['legacyVaccineId'] == null
@@ -102,9 +102,7 @@ class GetMobileVaccinesVaccines {
       calendarVersion = json['calendarVersion'] == null
           ? null
           : nativeFromJson<String>(json['calendarVersion']),
-      active = json['active'] == null
-          ? null
-          : nativeFromJson<bool>(json['active']);
+      active = nativeFromJson<bool>(json['active']);
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
@@ -218,9 +216,7 @@ class GetMobileVaccinesVaccines {
     if (calendarVersion != null) {
       json['calendarVersion'] = nativeToJson<String?>(calendarVersion);
     }
-    if (active != null) {
-      json['active'] = nativeToJson<bool?>(active);
-    }
+    json['active'] = nativeToJson<bool>(active);
     return json;
   }
 
@@ -243,7 +239,7 @@ class GetMobileVaccinesVaccines {
     this.sourceUrl,
     this.sourceUpdatedAt,
     this.calendarVersion,
-    this.active,
+    required this.active,
   });
 }
 

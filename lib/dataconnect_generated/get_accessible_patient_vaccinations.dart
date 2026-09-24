@@ -44,25 +44,39 @@ class GetAccessiblePatientVaccinationsVariablesBuilder {
 class GetAccessiblePatientVaccinationsApplications {
   final String id;
   final String? legacyRecordId;
+  final String patientIdSnapshot;
+  final String? patientLegacyPersonIdSnapshot;
+  final String patientNameSnapshot;
+  final String vaccineNameSnapshot;
   final Timestamp applicationDate;
   final Timestamp? nextDoseAt;
   final int? doseNumber;
   final String? doseLabel;
   final String? lotSnapshot;
   final String? manufacturerSnapshot;
-  final String? facilityNameSnapshot;
-  final String? professionalNameSnapshot;
+  final String facilityNameSnapshot;
+  final String professionalNameSnapshot;
+  final String? professionalRegistrationSnapshot;
   final String? source;
+  final Timestamp? voidedAt;
+  final String? voidReason;
   final String? notes;
-  final GetAccessiblePatientVaccinationsApplicationsVaccine vaccine;
+  final GetAccessiblePatientVaccinationsApplicationsVaccine? vaccine;
   final GetAccessiblePatientVaccinationsApplicationsBatch? batch;
-  final GetAccessiblePatientVaccinationsApplicationsProfessional professional;
-  final GetAccessiblePatientVaccinationsApplicationsUbs ubs;
+  final GetAccessiblePatientVaccinationsApplicationsProfessional? professional;
+  final GetAccessiblePatientVaccinationsApplicationsUbs? ubs;
   GetAccessiblePatientVaccinationsApplications.fromJson(dynamic json)
     : id = nativeFromJson<String>(json['id']),
       legacyRecordId = json['legacyRecordId'] == null
           ? null
           : nativeFromJson<String>(json['legacyRecordId']),
+      patientIdSnapshot = nativeFromJson<String>(json['patientIdSnapshot']),
+      patientLegacyPersonIdSnapshot =
+          json['patientLegacyPersonIdSnapshot'] == null
+          ? null
+          : nativeFromJson<String>(json['patientLegacyPersonIdSnapshot']),
+      patientNameSnapshot = nativeFromJson<String>(json['patientNameSnapshot']),
+      vaccineNameSnapshot = nativeFromJson<String>(json['vaccineNameSnapshot']),
       applicationDate = Timestamp.fromJson(json['applicationDate']),
       nextDoseAt = json['nextDoseAt'] == null
           ? null
@@ -79,33 +93,48 @@ class GetAccessiblePatientVaccinationsApplications {
       manufacturerSnapshot = json['manufacturerSnapshot'] == null
           ? null
           : nativeFromJson<String>(json['manufacturerSnapshot']),
-      facilityNameSnapshot = json['facilityNameSnapshot'] == null
+      facilityNameSnapshot = nativeFromJson<String>(
+        json['facilityNameSnapshot'],
+      ),
+      professionalNameSnapshot = nativeFromJson<String>(
+        json['professionalNameSnapshot'],
+      ),
+      professionalRegistrationSnapshot =
+          json['professionalRegistrationSnapshot'] == null
           ? null
-          : nativeFromJson<String>(json['facilityNameSnapshot']),
-      professionalNameSnapshot = json['professionalNameSnapshot'] == null
-          ? null
-          : nativeFromJson<String>(json['professionalNameSnapshot']),
+          : nativeFromJson<String>(json['professionalRegistrationSnapshot']),
       source = json['source'] == null
           ? null
           : nativeFromJson<String>(json['source']),
+      voidedAt = json['voidedAt'] == null
+          ? null
+          : Timestamp.fromJson(json['voidedAt']),
+      voidReason = json['voidReason'] == null
+          ? null
+          : nativeFromJson<String>(json['voidReason']),
       notes = json['notes'] == null
           ? null
           : nativeFromJson<String>(json['notes']),
-      vaccine = GetAccessiblePatientVaccinationsApplicationsVaccine.fromJson(
-        json['vaccine'],
-      ),
+      vaccine = json['vaccine'] == null
+          ? null
+          : GetAccessiblePatientVaccinationsApplicationsVaccine.fromJson(
+              json['vaccine'],
+            ),
       batch = json['batch'] == null
           ? null
           : GetAccessiblePatientVaccinationsApplicationsBatch.fromJson(
               json['batch'],
             ),
-      professional =
-          GetAccessiblePatientVaccinationsApplicationsProfessional.fromJson(
-            json['professional'],
-          ),
-      ubs = GetAccessiblePatientVaccinationsApplicationsUbs.fromJson(
-        json['ubs'],
-      );
+      professional = json['professional'] == null
+          ? null
+          : GetAccessiblePatientVaccinationsApplicationsProfessional.fromJson(
+              json['professional'],
+            ),
+      ubs = json['ubs'] == null
+          ? null
+          : GetAccessiblePatientVaccinationsApplicationsUbs.fromJson(
+              json['ubs'],
+            );
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
@@ -119,6 +148,11 @@ class GetAccessiblePatientVaccinationsApplications {
         other as GetAccessiblePatientVaccinationsApplications;
     return id == otherTyped.id &&
         legacyRecordId == otherTyped.legacyRecordId &&
+        patientIdSnapshot == otherTyped.patientIdSnapshot &&
+        patientLegacyPersonIdSnapshot ==
+            otherTyped.patientLegacyPersonIdSnapshot &&
+        patientNameSnapshot == otherTyped.patientNameSnapshot &&
+        vaccineNameSnapshot == otherTyped.vaccineNameSnapshot &&
         applicationDate == otherTyped.applicationDate &&
         nextDoseAt == otherTyped.nextDoseAt &&
         doseNumber == otherTyped.doseNumber &&
@@ -127,7 +161,11 @@ class GetAccessiblePatientVaccinationsApplications {
         manufacturerSnapshot == otherTyped.manufacturerSnapshot &&
         facilityNameSnapshot == otherTyped.facilityNameSnapshot &&
         professionalNameSnapshot == otherTyped.professionalNameSnapshot &&
+        professionalRegistrationSnapshot ==
+            otherTyped.professionalRegistrationSnapshot &&
         source == otherTyped.source &&
+        voidedAt == otherTyped.voidedAt &&
+        voidReason == otherTyped.voidReason &&
         notes == otherTyped.notes &&
         vaccine == otherTyped.vaccine &&
         batch == otherTyped.batch &&
@@ -139,6 +177,10 @@ class GetAccessiblePatientVaccinationsApplications {
   int get hashCode => Object.hashAll([
     id.hashCode,
     legacyRecordId.hashCode,
+    patientIdSnapshot.hashCode,
+    patientLegacyPersonIdSnapshot.hashCode,
+    patientNameSnapshot.hashCode,
+    vaccineNameSnapshot.hashCode,
     applicationDate.hashCode,
     nextDoseAt.hashCode,
     doseNumber.hashCode,
@@ -147,7 +189,10 @@ class GetAccessiblePatientVaccinationsApplications {
     manufacturerSnapshot.hashCode,
     facilityNameSnapshot.hashCode,
     professionalNameSnapshot.hashCode,
+    professionalRegistrationSnapshot.hashCode,
     source.hashCode,
+    voidedAt.hashCode,
+    voidReason.hashCode,
     notes.hashCode,
     vaccine.hashCode,
     batch.hashCode,
@@ -161,6 +206,14 @@ class GetAccessiblePatientVaccinationsApplications {
     if (legacyRecordId != null) {
       json['legacyRecordId'] = nativeToJson<String?>(legacyRecordId);
     }
+    json['patientIdSnapshot'] = nativeToJson<String>(patientIdSnapshot);
+    if (patientLegacyPersonIdSnapshot != null) {
+      json['patientLegacyPersonIdSnapshot'] = nativeToJson<String?>(
+        patientLegacyPersonIdSnapshot,
+      );
+    }
+    json['patientNameSnapshot'] = nativeToJson<String>(patientNameSnapshot);
+    json['vaccineNameSnapshot'] = nativeToJson<String>(vaccineNameSnapshot);
     json['applicationDate'] = applicationDate.toJson();
     if (nextDoseAt != null) {
       json['nextDoseAt'] = nextDoseAt!.toJson();
@@ -179,48 +232,66 @@ class GetAccessiblePatientVaccinationsApplications {
         manufacturerSnapshot,
       );
     }
-    if (facilityNameSnapshot != null) {
-      json['facilityNameSnapshot'] = nativeToJson<String?>(
-        facilityNameSnapshot,
-      );
-    }
-    if (professionalNameSnapshot != null) {
-      json['professionalNameSnapshot'] = nativeToJson<String?>(
-        professionalNameSnapshot,
+    json['facilityNameSnapshot'] = nativeToJson<String>(facilityNameSnapshot);
+    json['professionalNameSnapshot'] = nativeToJson<String>(
+      professionalNameSnapshot,
+    );
+    if (professionalRegistrationSnapshot != null) {
+      json['professionalRegistrationSnapshot'] = nativeToJson<String?>(
+        professionalRegistrationSnapshot,
       );
     }
     if (source != null) {
       json['source'] = nativeToJson<String?>(source);
     }
+    if (voidedAt != null) {
+      json['voidedAt'] = voidedAt!.toJson();
+    }
+    if (voidReason != null) {
+      json['voidReason'] = nativeToJson<String?>(voidReason);
+    }
     if (notes != null) {
       json['notes'] = nativeToJson<String?>(notes);
     }
-    json['vaccine'] = vaccine.toJson();
+    if (vaccine != null) {
+      json['vaccine'] = vaccine!.toJson();
+    }
     if (batch != null) {
       json['batch'] = batch!.toJson();
     }
-    json['professional'] = professional.toJson();
-    json['ubs'] = ubs.toJson();
+    if (professional != null) {
+      json['professional'] = professional!.toJson();
+    }
+    if (ubs != null) {
+      json['ubs'] = ubs!.toJson();
+    }
     return json;
   }
 
   GetAccessiblePatientVaccinationsApplications({
     required this.id,
     this.legacyRecordId,
+    required this.patientIdSnapshot,
+    this.patientLegacyPersonIdSnapshot,
+    required this.patientNameSnapshot,
+    required this.vaccineNameSnapshot,
     required this.applicationDate,
     this.nextDoseAt,
     this.doseNumber,
     this.doseLabel,
     this.lotSnapshot,
     this.manufacturerSnapshot,
-    this.facilityNameSnapshot,
-    this.professionalNameSnapshot,
+    required this.facilityNameSnapshot,
+    required this.professionalNameSnapshot,
+    this.professionalRegistrationSnapshot,
     this.source,
+    this.voidedAt,
+    this.voidReason,
     this.notes,
-    required this.vaccine,
+    this.vaccine,
     this.batch,
-    required this.professional,
-    required this.ubs,
+    this.professional,
+    this.ubs,
   });
 }
 

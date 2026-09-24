@@ -8,12 +8,11 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
-import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
@@ -53,9 +52,9 @@ class VaccinationCardScreen extends StatefulWidget {
 
 class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
   late final AuthRepository _authRepository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final VaccinationRepository _repository =
-      widget.vaccinationRepository ?? FirebaseVaccinationRepository();
+      widget.vaccinationRepository ?? DomainRepositoryFactory.vaccination();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
   final _searchController = TextEditingController();
