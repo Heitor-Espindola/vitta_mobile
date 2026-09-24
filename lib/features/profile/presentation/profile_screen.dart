@@ -2,10 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/core/validators/full_name_validator.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
@@ -25,7 +25,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late final AuthRepository _authRepository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
 
@@ -157,9 +157,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = _user;
     if (user == null) return;
 
-    final emailVerified = _authRepository is FirebaseAuthRepository
-        ? FirebaseAuth.instance.currentUser?.emailVerified
-        : null;
+    bool? emailVerified;
+    try {
+      emailVerified = FirebaseAuth.instance.currentUser?.emailVerified;
+    } on FirebaseException {
+      // Widget tests and injected repositories may run without Firebase setup.
+      emailVerified = null;
+    }
     _openPage(
       AccountSecurityScreen(
         email: user.email,

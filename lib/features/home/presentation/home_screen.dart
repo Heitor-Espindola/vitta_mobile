@@ -4,18 +4,16 @@ import 'package:share_plus/share_plus.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/app/routes.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
-import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
 import 'package:vitta_mobile/features/people/presentation/dependents_screen.dart';
 import 'package:vitta_mobile/features/people/presentation/family_screen.dart';
-import 'package:vitta_mobile/features/vaccination_card/data/repositories/firebase_vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
@@ -51,11 +49,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final AuthRepository _authRepository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final VaccinationRepository _vaccinationRepository =
-      widget.vaccinationRepository ?? FirebaseVaccinationRepository();
+      widget.vaccinationRepository ?? DomainRepositoryFactory.vaccination();
   late final PeopleRepository _peopleRepository =
-      widget.peopleRepository ?? FirebasePeopleRepository();
+      widget.peopleRepository ?? DomainRepositoryFactory.people();
   late final WalletSelectionController _wallet =
       widget.walletController ?? WalletSelectionController.instance;
   late final NotificationReadController _notificationReadController =

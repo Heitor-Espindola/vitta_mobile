@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/design_system.dart';
+import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/date_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
@@ -7,10 +8,8 @@ import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/core/validators/birth_date_validator.dart';
 import 'package:vitta_mobile/core/validators/cpf_validator.dart';
 import 'package:vitta_mobile/core/validators/full_name_validator.dart';
-import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
-import 'package:vitta_mobile/features/people/data/repositories/firebase_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
@@ -36,9 +35,9 @@ class _DependentsScreenState extends State<DependentsScreen> {
   final _birthDateController = TextEditingController();
   final _cpfController = TextEditingController();
   late final AuthRepository _authRepository =
-      widget.authRepository ?? FirebaseAuthRepository();
+      widget.authRepository ?? DomainRepositoryFactory.auth();
   late final PeopleRepository _peopleRepository =
-      widget.peopleRepository ?? FirebasePeopleRepository();
+      widget.peopleRepository ?? DomainRepositoryFactory.people();
   String _relationship = 'Filho(a)';
   bool _saving = false;
   String? _error;
