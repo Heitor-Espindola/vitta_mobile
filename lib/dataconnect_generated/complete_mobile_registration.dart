@@ -7,77 +7,46 @@ class CompleteMobileRegistrationVariablesBuilder {
   String cpf;
   Optional<String> _sex = Optional.optional(nativeFromJson, nativeToJson);
 
-  final FirebaseDataConnect _dataConnect;
-  CompleteMobileRegistrationVariablesBuilder sex(String? t) {
-    _sex.value = t;
-    return this;
+  final FirebaseDataConnect _dataConnect;  CompleteMobileRegistrationVariablesBuilder sex(String? t) {
+   _sex.value = t;
+   return this;
   }
 
-  CompleteMobileRegistrationVariablesBuilder(
-    this._dataConnect, {
-    required this.name,
-    required this.birthDate,
-    required this.email,
-    required this.cpf,
-  });
-  Deserializer<CompleteMobileRegistrationData> dataDeserializer =
-      (dynamic json) =>
-          CompleteMobileRegistrationData.fromJson(jsonDecode(json));
-  Serializer<CompleteMobileRegistrationVariables> varsSerializer =
-      (CompleteMobileRegistrationVariables vars) => jsonEncode(vars.toJson());
-  Future<
-    OperationResult<
-      CompleteMobileRegistrationData,
-      CompleteMobileRegistrationVariables
-    >
-  >
-  execute() {
+  CompleteMobileRegistrationVariablesBuilder(this._dataConnect, {required  this.name,required  this.birthDate,required  this.email,required  this.cpf,});
+  Deserializer<CompleteMobileRegistrationData> dataDeserializer = (dynamic json)  => CompleteMobileRegistrationData.fromJson(jsonDecode(json));
+  Serializer<CompleteMobileRegistrationVariables> varsSerializer = (CompleteMobileRegistrationVariables vars) => jsonEncode(vars.toJson());
+  Future<OperationResult<CompleteMobileRegistrationData, CompleteMobileRegistrationVariables>> execute() {
     return ref().execute();
   }
 
-  MutationRef<
-    CompleteMobileRegistrationData,
-    CompleteMobileRegistrationVariables
-  >
-  ref() {
-    CompleteMobileRegistrationVariables vars =
-        CompleteMobileRegistrationVariables(
-          name: name,
-          birthDate: birthDate,
-          email: email,
-          cpf: cpf,
-          sex: _sex,
-        );
-    return _dataConnect.mutation(
-      "CompleteMobileRegistration",
-      dataDeserializer,
-      varsSerializer,
-      vars,
-    );
+  MutationRef<CompleteMobileRegistrationData, CompleteMobileRegistrationVariables> ref() {
+    CompleteMobileRegistrationVariables vars= CompleteMobileRegistrationVariables(name: name,birthDate: birthDate,email: email,cpf: cpf,sex: _sex,);
+    return _dataConnect.mutation("CompleteMobileRegistration", dataDeserializer, varsSerializer, vars);
   }
 }
 
 @immutable
 class CompleteMobileRegistrationUserInsert {
   final String id;
-  CompleteMobileRegistrationUserInsert.fromJson(dynamic json)
-    : id = nativeFromJson<String>(json['id']);
+  CompleteMobileRegistrationUserInsert.fromJson(dynamic json):
+  
+  id = nativeFromJson<String>(json['id']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final CompleteMobileRegistrationUserInsert otherTyped =
-        other as CompleteMobileRegistrationUserInsert;
+    final CompleteMobileRegistrationUserInsert otherTyped = other as CompleteMobileRegistrationUserInsert;
     return id == otherTyped.id;
+    
   }
-
   @override
   int get hashCode => id.hashCode;
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -85,30 +54,33 @@ class CompleteMobileRegistrationUserInsert {
     return json;
   }
 
-  CompleteMobileRegistrationUserInsert({required this.id});
+  CompleteMobileRegistrationUserInsert({
+    required this.id,
+  });
 }
 
 @immutable
 class CompleteMobileRegistrationPatientInsert {
   final String id;
-  CompleteMobileRegistrationPatientInsert.fromJson(dynamic json)
-    : id = nativeFromJson<String>(json['id']);
+  CompleteMobileRegistrationPatientInsert.fromJson(dynamic json):
+  
+  id = nativeFromJson<String>(json['id']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final CompleteMobileRegistrationPatientInsert otherTyped =
-        other as CompleteMobileRegistrationPatientInsert;
+    final CompleteMobileRegistrationPatientInsert otherTyped = other as CompleteMobileRegistrationPatientInsert;
     return id == otherTyped.id;
+    
   }
-
   @override
   int get hashCode => id.hashCode;
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -116,34 +88,36 @@ class CompleteMobileRegistrationPatientInsert {
     return json;
   }
 
-  CompleteMobileRegistrationPatientInsert({required this.id});
+  CompleteMobileRegistrationPatientInsert({
+    required this.id,
+  });
 }
 
 @immutable
 class CompleteMobileRegistrationPatientAccessInsert {
   final String granteeAuthUid;
   final String patientId;
-  CompleteMobileRegistrationPatientAccessInsert.fromJson(dynamic json)
-    : granteeAuthUid = nativeFromJson<String>(json['granteeAuthUid']),
-      patientId = nativeFromJson<String>(json['patientId']);
+  CompleteMobileRegistrationPatientAccessInsert.fromJson(dynamic json):
+  
+  granteeAuthUid = nativeFromJson<String>(json['granteeAuthUid']),
+  patientId = nativeFromJson<String>(json['patientId']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final CompleteMobileRegistrationPatientAccessInsert otherTyped =
-        other as CompleteMobileRegistrationPatientAccessInsert;
-    return granteeAuthUid == otherTyped.granteeAuthUid &&
-        patientId == otherTyped.patientId;
+    final CompleteMobileRegistrationPatientAccessInsert otherTyped = other as CompleteMobileRegistrationPatientAccessInsert;
+    return granteeAuthUid == otherTyped.granteeAuthUid && 
+    patientId == otherTyped.patientId;
+    
   }
-
   @override
-  int get hashCode =>
-      Object.hashAll([granteeAuthUid.hashCode, patientId.hashCode]);
+  int get hashCode => Object.hashAll([granteeAuthUid.hashCode, patientId.hashCode]);
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -163,39 +137,29 @@ class CompleteMobileRegistrationData {
   final CompleteMobileRegistrationUserInsert user_insert;
   final CompleteMobileRegistrationPatientInsert patient_insert;
   final CompleteMobileRegistrationPatientAccessInsert patientAccess_insert;
-  CompleteMobileRegistrationData.fromJson(dynamic json)
-    : user_insert = CompleteMobileRegistrationUserInsert.fromJson(
-        json['user_insert'],
-      ),
-      patient_insert = CompleteMobileRegistrationPatientInsert.fromJson(
-        json['patient_insert'],
-      ),
-      patientAccess_insert =
-          CompleteMobileRegistrationPatientAccessInsert.fromJson(
-            json['patientAccess_insert'],
-          );
+  CompleteMobileRegistrationData.fromJson(dynamic json):
+  
+  user_insert = CompleteMobileRegistrationUserInsert.fromJson(json['user_insert']),
+  patient_insert = CompleteMobileRegistrationPatientInsert.fromJson(json['patient_insert']),
+  patientAccess_insert = CompleteMobileRegistrationPatientAccessInsert.fromJson(json['patientAccess_insert']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final CompleteMobileRegistrationData otherTyped =
-        other as CompleteMobileRegistrationData;
-    return user_insert == otherTyped.user_insert &&
-        patient_insert == otherTyped.patient_insert &&
-        patientAccess_insert == otherTyped.patientAccess_insert;
+    final CompleteMobileRegistrationData otherTyped = other as CompleteMobileRegistrationData;
+    return user_insert == otherTyped.user_insert && 
+    patient_insert == otherTyped.patient_insert && 
+    patientAccess_insert == otherTyped.patientAccess_insert;
+    
   }
-
   @override
-  int get hashCode => Object.hashAll([
-    user_insert.hashCode,
-    patient_insert.hashCode,
-    patientAccess_insert.hashCode,
-  ]);
+  int get hashCode => Object.hashAll([user_insert.hashCode, patient_insert.hashCode, patientAccess_insert.hashCode]);
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -218,46 +182,44 @@ class CompleteMobileRegistrationVariables {
   final DateTime birthDate;
   final String email;
   final String cpf;
-  late final Optional<String> sex;
-  @Deprecated(
-    'fromJson is deprecated for Variable classes as they are no longer required for deserialization.',
-  )
-  CompleteMobileRegistrationVariables.fromJson(Map<String, dynamic> json)
-    : name = nativeFromJson<String>(json['name']),
-      birthDate = nativeFromJson<DateTime>(json['birthDate']),
-      email = nativeFromJson<String>(json['email']),
-      cpf = nativeFromJson<String>(json['cpf']) {
+  late final Optional<String>sex;
+  @Deprecated('fromJson is deprecated for Variable classes as they are no longer required for deserialization.')
+  CompleteMobileRegistrationVariables.fromJson(Map<String, dynamic> json):
+  
+  name = nativeFromJson<String>(json['name']),
+  birthDate = nativeFromJson<DateTime>(json['birthDate']),
+  email = nativeFromJson<String>(json['email']),
+  cpf = nativeFromJson<String>(json['cpf']) {
+  
+  
+  
+  
+  
+  
     sex = Optional.optional(nativeFromJson, nativeToJson);
-    sex.value = json['sex'] == null
-        ? null
-        : nativeFromJson<String>(json['sex']);
+    sex.value = json['sex'] == null ? null : nativeFromJson<String>(json['sex']);
+  
   }
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final CompleteMobileRegistrationVariables otherTyped =
-        other as CompleteMobileRegistrationVariables;
-    return name == otherTyped.name &&
-        birthDate == otherTyped.birthDate &&
-        email == otherTyped.email &&
-        cpf == otherTyped.cpf &&
-        sex == otherTyped.sex;
+    final CompleteMobileRegistrationVariables otherTyped = other as CompleteMobileRegistrationVariables;
+    return name == otherTyped.name && 
+    birthDate == otherTyped.birthDate && 
+    email == otherTyped.email && 
+    cpf == otherTyped.cpf && 
+    sex == otherTyped.sex;
+    
   }
-
   @override
-  int get hashCode => Object.hashAll([
-    name.hashCode,
-    birthDate.hashCode,
-    email.hashCode,
-    cpf.hashCode,
-    sex.hashCode,
-  ]);
+  int get hashCode => Object.hashAll([name.hashCode, birthDate.hashCode, email.hashCode, cpf.hashCode, sex.hashCode]);
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -265,7 +227,7 @@ class CompleteMobileRegistrationVariables {
     json['birthDate'] = nativeToJson<DateTime>(birthDate);
     json['email'] = nativeToJson<String>(email);
     json['cpf'] = nativeToJson<String>(cpf);
-    if (sex.state == OptionalState.set) {
+    if(sex.state == OptionalState.set) {
       json['sex'] = sex.toJson();
     }
     return json;
@@ -279,3 +241,4 @@ class CompleteMobileRegistrationVariables {
     required this.sex,
   });
 }
+

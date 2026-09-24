@@ -1,24 +1,18 @@
 part of 'mobile_connector.dart';
 
 class GetMobileCurrentPersonVariablesBuilder {
+  
   final FirebaseDataConnect _dataConnect;
-  GetMobileCurrentPersonVariablesBuilder(this._dataConnect);
-  Deserializer<GetMobileCurrentPersonData> dataDeserializer = (dynamic json) =>
-      GetMobileCurrentPersonData.fromJson(jsonDecode(json));
-
-  Future<QueryResult<GetMobileCurrentPersonData, void>> execute({
-    QueryFetchPolicy fetchPolicy = QueryFetchPolicy.preferCache,
-  }) {
+  GetMobileCurrentPersonVariablesBuilder(this._dataConnect, );
+  Deserializer<GetMobileCurrentPersonData> dataDeserializer = (dynamic json)  => GetMobileCurrentPersonData.fromJson(jsonDecode(json));
+  
+  Future<QueryResult<GetMobileCurrentPersonData, void>> execute({QueryFetchPolicy fetchPolicy = QueryFetchPolicy.preferCache}) {
     return ref().execute(fetchPolicy: fetchPolicy);
   }
 
   QueryRef<GetMobileCurrentPersonData, void> ref() {
-    return _dataConnect.query(
-      "GetMobileCurrentPerson",
-      dataDeserializer,
-      emptySerializer,
-      null,
-    );
+    
+    return _dataConnect.query("GetMobileCurrentPerson", dataDeserializer, emptySerializer, null);
   }
 }
 
@@ -38,83 +32,51 @@ class GetMobileCurrentPersonUsers {
   final Timestamp? updatedAt;
   final Timestamp? lastLoginAt;
   final GetMobileCurrentPersonUsersPatientOnUser? patient_on_user;
-  GetMobileCurrentPersonUsers.fromJson(dynamic json)
-    : id = nativeFromJson<String>(json['id']),
-      name = nativeFromJson<String>(json['name']),
-      birthDate = nativeFromJson<DateTime>(json['birthDate']),
-      email = json['email'] == null
-          ? null
-          : nativeFromJson<String>(json['email']),
-      authUid = json['authUid'] == null
-          ? null
-          : nativeFromJson<String>(json['authUid']),
-      status = userStatusDeserializer(json['status']),
-      cpf = nativeFromJson<String>(json['cpf']),
-      sex = json['sex'] == null ? null : nativeFromJson<String>(json['sex']),
-      phone = json['phone'] == null
-          ? null
-          : nativeFromJson<String>(json['phone']),
-      photoUrl = json['photoUrl'] == null
-          ? null
-          : nativeFromJson<String>(json['photoUrl']),
-      createdAt = json['createdAt'] == null
-          ? null
-          : Timestamp.fromJson(json['createdAt']),
-      updatedAt = json['updatedAt'] == null
-          ? null
-          : Timestamp.fromJson(json['updatedAt']),
-      lastLoginAt = json['lastLoginAt'] == null
-          ? null
-          : Timestamp.fromJson(json['lastLoginAt']),
-      patient_on_user = json['patient_on_user'] == null
-          ? null
-          : GetMobileCurrentPersonUsersPatientOnUser.fromJson(
-              json['patient_on_user'],
-            );
+  GetMobileCurrentPersonUsers.fromJson(dynamic json):
+  
+  id = nativeFromJson<String>(json['id']),
+  name = nativeFromJson<String>(json['name']),
+  birthDate = nativeFromJson<DateTime>(json['birthDate']),
+  email = json['email'] == null ? null : nativeFromJson<String>(json['email']),
+  authUid = json['authUid'] == null ? null : nativeFromJson<String>(json['authUid']),
+  status = userStatusDeserializer(json['status']),
+  cpf = nativeFromJson<String>(json['cpf']),
+  sex = json['sex'] == null ? null : nativeFromJson<String>(json['sex']),
+  phone = json['phone'] == null ? null : nativeFromJson<String>(json['phone']),
+  photoUrl = json['photoUrl'] == null ? null : nativeFromJson<String>(json['photoUrl']),
+  createdAt = json['createdAt'] == null ? null : Timestamp.fromJson(json['createdAt']),
+  updatedAt = json['updatedAt'] == null ? null : Timestamp.fromJson(json['updatedAt']),
+  lastLoginAt = json['lastLoginAt'] == null ? null : Timestamp.fromJson(json['lastLoginAt']),
+  patient_on_user = json['patient_on_user'] == null ? null : GetMobileCurrentPersonUsersPatientOnUser.fromJson(json['patient_on_user']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetMobileCurrentPersonUsers otherTyped =
-        other as GetMobileCurrentPersonUsers;
-    return id == otherTyped.id &&
-        name == otherTyped.name &&
-        birthDate == otherTyped.birthDate &&
-        email == otherTyped.email &&
-        authUid == otherTyped.authUid &&
-        status == otherTyped.status &&
-        cpf == otherTyped.cpf &&
-        sex == otherTyped.sex &&
-        phone == otherTyped.phone &&
-        photoUrl == otherTyped.photoUrl &&
-        createdAt == otherTyped.createdAt &&
-        updatedAt == otherTyped.updatedAt &&
-        lastLoginAt == otherTyped.lastLoginAt &&
-        patient_on_user == otherTyped.patient_on_user;
+    final GetMobileCurrentPersonUsers otherTyped = other as GetMobileCurrentPersonUsers;
+    return id == otherTyped.id && 
+    name == otherTyped.name && 
+    birthDate == otherTyped.birthDate && 
+    email == otherTyped.email && 
+    authUid == otherTyped.authUid && 
+    status == otherTyped.status && 
+    cpf == otherTyped.cpf && 
+    sex == otherTyped.sex && 
+    phone == otherTyped.phone && 
+    photoUrl == otherTyped.photoUrl && 
+    createdAt == otherTyped.createdAt && 
+    updatedAt == otherTyped.updatedAt && 
+    lastLoginAt == otherTyped.lastLoginAt && 
+    patient_on_user == otherTyped.patient_on_user;
+    
   }
-
   @override
-  int get hashCode => Object.hashAll([
-    id.hashCode,
-    name.hashCode,
-    birthDate.hashCode,
-    email.hashCode,
-    authUid.hashCode,
-    status.hashCode,
-    cpf.hashCode,
-    sex.hashCode,
-    phone.hashCode,
-    photoUrl.hashCode,
-    createdAt.hashCode,
-    updatedAt.hashCode,
-    lastLoginAt.hashCode,
-    patient_on_user.hashCode,
-  ]);
+  int get hashCode => Object.hashAll([id.hashCode, name.hashCode, birthDate.hashCode, email.hashCode, authUid.hashCode, status.hashCode, cpf.hashCode, sex.hashCode, phone.hashCode, photoUrl.hashCode, createdAt.hashCode, updatedAt.hashCode, lastLoginAt.hashCode, patient_on_user.hashCode]);
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -127,7 +89,9 @@ class GetMobileCurrentPersonUsers {
     if (authUid != null) {
       json['authUid'] = nativeToJson<String?>(authUid);
     }
-    json['status'] = userStatusSerializer(status);
+    json['status'] = 
+    userStatusSerializer(status)
+    ;
     json['cpf'] = nativeToJson<String>(cpf);
     if (sex != null) {
       json['sex'] = nativeToJson<String?>(sex);
@@ -177,43 +141,39 @@ class GetMobileCurrentPersonUsersPatientOnUser {
   final bool active;
   final EnumValue<PatientType> patientType;
   final String? legacyPersonId;
-  GetMobileCurrentPersonUsersPatientOnUser.fromJson(dynamic json)
-    : id = nativeFromJson<String>(json['id']),
-      active = nativeFromJson<bool>(json['active']),
-      patientType = patientTypeDeserializer(json['patientType']),
-      legacyPersonId = json['legacyPersonId'] == null
-          ? null
-          : nativeFromJson<String>(json['legacyPersonId']);
+  GetMobileCurrentPersonUsersPatientOnUser.fromJson(dynamic json):
+  
+  id = nativeFromJson<String>(json['id']),
+  active = nativeFromJson<bool>(json['active']),
+  patientType = patientTypeDeserializer(json['patientType']),
+  legacyPersonId = json['legacyPersonId'] == null ? null : nativeFromJson<String>(json['legacyPersonId']);
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetMobileCurrentPersonUsersPatientOnUser otherTyped =
-        other as GetMobileCurrentPersonUsersPatientOnUser;
-    return id == otherTyped.id &&
-        active == otherTyped.active &&
-        patientType == otherTyped.patientType &&
-        legacyPersonId == otherTyped.legacyPersonId;
+    final GetMobileCurrentPersonUsersPatientOnUser otherTyped = other as GetMobileCurrentPersonUsersPatientOnUser;
+    return id == otherTyped.id && 
+    active == otherTyped.active && 
+    patientType == otherTyped.patientType && 
+    legacyPersonId == otherTyped.legacyPersonId;
+    
   }
-
   @override
-  int get hashCode => Object.hashAll([
-    id.hashCode,
-    active.hashCode,
-    patientType.hashCode,
-    legacyPersonId.hashCode,
-  ]);
+  int get hashCode => Object.hashAll([id.hashCode, active.hashCode, patientType.hashCode, legacyPersonId.hashCode]);
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
     json['id'] = nativeToJson<String>(id);
     json['active'] = nativeToJson<bool>(active);
-    json['patientType'] = patientTypeSerializer(patientType);
+    json['patientType'] = 
+    patientTypeSerializer(patientType)
+    ;
     if (legacyPersonId != null) {
       json['legacyPersonId'] = nativeToJson<String?>(legacyPersonId);
     }
@@ -231,26 +191,27 @@ class GetMobileCurrentPersonUsersPatientOnUser {
 @immutable
 class GetMobileCurrentPersonData {
   final List<GetMobileCurrentPersonUsers> users;
-  GetMobileCurrentPersonData.fromJson(dynamic json)
-    : users = (json['users'] as List<dynamic>)
-          .map((e) => GetMobileCurrentPersonUsers.fromJson(e))
-          .toList();
+  GetMobileCurrentPersonData.fromJson(dynamic json):
+  
+  users = (json['users'] as List<dynamic>)
+        .map((e) => GetMobileCurrentPersonUsers.fromJson(e))
+        .toList();
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) {
+    if(identical(this, other)) {
       return true;
     }
-    if (other.runtimeType != runtimeType) {
+    if(other.runtimeType != runtimeType) {
       return false;
     }
 
-    final GetMobileCurrentPersonData otherTyped =
-        other as GetMobileCurrentPersonData;
+    final GetMobileCurrentPersonData otherTyped = other as GetMobileCurrentPersonData;
     return users == otherTyped.users;
+    
   }
-
   @override
   int get hashCode => users.hashCode;
+  
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
@@ -258,5 +219,8 @@ class GetMobileCurrentPersonData {
     return json;
   }
 
-  GetMobileCurrentPersonData({required this.users});
+  GetMobileCurrentPersonData({
+    required this.users,
+  });
 }
+
