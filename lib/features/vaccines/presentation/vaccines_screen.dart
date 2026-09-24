@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/data/repositories/firebase_auth_repository.dart';
@@ -13,6 +14,7 @@ import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccines/domain/models/patient_vaccine_summary.dart';
+import 'package:vitta_mobile/features/vaccines/domain/models/vaccine_audience_guidance.dart';
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
@@ -623,31 +625,40 @@ class _VaccineDetailsScreen extends StatelessWidget {
                     icon: Icons.event_note_outlined,
                     title: 'Esquema de doses',
                     text:
-                        'O número de doses e os intervalos variam conforme a '
-                        'idade e o histórico vacinal. Consulte sua carteira e '
-                        'uma unidade de saúde.',
+                        'A quantidade de doses e o tempo entre elas dependem '
+                        'da sua idade e das vacinas que você já tomou. '
+                        'Leve sua carteira de vacinação ao posto de saúde '
+                        'para saber se falta alguma dose e quando tomar.',
                   ),
                   const _DetailSection(
                     icon: Icons.info_outline_rounded,
                     title: 'Possíveis reações',
                     text:
-                        'As reações podem variar. Consulte a equipe de saúde e '
-                        'as orientações fornecidas no momento da vacinação.',
+                        'Cada vacina pode causar reações diferentes. '
+                        'No momento da vacinação, pergunte quais reações '
+                        'podem acontecer e o que fazer se elas aparecerem.',
                   ),
                   const _DetailSection(
                     icon: Icons.local_hospital_outlined,
                     title: 'Quando procurar atendimento',
                     text:
-                        'Procure um serviço de saúde se houver sintomas '
-                        'intensos, persistentes ou qualquer preocupação após '
-                        'a vacinação.',
+                        'Procure atendimento se, depois da vacina, você '
+                        'sentir sintomas fortes ou que não melhoram. '
+                        'Se algo preocupar você, procure a equipe de saúde.',
                   ),
-                  const _DetailSection(
+                  _DetailSection(
                     icon: Icons.verified_outlined,
-                    title: 'Fonte oficial',
-                    text:
-                        'Ministério da Saúde — Calendário Nacional de '
-                        'Vacinação. Confirme sempre as recomendações vigentes.',
+                    title: item.audienceGuidance != null
+                        ? 'Fonte oficial'
+                        : 'Fonte das informações',
+                    text: item.audienceGuidance != null
+                        ? 'As idades recomendadas seguem o Calendário '
+                              'Nacional de Vacinação 2026 do Ministério '
+                              'da Saúde. Fontes consultadas em 23/09/2026.'
+                        : 'Esta informação veio do cadastro da vacina '
+                              'no aplicativo. Confirme no posto de saúde '
+                              'se você pode tomar essa vacina.',
+                    sourceUrl: item.audienceGuidance?.sourceUrl,
                     isLast: true,
                   ),
                 ],
@@ -718,13 +729,32 @@ class _DetailSection extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.text,
+    this.sourceUrl,
     this.isLast = false,
   });
 
   final IconData icon;
   final String title;
   final String text;
+  final String? sourceUrl;
   final bool isLast;
+
+  Future<void> _openSource(BuildContext context) async {
+    try {
+      if (await launchUrl(
+        Uri.parse(sourceUrl!),
+        mode: LaunchMode.externalApplication,
+      )) {
+        return;
+      }
+    } catch (_) {
+      // Keep the details readable if the platform cannot open a browser.
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Não foi possível abrir a fonte oficial.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -777,6 +807,11 @@ class _DetailSection extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
+                if (sourceUrl != null)
+                  TextButton(
+                    onPressed: () => _openSource(context),
+                    child: const Text('Consultar no Ministério da Saúde'),
+                  ),
               ],
             ),
           ),
@@ -815,17 +850,20 @@ class _VaccineItem {
     required this.title,
     required this.description,
     required this.category,
+    this.catalogVaccine,
   });
 
   final String title;
   final String description;
   final String category;
+  final Vaccine? catalogVaccine;
 
   factory _VaccineItem.fromVaccine(Vaccine vaccine) => _VaccineItem(
     title: vaccine.name,
     description:
         vaccine.description ?? 'Consulte as orientações oficiais desta vacina.',
     category: _categoryFor(vaccine),
+    catalogVaccine: vaccine,
   );
 
   Vaccine toVaccine() => Vaccine(
@@ -844,14 +882,22 @@ class _VaccineItem {
     _ => category,
   };
 
-  String get audienceDescription => switch (category) {
-    'Infantis' =>
-      'Crianças, conforme a faixa etária e o calendário de vacinação.',
-    'Juvenis' => 'Adolescentes, conforme a faixa etária e o histórico vacinal.',
-    'Gestantes' => 'Gestantes, após avaliação e orientação da equipe de saúde.',
-    'Idosos' => 'Pessoas idosas, conforme avaliação e recomendação de saúde.',
-    _ => 'Consulte uma unidade de saúde para orientação individual.',
-  };
+  VaccineAudienceGuidance? get audienceGuidance =>
+      VaccineAudienceGuidance.forVaccine(
+        catalogVaccine ?? toVaccine(),
+        category,
+      );
+
+  String get audienceDescription {
+    final guidance = audienceGuidance;
+    if (guidance != null) return guidance.description;
+    final registeredAge = catalogVaccine?.recommendedAge?.trim();
+    if (registeredAge != null && registeredAge.isNotEmpty) {
+      return registeredAge;
+    }
+    return 'Ainda não temos a idade recomendada para esta vacina. '
+        'Pergunte no posto de saúde quem pode tomá-la.';
+  }
 }
 
 String _categoryFor(Vaccine vaccine) {
