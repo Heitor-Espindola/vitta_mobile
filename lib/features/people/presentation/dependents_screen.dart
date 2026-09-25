@@ -97,7 +97,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: SafeArea(
       child: Column(
         children: [
@@ -117,13 +117,16 @@ class _DependentsScreenState extends State<DependentsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(AppSpacing.normal),
-            decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
-            child: const Row(
+            decoration: AppCardStyle.decoration(
+              context,
+              color: context.appPrimarySoft,
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.science_outlined, color: AppColors.primaryDark),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
+                Icon(Icons.science_outlined, color: context.appPrimaryInk),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(
                   child: Text(
                     'Versão acadêmica do Vitta. O familiar será vinculado imediatamente para uso no aplicativo; este fluxo não representa validação governamental.',
                     style: AppTypography.body,
@@ -135,7 +138,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
           const SizedBox(height: AppSpacing.normal),
           Container(
             padding: const EdgeInsets.all(AppSpacing.normal),
-            decoration: AppCardStyle.decoration(),
+            decoration: AppCardStyle.decoration(context),
             child: Form(
               key: _formKey,
               child: Column(

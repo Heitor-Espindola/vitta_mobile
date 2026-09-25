@@ -275,29 +275,31 @@ class _InformationHero extends StatelessWidget {
         width: width,
         padding: const EdgeInsets.fromLTRB(18, 17, 16, 16),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
+          gradient: LinearGradient(
+            colors: context.isDarkMode
+                ? const [Color(0xFF182B36), Color(0xFF12212A)]
+                : const [Color(0xFFEAF6FC), Color(0xFFF9FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Conteúdo',
                     style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Informações confiáveis para cuidar da sua vacinação.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: Color(0xFF496273),
+                      color: context.appTextSecondary,
                     ),
                   ),
                 ],
@@ -311,11 +313,11 @@ class _InformationHero extends StatelessWidget {
                 child: MuuniTimedPresence(frame: 9, size: 70),
               )
             else
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 22,
-                backgroundColor: Color(0xFFDDEFFC),
-                foregroundColor: AppColors.primaryDark,
-                child: Icon(Icons.menu_book_outlined, size: 22),
+                backgroundColor: context.appPrimarySoft,
+                foregroundColor: context.appPrimaryInk,
+                child: const Icon(Icons.menu_book_outlined, size: 22),
               ),
           ],
         ),

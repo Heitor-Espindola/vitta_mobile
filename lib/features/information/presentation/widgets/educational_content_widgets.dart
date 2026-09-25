@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/presentation/models/educational_content.dart';
-import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class EducationalContentCard extends StatelessWidget {
   const EducationalContentCard({
@@ -21,7 +21,7 @@ class EducationalContentCard extends StatelessWidget {
     if (!compact) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
@@ -53,7 +53,7 @@ class EducationalContentCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: vittaDarkBlue),
+                Icon(Icons.chevron_right_rounded, color: context.appPrimaryInk),
               ],
             ),
           ),
@@ -74,10 +74,12 @@ class EducationalContentCard extends StatelessWidget {
                 width: 108,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: content.color,
+                  color: _contentBackground(context, content.color),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: selected ? vittaDarkBlue : vittaLineBlue,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : context.appBorder,
                     width: selected ? 2 : 1,
                   ),
                 ),
@@ -118,12 +120,17 @@ class _ContentIcon extends StatelessWidget {
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: content.color,
+      color: _contentBackground(context, content.color),
       borderRadius: BorderRadius.circular(16),
     ),
     child: Icon(content.icon, color: content.iconColor, size: size * .55),
   );
 }
+
+Color _contentBackground(BuildContext context, Color lightColor) =>
+    context.isDarkMode
+    ? Color.lerp(Theme.of(context).colorScheme.surface, lightColor, .18)!
+    : lightColor;
 
 Future<bool?> showEducationalContent(
   BuildContext context,
@@ -146,9 +153,9 @@ class _EducationalContentSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.82,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
@@ -160,7 +167,7 @@ class _EducationalContentSheet extends StatelessWidget {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD5DDE2),
+                  color: context.appBorder,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -198,11 +205,11 @@ class _EducationalContentSheet extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 3),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
                       child: Icon(
                         Icons.check_circle_outline,
-                        color: vittaBlue,
+                        color: context.appPrimaryInk,
                         size: 19,
                       ),
                     ),
@@ -221,12 +228,12 @@ class _EducationalContentSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F7FA),
+                color: context.appPrimarySoft,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Text(
+              child: Text(
                 'Este conteúdo é educativo. Para orientações individuais, procure uma unidade de saúde.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF566D7A)),
+                style: TextStyle(fontSize: 11, color: context.appTextSecondary),
               ),
             ),
             const SizedBox(height: 20),

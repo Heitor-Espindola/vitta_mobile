@@ -120,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(AppRadius.large),
@@ -194,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: _isViewingDependent
-          ? DependentWalletColors.background
+          ? DependentWalletPalette.of(context).background
           : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: DependentWalletBackground(
@@ -213,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Perfil',
                       showBack: true,
                       backgroundColor: _isViewingDependent
-                          ? DependentWalletColors.sky
+                          ? DependentWalletPalette.of(context).sky
                           : null,
                     ),
                     Padding(
@@ -230,6 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.normal),
                             decoration: AppCardStyle.decoration(
+                              context,
                               color: Theme.of(context).colorScheme.surface,
                             ),
                             child: Row(
@@ -237,11 +238,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 CircleAvatar(
                                   radius: 24,
                                   backgroundColor: _isViewingDependent
-                                      ? DependentWalletColors.peach
-                                      : AppColors.primarySoft,
+                                      ? DependentWalletPalette.of(context).peach
+                                      : context.appPrimarySoft,
                                   foregroundColor: _isViewingDependent
-                                      ? DependentWalletColors.ink
-                                      : AppColors.primaryDark,
+                                      ? DependentWalletPalette.of(context).ink
+                                      : context.appPrimaryInk,
                                   child: Text(
                                     _initials(name),
                                     style: const TextStyle(
@@ -349,7 +350,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.danger,
                               minimumSize: const Size.fromHeight(42),
-                              side: const BorderSide(color: AppColors.border),
+                              side: BorderSide(color: context.appBorder),
                             ),
                           ),
                         ],
@@ -592,7 +593,7 @@ class _ProtectedDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(AppSpacing.md),
-    decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+    decoration: AppCardStyle.decoration(context, color: context.appPrimarySoft),
     child: Row(
       children: [
         Expanded(
@@ -605,10 +606,10 @@ class _ProtectedDetail extends StatelessWidget {
             ],
           ),
         ),
-        const Icon(
+        Icon(
           Icons.lock_outline_rounded,
           size: 18,
-          color: AppColors.primaryDark,
+          color: context.appPrimaryInk,
         ),
       ],
     ),
@@ -624,8 +625,8 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFF9A9A9A),
+      style: TextStyle(
+        color: context.appTextSecondary,
         fontSize: 13,
         letterSpacing: 2,
       ),
@@ -653,7 +654,7 @@ class _SettingsGroup extends StatelessWidget {
           for (var index = 0; index < children.length; index++) ...[
             children[index],
             if (index < children.length - 1)
-              const Divider(height: 1, color: AppColors.border),
+              Divider(height: 1, color: context.appBorder),
           ],
         ],
       ),

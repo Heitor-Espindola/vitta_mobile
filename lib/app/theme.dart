@@ -4,13 +4,14 @@ import 'package:vitta_mobile/app/design_system.dart';
 abstract final class AppTheme {
   static ThemeData get light {
     const seedColor = AppColors.primary;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: Brightness.light,
+    );
 
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: seedColor,
-        brightness: Brightness.light,
-      ),
+      colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
       appBarTheme: const AppBarTheme(
         centerTitle: false,
@@ -43,6 +44,20 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.card),
           borderSide: const BorderSide(color: AppColors.border),
         ),
+      ),
+      dividerTheme: const DividerThemeData(color: AppColors.border),
+      iconTheme: const IconThemeData(color: AppColors.textSecondary),
+      listTileTheme: const ListTileThemeData(
+        textColor: AppColors.text,
+        iconColor: AppColors.primaryDark,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
       ),
     );
   }
@@ -94,6 +109,25 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.card),
           borderSide: const BorderSide(color: Color(0xFF536873)),
         ),
+      ),
+      dividerTheme: const DividerThemeData(color: Color(0xFF354A55)),
+      iconTheme: IconThemeData(color: scheme.onSurface.withValues(alpha: .78)),
+      listTileTheme: ListTileThemeData(
+        tileColor: scheme.surface,
+        textColor: scheme.onSurface,
+        iconColor: scheme.primary,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Color(0xFF0F1B22),
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF253740),
+        contentTextStyle: TextStyle(color: scheme.onSurface),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/presentation/models/educational_content.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/educational_content_widgets.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
@@ -35,7 +36,7 @@ class _AllEducationalContentScreenState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF7FAFC),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(title: const Text('Conteúdos educativos')),
     body: SafeArea(
       top: false,
@@ -49,9 +50,9 @@ class _AllEducationalContentScreenState
             onClosed: () => setState(() => _searchTerm = ''),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Orientações gerais sobre vacinação, calendário e conservação da carteira.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF566D7A)),
+            style: TextStyle(fontSize: 12, color: context.appTextSecondary),
           ),
           const SizedBox(height: 16),
           if (_filteredContents.isEmpty)

@@ -407,6 +407,7 @@ class VittaSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 36,
       child: TextField(
@@ -423,14 +424,14 @@ class VittaSearchField extends StatelessWidget {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           filled: true,
-          fillColor: const Color(0xFFF4F8FB),
+          fillColor: scheme.surface,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: const BorderSide(color: vittaLineBlue),
+            borderSide: BorderSide(color: scheme.outline),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: const BorderSide(color: vittaDarkBlue, width: 1.3),
+            borderSide: BorderSide(color: scheme.primary, width: 1.3),
           ),
         ),
       ),
@@ -452,19 +453,20 @@ class VittaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 12 : 18,
         vertical: compact ? 6 : 8,
       ),
       decoration: BoxDecoration(
-        color: selected ? Colors.black : const Color(0xFFEFF4F7),
+        color: selected ? scheme.primary : scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: selected ? Colors.white : Colors.black,
+          color: selected ? scheme.onPrimary : scheme.onSurface,
           fontSize: compact ? 10 : 14,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ),
@@ -495,15 +497,15 @@ class SectionTitle extends StatelessWidget {
             style: TextStyle(
               fontSize: compact ? 16 : 20,
               fontWeight: FontWeight.w800,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ),
         if (action != null)
           Text(
             action!,
-            style: const TextStyle(
-              color: Color(0xFF123B91),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vitta_mobile/app/theme.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
@@ -133,6 +134,71 @@ void main() {
     expect(find.byKey(const Key('profile-dependent-theme')), findsOneWidget);
     expect(find.byType(MuuniSpriteFrame), findsNothing);
     expect(find.text('Editar'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dark theme uses a dark dependent palette on primary screens', (
+    tester,
+  ) async {
+    final wallet = _dependentWallet();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.dark,
+        home: InformationScreen(
+          newsRepository: _EmptyNewsRepository(),
+          walletController: wallet,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final informationHeader = tester.widget<Container>(
+      find.byKey(const Key('information-header-band')),
+    );
+    final informationGradient =
+        (informationHeader.decoration! as BoxDecoration).gradient!
+            as LinearGradient;
+    expect(informationGradient.colors.first, const Color(0xFF182B36));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.dark,
+        home: VaccinesScreen(
+          authRepository: _AuthFake(),
+          vaccinationRepository: _VaccinationFake(),
+          walletController: wallet,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final vaccinesHeader = tester.widget<Container>(
+      find.byKey(const Key('vaccines-header-band')),
+    );
+    final vaccinesGradient =
+        (vaccinesHeader.decoration! as BoxDecoration).gradient!
+            as LinearGradient;
+    expect(vaccinesGradient.colors.first, const Color(0xFF173442));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.dark,
+        home: ProfileScreen(
+          authRepository: _AuthFake(),
+          walletController: wallet,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).first).backgroundColor,
+      const Color(0xFF10232D),
+    );
     expect(tester.takeException(), isNull);
   });
 }

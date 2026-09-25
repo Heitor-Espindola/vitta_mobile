@@ -91,8 +91,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: _isViewingDependent
-        ? DependentWalletColors.background
-        : AppColors.background,
+        ? DependentWalletPalette.of(context).background
+        : Theme.of(context).scaffoldBackgroundColor,
     body: SafeArea(
       child: DependentWalletBackground(
         enabled: _isViewingDependent,
@@ -105,8 +105,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   : 'Atualizações da sua carteira',
               showBack: true,
               backgroundColor: _isViewingDependent
-                  ? DependentWalletColors.sky
-                  : AppColors.primarySoft,
+                  ? DependentWalletPalette.of(context).sky
+                  : context.appPrimarySoft,
             ),
             Expanded(child: _body()),
           ],
@@ -198,27 +198,28 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final (icon, color, background) = switch (item.kind) {
       VaccinationNotificationKind.overdue => (
         Icons.warning_amber_rounded,
         AppColors.danger,
-        const Color(0xFFFFEEEE),
+        dark ? const Color(0xFF46262A) : const Color(0xFFFFEEEE),
       ),
       VaccinationNotificationKind.upcoming => (
         Icons.event_outlined,
-        AppColors.primaryDark,
-        AppColors.primarySoft,
+        context.appPrimaryInk,
+        context.appPrimarySoft,
       ),
       VaccinationNotificationKind.applied => (
         Icons.check_circle_outline,
         AppColors.success,
-        const Color(0xFFEAF7F0),
+        dark ? const Color(0xFF18382C) : const Color(0xFFEAF7F0),
       ),
     };
     return Container(
       key: Key('notification-${item.id}'),
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: AppCardStyle.decoration(),
+      decoration: AppCardStyle.decoration(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -265,20 +266,20 @@ class _NotificationEmptyState extends StatelessWidget {
       key: const Key('notifications-empty-state'),
       margin: const EdgeInsets.all(AppSpacing.normal),
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: AppCardStyle.decoration(),
-      child: const Column(
+      decoration: AppCardStyle.decoration(context),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
             radius: 23,
-            backgroundColor: AppColors.primarySoft,
-            foregroundColor: AppColors.primaryDark,
-            child: Icon(Icons.check_rounded),
+            backgroundColor: context.appPrimarySoft,
+            foregroundColor: context.appPrimaryInk,
+            child: const Icon(Icons.check_rounded),
           ),
-          SizedBox(height: AppSpacing.md),
-          Text('Tudo certo por aqui', style: AppTypography.sectionTitle),
-          SizedBox(height: AppSpacing.xs),
-          Text(
+          const SizedBox(height: AppSpacing.md),
+          const Text('Tudo certo por aqui', style: AppTypography.sectionTitle),
+          const SizedBox(height: AppSpacing.xs),
+          const Text(
             'Você não possui notificações no momento.',
             textAlign: TextAlign.center,
             style: AppTypography.body,

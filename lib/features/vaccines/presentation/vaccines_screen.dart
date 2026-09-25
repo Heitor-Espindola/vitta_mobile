@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
@@ -17,10 +18,6 @@ import 'package:vitta_mobile/features/vaccines/domain/models/vaccine_audience_gu
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
-
-const _pageBackground = Color(0xFFF7F9FB);
-const _secondaryText = Color(0xFF455967);
-const _softBlue = Color(0xFFE2F0F9);
 
 class VaccinesScreen extends StatefulWidget {
   const VaccinesScreen({
@@ -170,7 +167,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
       body: DependentWalletBackground(
         enabled: isViewingDependent,
         child: ColoredBox(
-          color: isViewingDependent ? Colors.transparent : _pageBackground,
+          color: isViewingDependent
+              ? Colors.transparent
+              : Theme.of(context).scaffoldBackgroundColor,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             children: [
@@ -242,6 +241,7 @@ class _VaccinesHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final dependentPalette = DependentWalletPalette.of(context);
     return OverflowBox(
       maxWidth: width,
       fit: OverflowBoxFit.deferToChild,
@@ -252,7 +252,9 @@ class _VaccinesHeader extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: dependent
-                ? const [DependentWalletColors.sky, Color(0xFFFFF7E8)]
+                ? [dependentPalette.sky, dependentPalette.background]
+                : context.isDarkMode
+                ? const [Color(0xFF182B36), Color(0xFF12212A)]
                 : const [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -261,11 +263,11 @@ class _VaccinesHeader extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Vacinas',
                     style: TextStyle(
                       fontSize: 23,
@@ -274,13 +276,13 @@ class _VaccinesHeader extends StatelessWidget {
                       letterSpacing: -0.8,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Informações para cuidar de você e\nde quem você ama.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.4,
-                      color: _secondaryText,
+                      color: context.appTextSecondary,
                     ),
                   ),
                 ],
@@ -297,13 +299,13 @@ class _VaccinesHeader extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: const BoxDecoration(
-                  color: _softBlue,
+                decoration: BoxDecoration(
+                  color: context.appPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.vaccines_outlined,
-                  color: vittaDarkBlue,
+                  color: context.appPrimaryInk,
                   size: 22,
                 ),
               ),
@@ -358,13 +360,17 @@ class _CategorySelector extends StatelessWidget {
             showCheckmark: false,
             onSelected: (_) => onSelected(category),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-            backgroundColor: Colors.white,
-            selectedColor: vittaDarkBlue,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            selectedColor: Theme.of(context).colorScheme.primary,
             side: BorderSide(
-              color: isSelected ? vittaDarkBlue : const Color(0xFFDCE2E6),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : context.appBorder,
             ),
             labelStyle: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF263944),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
               fontSize: 15,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
@@ -386,7 +392,7 @@ class _EducationalCard extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     decoration: BoxDecoration(
-      color: const Color(0xFFDDEDF7),
+      color: context.appPrimarySoft,
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
@@ -395,35 +401,35 @@ class _EducationalCard extends StatelessWidget {
         Container(
           width: 38,
           height: 38,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF8FCFF),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.shield_outlined,
-            color: vittaDarkBlue,
+            color: context.appPrimaryInk,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Vacinar é proteger',
                 style: TextStyle(
-                  color: vittaDarkBlue,
+                  color: context.appPrimaryInk,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'As vacinas ajudam a prevenir doenças e reduzir complicações. '
                 'Consulte sempre informações de fontes oficiais.',
                 style: TextStyle(
-                  color: Color(0xFF314B5B),
+                  color: context.appTextSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),
@@ -444,7 +450,7 @@ class _VaccineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Colors.white,
+    color: Theme.of(context).colorScheme.surface,
     borderRadius: BorderRadius.circular(16),
     elevation: 0,
     shadowColor: const Color(0x180C527E),
@@ -460,10 +466,12 @@ class _VaccineCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF0F3F5)),
-          boxShadow: const [
+          border: Border.all(color: context.appBorder),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x0D0C527E),
+              color: context.isDarkMode
+                  ? Colors.black.withValues(alpha: .16)
+                  : const Color(0x0D0C527E),
               blurRadius: 12,
               offset: Offset(0, 4),
             ),
@@ -475,14 +483,14 @@ class _VaccineCard extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: _softBlue,
+              decoration: BoxDecoration(
+                color: context.appPrimarySoft,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.vaccines_outlined,
                 size: 20,
-                color: vittaDarkBlue,
+                color: context.appPrimaryInk,
               ),
             ),
             const SizedBox(width: 12),
@@ -503,9 +511,9 @@ class _VaccineCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
-                        color: Color(0xFF87959D),
+                        color: context.appTextSecondary,
                         size: 22,
                       ),
                     ],
@@ -515,10 +523,10 @@ class _VaccineCard extends StatelessWidget {
                     '${item.categoryLabel} · ${summary.latestRecord?.effectiveDoseLabel.isNotEmpty == true ? summary.latestRecord!.effectiveDoseLabel : 'Esquema vacinal'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.45,
-                      color: _secondaryText,
+                      color: context.appTextSecondary,
                     ),
                   ),
                   const SizedBox(height: 9),
@@ -549,9 +557,9 @@ class _VaccineCard extends StatelessWidget {
                             formatBrazilianDate(_statusDate(summary)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: _secondaryText,
+                              color: context.appTextSecondary,
                             ),
                           ),
                         ),
@@ -575,9 +583,9 @@ class _VaccineDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _pageBackground,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
-      backgroundColor: _pageBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       leading: IconButton(
@@ -673,7 +681,7 @@ class _VaccineDetailsHeader extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(26),
     decoration: BoxDecoration(
-      color: const Color(0xFFDDEDF7),
+      color: context.appPrimarySoft,
       borderRadius: BorderRadius.circular(30),
     ),
     child: Column(
@@ -682,13 +690,13 @@ class _VaccineDetailsHeader extends StatelessWidget {
         Container(
           width: 62,
           height: 62,
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.vaccines_outlined,
-            color: vittaDarkBlue,
+            color: context.appPrimaryInk,
             size: 30,
           ),
         ),
@@ -705,8 +713,8 @@ class _VaccineDetailsHeader extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           item.description,
-          style: const TextStyle(
-            color: _secondaryText,
+          style: TextStyle(
+            color: context.appTextSecondary,
             fontSize: 15,
             height: 1.45,
           ),
@@ -755,12 +763,14 @@ class _DetailSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF0F3F5)),
-        boxShadow: const [
+        border: Border.all(color: context.appBorder),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0A0C527E),
+            color: context.isDarkMode
+                ? Colors.black.withValues(alpha: .16)
+                : const Color(0x0A0C527E),
             blurRadius: 20,
             offset: Offset(0, 7),
           ),
@@ -772,11 +782,11 @@ class _DetailSection extends StatelessWidget {
           Container(
             width: 42,
             height: 42,
-            decoration: const BoxDecoration(
-              color: _softBlue,
+            decoration: BoxDecoration(
+              color: context.appPrimarySoft,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: vittaDarkBlue, size: 22),
+            child: Icon(icon, color: context.appPrimaryInk, size: 22),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -793,8 +803,8 @@ class _DetailSection extends StatelessWidget {
                 const SizedBox(height: 7),
                 Text(
                   text,
-                  style: const TextStyle(
-                    color: _secondaryText,
+                  style: TextStyle(
+                    color: context.appTextSecondary,
                     fontSize: 14,
                     height: 1.45,
                   ),
@@ -821,16 +831,20 @@ class _EmptyVaccines extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(30),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(28),
     ),
-    child: const Column(
+    child: Column(
       children: [
-        Icon(Icons.search_off_rounded, size: 42, color: Color(0xFF91A6B3)),
-        SizedBox(height: 12),
+        Icon(
+          Icons.search_off_rounded,
+          size: 42,
+          color: context.appTextSecondary,
+        ),
+        const SizedBox(height: 12),
         Text(
           'Nenhuma vacina encontrada.',
-          style: TextStyle(fontSize: 15, color: _secondaryText),
+          style: TextStyle(fontSize: 15, color: context.appTextSecondary),
         ),
       ],
     ),

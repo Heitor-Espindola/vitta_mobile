@@ -128,7 +128,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: SafeArea(
       child: Column(
         children: [
@@ -238,14 +238,15 @@ class _FamilyCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: AppCardStyle.decoration(
-            color: selected ? AppColors.primarySoft : AppColors.surface,
+            context,
+            color: selected ? context.appPrimarySoft : context.appSurface,
           ),
           child: Row(
             children: [
               CircleAvatar(
                 radius: 21,
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.primaryDark,
+                backgroundColor: context.appPrimarySoft,
+                foregroundColor: context.appPrimaryInk,
                 child: Text(_initials(name)),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -266,11 +267,11 @@ class _FamilyCard extends StatelessWidget {
                     ),
                     if (!member.isCurrent && !canOpen) ...[
                       const SizedBox(height: AppSpacing.xs),
-                      const Text(
+                      Text(
                         'Acesso indisponível para este vínculo',
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: context.appTextSecondary,
                         ),
                       ),
                     ],
@@ -282,8 +283,8 @@ class _FamilyCard extends StatelessWidget {
                     ? Icons.check_circle_rounded
                     : Icons.chevron_right_rounded,
                 color: selected
-                    ? AppColors.primaryDark
-                    : AppColors.textSecondary,
+                    ? context.appPrimaryInk
+                    : context.appTextSecondary,
               ),
             ],
           ),
@@ -304,14 +305,11 @@ class _FamilyMessage extends StatelessWidget {
     child: Container(
       margin: const EdgeInsets.all(AppSpacing.normal),
       padding: const EdgeInsets.all(AppSpacing.normal),
-      decoration: AppCardStyle.decoration(),
+      decoration: AppCardStyle.decoration(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.family_restroom_outlined,
-            color: AppColors.primaryDark,
-          ),
+          Icon(Icons.family_restroom_outlined, color: context.appPrimaryInk),
           const SizedBox(height: AppSpacing.sm),
           Text(message, textAlign: TextAlign.center, style: AppTypography.body),
           if (onRetry != null)

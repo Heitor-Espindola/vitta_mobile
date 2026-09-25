@@ -449,6 +449,7 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: AppCardStyle.decoration(
+        context,
         color: Theme.of(context).colorScheme.surface,
       ),
       child: Material(
@@ -460,7 +461,7 @@ class _DetailCard extends StatelessWidget {
             for (var index = 0; index < children.length; index++) ...[
               children[index],
               if (index < children.length - 1)
-                const Divider(height: 1, color: AppColors.border),
+                Divider(height: 1, color: context.appBorder),
             ],
           ],
         ),
@@ -489,7 +490,7 @@ class _DetailRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.primaryDark),
+          Icon(icon, size: 18, color: context.appPrimaryInk),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -517,11 +518,14 @@ class _NoticeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: AppCardStyle.decoration(color: AppColors.primarySoft),
+      decoration: AppCardStyle.decoration(
+        context,
+        color: context.appPrimarySoft,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.primaryDark),
+          Icon(icon, size: 18, color: context.appPrimaryInk),
           const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(text, style: AppTypography.caption)),
         ],
@@ -539,12 +543,12 @@ class _QuestionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       elevation: 1,
       shadowColor: const Color(0x0A173B50),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: context.appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
@@ -586,18 +590,18 @@ class _TextSection extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.normal),
-      decoration: AppCardStyle.decoration(),
+      decoration: AppCardStyle.decoration(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 42,
             height: 42,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySoft,
+            decoration: BoxDecoration(
+              color: context.appPrimarySoft,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 21, color: AppColors.primaryDark),
+            child: Icon(icon, size: 21, color: context.appPrimaryInk),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

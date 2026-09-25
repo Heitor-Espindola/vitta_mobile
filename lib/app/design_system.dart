@@ -34,37 +34,46 @@ abstract final class AppTypography {
     fontSize: 23,
     height: 1.15,
     fontWeight: FontWeight.w800,
-    color: AppColors.text,
   );
   static const sectionTitle = TextStyle(
     fontSize: 17,
     fontWeight: FontWeight.w800,
-    color: AppColors.text,
   );
-  static const body = TextStyle(
-    fontSize: 14,
-    height: 1.35,
-    color: AppColors.text,
-  );
-  static const caption = TextStyle(
-    fontSize: 11,
-    height: 1.3,
-    color: AppColors.textSecondary,
-  );
+  static const body = TextStyle(fontSize: 14, height: 1.35);
+  static const caption = TextStyle(fontSize: 11, height: 1.3);
 }
 
 abstract final class AppCardStyle {
-  static BoxDecoration decoration({Color color = AppColors.surface}) =>
+  static BoxDecoration decoration(BuildContext context, {Color? color}) =>
       BoxDecoration(
-        color: color,
+        color: color ?? Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [
+        border: Border.all(color: context.appBorder),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0A173B50),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: .18)
+                : const Color(0x0A173B50),
             blurRadius: 12,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       );
+}
+
+extension VittaThemeColors on BuildContext {
+  ThemeData get appTheme => Theme.of(this);
+  bool get isDarkMode => appTheme.brightness == Brightness.dark;
+  ColorScheme get appColorScheme => appTheme.colorScheme;
+  Color get appBackground => appTheme.scaffoldBackgroundColor;
+  Color get appSurface => appColorScheme.surface;
+  Color get appText => appColorScheme.onSurface;
+  Color get appTextSecondary => appColorScheme.onSurface.withValues(alpha: .7);
+  Color get appBorder =>
+      appColorScheme.outline.withValues(alpha: isDarkMode ? .72 : .28);
+  Color get appPrimarySoft => isDarkMode
+      ? appColorScheme.primary.withValues(alpha: .14)
+      : AppColors.primarySoft;
+  Color get appPrimaryInk =>
+      isDarkMode ? appColorScheme.primary : AppColors.primaryDark;
 }

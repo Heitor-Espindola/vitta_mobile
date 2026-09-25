@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/domain/models/news_article.dart';
-import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
 
 class NewsArticleCard extends StatelessWidget {
   const NewsArticleCard({
@@ -58,8 +58,8 @@ class NewsArticleCard extends StatelessWidget {
                           '${article.sourceName} · ${formatNewsDate(article.publishedAt)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: vittaDarkBlue,
+                          style: TextStyle(
+                            color: context.appPrimaryInk,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                           ),
@@ -74,10 +74,10 @@ class NewsArticleCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 5),
-                        const Text(
+                        Text(
                           'Ler notícia',
                           style: TextStyle(
-                            color: vittaDarkBlue,
+                            color: context.appPrimaryInk,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
@@ -92,10 +92,10 @@ class NewsArticleCard extends StatelessWidget {
         )
       : Card(
           margin: const EdgeInsets.only(bottom: 12),
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: vittaLineBlue),
+            side: BorderSide(color: context.appBorder),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -113,8 +113,8 @@ class NewsArticleCard extends StatelessWidget {
                           '${article.sourceName} · ${formatNewsDate(article.publishedAt)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: vittaBlue,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
@@ -139,21 +139,21 @@ class NewsArticleCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 8),
-                        const Row(
+                        Row(
                           children: [
                             Text(
                               'Ler notícia',
                               style: TextStyle(
-                                color: vittaDarkBlue,
+                                color: context.appPrimaryInk,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Icon(
                               Icons.open_in_new,
                               size: 13,
-                              color: vittaDarkBlue,
+                              color: context.appPrimaryInk,
                             ),
                           ],
                         ),
@@ -180,9 +180,9 @@ class _ArticleImage extends StatelessWidget {
       image: true,
       label: 'Imagem ilustrativa da notícia',
       child: Container(
-        color: const Color(0xFFE8F2F8),
+        color: context.appPrimarySoft,
         alignment: Alignment.center,
-        child: const Icon(Icons.newspaper, color: vittaDarkBlue, size: 30),
+        child: Icon(Icons.newspaper, color: context.appPrimaryInk, size: 30),
       ),
     );
     return ClipRRect(

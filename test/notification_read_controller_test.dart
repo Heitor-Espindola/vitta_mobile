@@ -14,6 +14,7 @@ void main() {
         message: 'BCG prevista para amanhã.',
         date: DateTime(2026, 9, 3),
       );
+      await controller.ensureLoaded('person-1');
 
       expect(
         controller.hasUnread(personId: 'person-1', notifications: [first]),
@@ -42,6 +43,7 @@ void main() {
         ),
         isTrue,
       );
+      await controller.ensureLoaded('person-2');
       expect(
         controller.hasUnread(personId: 'person-2', notifications: [first]),
         isTrue,

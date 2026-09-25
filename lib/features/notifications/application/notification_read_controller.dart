@@ -27,21 +27,41 @@ class NotificationReadController extends ChangeNotifier {
   }
 
   Future<void> _load(String personId) async {
-    final stored = await _storage?.getStringList(
-      'viewed_notifications_$personId',
-    );
-    _viewedByPerson
-        .putIfAbsent(personId, () => <String>{})
-        .addAll(stored ?? []);
-    _loadedPeople.add(personId);
-    _loadingPeople.remove(personId);
-    notifyListeners();
+    try {
+      final stored = await _storage?.getStringList(
+        'viewed_notifications_$personId',
+      );
+      final normalized = (stored ?? const <String>[])
+          .map(_normalizeStoredFingerprint)
+          .where((value) => value.isNotEmpty)
+          .toSet();
+      _viewedByPerson
+          .putIfAbsent(personId, () => <String>{})
+          .addAll(normalized);
+
+      // Persist the normalized representation once so installations that used
+      // the old date-based fingerprint are migrated transparently.
+      if (stored != null && !setEquals(stored.toSet(), normalized)) {
+        await _storage?.setStringList(
+          'viewed_notifications_$personId',
+          normalized.toList()..sort(),
+        );
+      }
+    } catch (_) {
+      // Notification state is best-effort and must never block app startup.
+    } finally {
+      _loadedPeople.add(personId);
+      _loadingPeople.remove(personId);
+      notifyListeners();
+    }
   }
 
   bool hasUnread({
     required String personId,
     required Iterable<VaccinationNotification> notifications,
   }) {
+    // Do not flash an unread badge while persisted state is still loading.
+    if (!_loadedPeople.contains(personId)) return false;
     final viewed = _viewedByPerson[personId] ?? const <String>{};
     return notifications.any(
       (notification) => !viewed.contains(_fingerprint(notification)),
@@ -60,13 +80,24 @@ class NotificationReadController extends ChangeNotifier {
     viewed.addAll(fingerprints);
     if (viewed.length != previousLength) {
       notifyListeners();
-      await _storage?.setStringList(
-        'viewed_notifications_$personId',
-        viewed.toList(),
-      );
+      try {
+        await _storage?.setStringList(
+          'viewed_notifications_$personId',
+          viewed.toList()..sort(),
+        );
+      } catch (_) {
+        // Keep the current session consistent even if local persistence fails.
+      }
     }
   }
 
   String _fingerprint(VaccinationNotification notification) =>
-      '${notification.kind.name}|${notification.id}|${notification.date.year}-${notification.date.month}-${notification.date.day}';
+      '${notification.kind.name}|${notification.id}';
+
+  String _normalizeStoredFingerprint(String value) {
+    final firstSeparator = value.indexOf('|');
+    if (firstSeparator < 0) return value;
+    final secondSeparator = value.indexOf('|', firstSeparator + 1);
+    return secondSeparator < 0 ? value : value.substring(0, secondSeparator);
+  }
 }

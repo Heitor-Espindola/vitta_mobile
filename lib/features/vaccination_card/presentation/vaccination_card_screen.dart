@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
@@ -348,6 +349,7 @@ class _VaccinationCardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final dependentPalette = DependentWalletPalette.of(context);
     return OverflowBox(
       maxWidth: width,
       fit: OverflowBoxFit.deferToChild,
@@ -358,21 +360,23 @@ class _VaccinationCardHeader extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: dependent
-                ? const [DependentWalletColors.sky, Color(0xFFF3FAFD)]
+                ? [dependentPalette.sky, dependentPalette.background]
+                : context.isDarkMode
+                ? const [Color(0xFF182B36), Color(0xFF12212A)]
                 : const [Color(0xFFE7F4FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: const Border(bottom: BorderSide(color: Color(0xFFDCEBF4))),
+          border: Border(bottom: BorderSide(color: context.appBorder)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Carteira',
                     style: TextStyle(
                       fontSize: 23,
@@ -381,13 +385,13 @@ class _VaccinationCardHeader extends StatelessWidget {
                       letterSpacing: -0.8,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Acompanhe aplicações e próximas doses\nde quem você cuida.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.4,
-                      color: Color(0xFF496273),
+                      color: context.appTextSecondary,
                     ),
                   ),
                 ],
@@ -403,13 +407,13 @@ class _VaccinationCardHeader extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDDEFFC),
+                decoration: BoxDecoration(
+                  color: context.appPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.article_outlined,
-                  color: vittaDarkBlue,
+                  color: context.appPrimaryInk,
                   size: 22,
                 ),
               ),
@@ -427,6 +431,7 @@ class _PersonHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dependentPalette = DependentWalletPalette.of(context);
     final name = _present(person?.name, 'Usuário');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -434,12 +439,12 @@ class _PersonHeader extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: isOwner ? vittaBlue : DependentWalletColors.peach,
-            foregroundColor: Colors.white,
+            backgroundColor: isOwner ? vittaBlue : dependentPalette.peach,
+            foregroundColor: isOwner ? Colors.white : dependentPalette.ink,
             child: Text(
               _initials(name),
               style: TextStyle(
-                color: isOwner ? Colors.white : DependentWalletColors.ink,
+                color: isOwner ? Colors.white : dependentPalette.ink,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -461,7 +466,7 @@ class _PersonHeader extends StatelessWidget {
                   isOwner
                       ? 'Minha carteira'
                       : _present(person?.relationshipToGuardian, 'Dependente'),
-                  style: const TextStyle(color: Color(0xFF54758A)),
+                  style: TextStyle(color: context.appTextSecondary),
                 ),
               ],
             ),
@@ -483,7 +488,7 @@ class _ModeSelector extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(4),
     decoration: BoxDecoration(
-      color: const Color(0xFFF1F6F9),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
@@ -534,7 +539,9 @@ class _ModeOption extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
+          color: selected
+              ? Theme.of(context).colorScheme.surface
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: selected
               ? const [
@@ -552,7 +559,9 @@ class _ModeOption extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: selected ? vittaBlue : const Color(0xFF638096),
+              color: selected
+                  ? context.appPrimaryInk
+                  : context.appTextSecondary,
             ),
             const SizedBox(width: 6),
             Flexible(
@@ -563,7 +572,9 @@ class _ModeOption extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: selected ? vittaDarkBlue : const Color(0xFF638096),
+                  color: selected
+                      ? context.appPrimaryInk
+                      : context.appTextSecondary,
                 ),
               ),
             ),
@@ -615,14 +626,14 @@ class _RecordCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.all(18),
-            decoration: _cardDecoration(Colors.white),
+            decoration: _cardDecoration(context),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -651,14 +662,14 @@ class _RecordCard extends StatelessWidget {
                       if (record.dose.trim().isNotEmpty)
                         Text(
                           record.dose,
-                          style: const TextStyle(color: Color(0xFF718096)),
+                          style: TextStyle(color: context.appTextSecondary),
                         ),
                       const SizedBox(height: 6),
                       Text(
                         '${occurrence.datePrefix} ${formatBrazilianDate(occurrence.date)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF54758A),
+                          color: context.appTextSecondary,
                         ),
                       ),
                     ],
@@ -728,7 +739,7 @@ class _DigitalBooklet extends StatelessWidget {
         Container(
           key: const Key('vitta-booklet-identity'),
           padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(Colors.white),
+          decoration: _cardDecoration(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -768,12 +779,12 @@ class _DigitalBooklet extends StatelessWidget {
               if (person?.birthDate != null)
                 Text(
                   'Nascimento: ${formatBrazilianDate(person!.birthDate)}',
-                  style: const TextStyle(color: Color(0xFF54758A)),
+                  style: TextStyle(color: context.appTextSecondary),
                 ),
               if ((person?.cpf ?? '').trim().isNotEmpty)
                 Text(
                   'CPF: ${_maskedCpf(person!.cpf!)}',
-                  style: const TextStyle(color: Color(0xFF54758A)),
+                  style: TextStyle(color: context.appTextSecondary),
                 ),
             ],
           ),
@@ -815,13 +826,13 @@ class _BookletGroup extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: vittaDarkBlue,
+            color: context.appPrimaryInk,
           ),
         ),
-        const Divider(height: 22, color: Color(0xFFDCE8F0)),
+        Divider(height: 22, color: context.appBorder),
         ...records.map(
           (record) => ListTile(
             contentPadding: EdgeInsets.zero,
@@ -887,9 +898,9 @@ class _VaccineDetails extends StatelessWidget {
       minChildSize: .55,
       maxChildSize: .96,
       builder: (context, controller) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: ListView(
           key: const Key('vaccination-detail-scroll'),
@@ -908,7 +919,7 @@ class _VaccineDetails extends StatelessWidget {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD3DAE0),
+                  color: context.appBorder,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -1003,13 +1014,13 @@ class _DetailRow extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 8),
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       children: [
         Expanded(
-          child: Text(label, style: const TextStyle(color: Color(0xFF718096))),
+          child: Text(label, style: TextStyle(color: context.appTextSecondary)),
         ),
         const SizedBox(width: 12),
         Flexible(
@@ -1038,7 +1049,7 @@ class _TextSection extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           text,
-          style: const TextStyle(height: 1.45, color: Color(0xFF4A5568)),
+          style: TextStyle(height: 1.45, color: context.appTextSecondary),
         ),
       ],
     ),
@@ -1062,7 +1073,7 @@ class _ListSection extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '• $value',
-              style: const TextStyle(height: 1.4, color: Color(0xFF4A5568)),
+              style: TextStyle(height: 1.4, color: context.appTextSecondary),
             ),
           ),
         ),
@@ -1105,7 +1116,14 @@ class _MessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
-    decoration: _cardDecoration(error ? const Color(0xFFFFF0F0) : Colors.white),
+    decoration: _cardDecoration(
+      context,
+      color: error
+          ? (context.isDarkMode
+                ? const Color(0xFF46262A)
+                : const Color(0xFFFFF0F0))
+          : null,
+    ),
     child: Row(
       children: [
         Icon(
@@ -1119,14 +1137,19 @@ class _MessageCard extends StatelessWidget {
   );
 }
 
-BoxDecoration _cardDecoration(Color color) => BoxDecoration(
-  color: color,
-  borderRadius: BorderRadius.circular(20),
-  border: Border.all(color: const Color(0xFFEDF1F4)),
-  boxShadow: const [
-    BoxShadow(color: Color(0x0C000000), blurRadius: 14, offset: Offset(0, 6)),
-  ],
-);
+BoxDecoration _cardDecoration(BuildContext context, {Color? color}) =>
+    BoxDecoration(
+      color: color ?? Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: context.appBorder),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0C000000),
+          blurRadius: 14,
+          offset: Offset(0, 6),
+        ),
+      ],
+    );
 
 bool _isDone(VaccinationRecord record) {
   return VaccinationRecordInsights.isApplied(record);

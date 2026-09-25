@@ -388,13 +388,15 @@ class _HomeHeader extends StatelessWidget {
         key: const Key('home-header-band'),
         width: width,
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
+            colors: context.isDarkMode
+                ? const [Color(0xFF182B36), Color(0xFF12212A)]
+                : const [Color(0xFFEAF6FC), Color(0xFFF8FBFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border(bottom: BorderSide(color: Color(0xFFE1EDF4))),
+          border: Border(bottom: BorderSide(color: context.appBorder)),
         ),
         child: Row(
           children: [
@@ -408,18 +410,21 @@ class _HomeHeader extends StatelessWidget {
                     'Olá, $name',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF718096),
+                      color: context.appTextSecondary,
                     ),
                   ),
-                  const Text(
+                  Text(
                     'Minha Carteira',
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                   ),
-                  const Text(
+                  Text(
                     'Digital de Vacinação',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.appTextSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -431,7 +436,7 @@ class _HomeHeader extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pushNamed(AppRoutes.notifications),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
                     shadowColor: const Color(0x25000000),
                     elevation: 2,
                   ),
@@ -477,87 +482,92 @@ class _SummaryCard extends StatelessWidget {
   final bool isDependent;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('home-summary-card'),
-    padding: const EdgeInsets.all(17),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: isDependent
-            ? const [Color(0xFF60B7DC), Color(0xFF4D93C5)]
-            : const [Color(0xFF3C9FE3), Color(0xFF267BB8)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('home-summary-card'),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDependent
+              ? const [Color(0xFF60B7DC), Color(0xFF4D93C5)]
+              : const [Color(0xFF3C9FE3), Color(0xFF267BB8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x383A92D3),
+            blurRadius: 22,
+            offset: Offset(0, 12),
+          ),
+        ],
       ),
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x383A92D3),
-          blurRadius: 22,
-          offset: Offset(0, 12),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '$appliedCount',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 38,
-            height: 1,
-            fontWeight: FontWeight.w900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '$appliedCount',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 38,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'vacinas aplicadas',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 5),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
-          child: Text(
-            message,
+          const SizedBox(height: 8),
+          const Text(
+            'vacinas aplicadas',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 11,
-              height: 1.35,
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const Key('share-wallet-button'),
-            onPressed: sharing ? null : onShare,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.72)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            ),
-            icon: sharing
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.ios_share_rounded, size: 18),
-            label: Text(
-              sharing ? 'Gerando caderneta...' : 'Compartilhar caderneta',
+          const SizedBox(height: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              message,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.82),
+                fontSize: 11,
+                height: 1.35,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('share-wallet-button'),
+              onPressed: sharing ? null : onShare,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.72)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+              ),
+              icon: sharing
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.ios_share_rounded, size: 18),
+              label: Text(
+                sharing ? 'Gerando caderneta...' : 'Compartilhar caderneta',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ViewingWalletBanner extends StatelessWidget {
@@ -570,43 +580,47 @@ class _ViewingWalletBanner extends StatelessWidget {
   final VoidCallback onReturn;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
-    decoration: AppCardStyle.decoration(
-      color: DependentWalletColors.peach,
-    ).copyWith(border: Border.all(color: DependentWalletColors.border)),
-    child: Row(
-      children: [
-        const MuuniTimedPresence(frame: 11, size: 44),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            'Visualizando: $personName',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: DependentWalletColors.ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+  Widget build(BuildContext context) {
+    final palette = DependentWalletPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+      decoration: AppCardStyle.decoration(
+        context,
+        color: palette.peach,
+      ).copyWith(border: Border.all(color: palette.border)),
+      child: Row(
+        children: [
+          const MuuniTimedPresence(frame: 11, size: 44),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Visualizando: $personName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: palette.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
-        OutlinedButton.icon(
-          key: const Key('return-to-own-wallet-button'),
-          onPressed: onReturn,
-          icon: const Icon(Icons.person_outline_rounded, size: 16),
-          label: const Text('Minha carteira'),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white.withValues(alpha: .88),
-            foregroundColor: AppColors.primaryDark,
-            side: const BorderSide(color: AppColors.primary),
-            minimumSize: const Size(0, 40),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+          OutlinedButton.icon(
+            key: const Key('return-to-own-wallet-button'),
+            onPressed: onReturn,
+            icon: const Icon(Icons.person_outline_rounded, size: 16),
+            label: const Text('Minha carteira'),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              foregroundColor: context.appPrimaryInk,
+              side: BorderSide(color: Theme.of(context).colorScheme.primary),
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _WalletsSection extends StatelessWidget {
@@ -719,10 +733,12 @@ class _WalletPersonCard extends StatelessWidget {
         width: 194,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: color,
+          color: context.isDarkMode ? context.appPrimarySoft : color,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.primary : Colors.white,
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : context.appBorder,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -730,8 +746,8 @@ class _WalletPersonCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: Colors.white.withValues(alpha: .88),
-              foregroundColor: vittaDarkBlue,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              foregroundColor: context.appPrimaryInk,
               child: Icon(icon, size: 22),
             ),
             const SizedBox(width: 10),
@@ -749,9 +765,9 @@ class _WalletPersonCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF426B86),
+                      color: context.appTextSecondary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -759,19 +775,19 @@ class _WalletPersonCard extends StatelessWidget {
                     detail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: vittaDarkBlue,
+                      color: context.appPrimaryInk,
                     ),
                   ),
                 ],
               ),
             ),
             if (selected)
-              const Icon(
+              Icon(
                 Icons.check_circle_rounded,
-                color: AppColors.primaryDark,
+                color: context.appPrimaryInk,
                 size: 18,
               ),
           ],
@@ -810,24 +826,24 @@ class _AddDependentCard extends StatelessWidget {
         width: 126,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: const Color(0xFF9AC8E4),
+            color: context.appBorder,
             style: BorderStyle.solid,
           ),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircleAvatar(
               radius: 15,
-              backgroundColor: Color(0xFFEAF5FC),
-              foregroundColor: vittaBlue,
-              child: Icon(Icons.add_rounded),
+              backgroundColor: context.appPrimarySoft,
+              foregroundColor: context.appPrimaryInk,
+              child: const Icon(Icons.add_rounded),
             ),
-            SizedBox(height: 4),
-            Text(
+            const SizedBox(height: 4),
+            const Text(
               'Adicionar\nfamiliar',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -884,10 +900,14 @@ class _UpcomingDoseCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: overdue ? const Color(0xFFFFEEEE) : Colors.white,
+      color: overdue
+          ? (context.isDarkMode
+                ? const Color(0xFF46262A)
+                : const Color(0xFFFFEEEE))
+          : Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(AppRadius.card),
       border: Border.all(
-        color: overdue ? const Color(0xFFFFD2D2) : const Color(0xFFE8EEF3),
+        color: overdue ? const Color(0xFFC9474E) : context.appBorder,
       ),
       boxShadow: const [
         BoxShadow(
@@ -913,7 +933,7 @@ class _UpcomingDoseCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 record.dose,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                style: TextStyle(fontSize: 11, color: context.appTextSecondary),
               ),
               const SizedBox(height: 8),
               Text(
@@ -924,7 +944,7 @@ class _UpcomingDoseCard extends StatelessWidget {
                   fontSize: 11,
                   color: overdue
                       ? const Color(0xFFC53D44)
-                      : const Color(0xFF426B86),
+                      : context.appPrimaryInk,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -950,17 +970,17 @@ class _RecentVaccineCard extends StatelessWidget {
     key: const Key('recent-vaccine-surface'),
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(15),
-    decoration: AppCardStyle.decoration(color: Colors.white),
+    decoration: AppCardStyle.decoration(context),
     child: Row(
       children: [
         Container(
           width: 42,
           height: 42,
-          decoration: const BoxDecoration(
-            color: Color(0xFFDDEFFC),
+          decoration: BoxDecoration(
+            color: context.appPrimarySoft,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.vaccines_outlined, color: vittaDarkBlue),
+          child: Icon(Icons.vaccines_outlined, color: context.appPrimaryInk),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -977,7 +997,7 @@ class _RecentVaccineCard extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 '${record.dose} • ${formatBrazilianDate(record.applicationDate)}',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+                style: TextStyle(fontSize: 10, color: context.appTextSecondary),
               ),
             ],
           ),
@@ -1002,18 +1022,18 @@ class _EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(AppSpacing.normal),
-    decoration: AppCardStyle.decoration(),
+    decoration: AppCardStyle.decoration(context),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 38,
           height: 38,
-          decoration: const BoxDecoration(
-            color: AppColors.primarySoft,
+          decoration: BoxDecoration(
+            color: context.appPrimarySoft,
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: AppColors.primaryDark, size: 20),
+          child: Icon(icon, color: context.appPrimaryInk, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1022,10 +1042,10 @@ class _EmptyCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.text,
+                  color: context.appText,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),

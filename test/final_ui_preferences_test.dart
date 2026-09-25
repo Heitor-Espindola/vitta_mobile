@@ -98,41 +98,61 @@ void main() {
     },
   );
 
-  test(
-    'read fingerprint survives recreation and a new date is unread',
-    () async {
-      final first = VaccinationNotification(
-        id: 'bcg',
-        kind: VaccinationNotificationKind.applied,
-        title: 'BCG',
-        message: 'Aplicação',
-        date: DateTime(2026, 9, 14),
-      );
-      final controller = NotificationReadController(storage: storage);
-      await controller.markAsViewed(personId: 'child', notifications: [first]);
-      final restarted = NotificationReadController(storage: storage);
-      await restarted.ensureLoaded('child');
-      expect(
-        restarted.hasUnread(personId: 'child', notifications: [first]),
-        isFalse,
-      );
-      expect(
-        restarted.hasUnread(personId: 'owner', notifications: [first]),
-        isTrue,
-      );
-      final changed = VaccinationNotification(
-        id: first.id,
-        kind: first.kind,
-        title: first.title,
-        message: first.message,
-        date: DateTime(2026, 9, 15),
-      );
-      expect(
-        restarted.hasUnread(personId: 'child', notifications: [changed]),
-        isTrue,
-      );
-    },
-  );
+  test('read fingerprint survives recreation and date recalculation', () async {
+    final first = VaccinationNotification(
+      id: 'bcg',
+      kind: VaccinationNotificationKind.applied,
+      title: 'BCG',
+      message: 'Aplicação',
+      date: DateTime(2026, 9, 14),
+    );
+    final controller = NotificationReadController(storage: storage);
+    await controller.markAsViewed(personId: 'child', notifications: [first]);
+    final restarted = NotificationReadController(storage: storage);
+    await restarted.ensureLoaded('child');
+    expect(
+      restarted.hasUnread(personId: 'child', notifications: [first]),
+      isFalse,
+    );
+    await restarted.ensureLoaded('owner');
+    expect(
+      restarted.hasUnread(personId: 'owner', notifications: [first]),
+      isTrue,
+    );
+    final changed = VaccinationNotification(
+      id: first.id,
+      kind: first.kind,
+      title: first.title,
+      message: first.message,
+      date: DateTime(2026, 9, 15),
+    );
+    expect(
+      restarted.hasUnread(personId: 'child', notifications: [changed]),
+      isFalse,
+    );
+  });
+
+  test('legacy dated notification fingerprints are migrated', () async {
+    await storage.setStringList('viewed_notifications_child', [
+      'upcoming|record-1|2026-9-14',
+    ]);
+    final notification = VaccinationNotification(
+      id: 'record-1',
+      kind: VaccinationNotificationKind.upcoming,
+      title: 'PrÃ³xima dose',
+      message: 'Dose prevista',
+      date: DateTime(2026, 9, 15),
+    );
+    final controller = NotificationReadController(storage: storage);
+    await controller.ensureLoaded('child');
+    expect(
+      controller.hasUnread(personId: 'child', notifications: [notification]),
+      isFalse,
+    );
+    expect(await storage.getStringList('viewed_notifications_child'), [
+      'upcoming|record-1',
+    ]);
+  });
 
   testWidgets('settings persists functional theme and typography controls', (
     tester,

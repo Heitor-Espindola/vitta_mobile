@@ -11,6 +11,54 @@ abstract final class DependentWalletColors {
   static const border = Color(0xFFCDE7F5);
 }
 
+class DependentWalletPalette {
+  const DependentWalletPalette({
+    required this.background,
+    required this.sky,
+    required this.mint,
+    required this.peach,
+    required this.lavender,
+    required this.ink,
+    required this.spot,
+    required this.border,
+  });
+
+  factory DependentWalletPalette.of(BuildContext context) {
+    if (Theme.of(context).brightness != Brightness.dark) {
+      return const DependentWalletPalette(
+        background: DependentWalletColors.background,
+        sky: DependentWalletColors.sky,
+        mint: DependentWalletColors.mint,
+        peach: DependentWalletColors.peach,
+        lavender: DependentWalletColors.lavender,
+        ink: DependentWalletColors.ink,
+        spot: DependentWalletColors.spot,
+        border: DependentWalletColors.border,
+      );
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return DependentWalletPalette(
+      background: const Color(0xFF10232D),
+      sky: const Color(0xFF173442),
+      mint: const Color(0xFF183A34),
+      peach: const Color(0xFF1A3545),
+      lavender: const Color(0xFF302B42),
+      ink: scheme.onSurface,
+      spot: scheme.primary,
+      border: const Color(0xFF31566A),
+    );
+  }
+
+  final Color background;
+  final Color sky;
+  final Color mint;
+  final Color peach;
+  final Color lavender;
+  final Color ink;
+  final Color spot;
+  final Color border;
+}
+
 class DependentWalletBackground extends StatelessWidget {
   const DependentWalletBackground({
     super.key,
@@ -24,12 +72,15 @@ class DependentWalletBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
+    final palette = DependentWalletPalette.of(context);
     return ColoredBox(
-      color: DependentWalletColors.background,
+      color: palette.background,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const IgnorePointer(child: CustomPaint(painter: _CowSpotsPainter())),
+          IgnorePointer(
+            child: CustomPaint(painter: _CowSpotsPainter(palette.spot)),
+          ),
           child,
         ],
       ),
@@ -38,12 +89,13 @@ class DependentWalletBackground extends StatelessWidget {
 }
 
 class _CowSpotsPainter extends CustomPainter {
-  const _CowSpotsPainter();
+  const _CowSpotsPainter(this.color);
+
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = DependentWalletColors.spot.withValues(alpha: .055);
+    final paint = Paint()..color = color.withValues(alpha: .055);
     canvas.drawOval(
       Rect.fromLTWH(-size.width * .12, size.height * .08, 118, 72),
       paint,
@@ -63,5 +115,6 @@ class _CowSpotsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CowSpotsPainter oldDelegate) =>
+      color != oldDelegate.color;
 }

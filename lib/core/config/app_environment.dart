@@ -18,7 +18,7 @@ abstract final class AppEnvironment {
 
   static const newsDataApiKey = String.fromEnvironment(
     'NEWSDATA_API_KEY',
-    defaultValue: '',
+    defaultValue: String.fromEnvironment('NEWS_DATA_API_KEY', defaultValue: ''),
   );
 
   static bool get hasNewsDataApiKey => newsDataApiKey.trim().isNotEmpty;

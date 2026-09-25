@@ -25,6 +25,7 @@ Future<void> main(List<String> arguments) async {
   final newsDataApiKey = _readSecret(
     root,
     environmentName: 'NEWS_DATA_API_KEY',
+    alternateEnvironmentName: 'NEWSDATA_API_KEY',
     fileName: 'news_data.json',
   );
   if (newsApiKey.isEmpty || newsDataApiKey.isEmpty) {
@@ -60,17 +61,24 @@ Future<void> main(List<String> arguments) async {
 String _readSecret(
   Directory root, {
   required String environmentName,
+  String? alternateEnvironmentName,
   required String fileName,
 }) {
-  final environmentValue = Platform.environment[environmentName]?.trim();
-  if (environmentValue?.isNotEmpty == true) return environmentValue!;
+  for (final name in [environmentName, ?alternateEnvironmentName]) {
+    final environmentValue = Platform.environment[name]?.trim();
+    if (environmentValue?.isNotEmpty == true) return environmentValue!;
+  }
   final file = File(
     '${root.path}${Platform.pathSeparator}config${Platform.pathSeparator}$fileName',
   );
   if (!file.existsSync()) return '';
   final decoded = jsonDecode(file.readAsStringSync());
   if (decoded is! Map<String, dynamic>) return '';
-  return (decoded[environmentName] as String?)?.trim() ?? '';
+  for (final name in [environmentName, ?alternateEnvironmentName]) {
+    final value = (decoded[name] as String?)?.trim();
+    if (value?.isNotEmpty == true) return value!;
+  }
+  return '';
 }
 
 Future<String> _firebaseAccessToken(Directory root) async {

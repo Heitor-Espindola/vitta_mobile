@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/features/information/presentation/controllers/news_controller.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_article_card.dart';
 import 'package:vitta_mobile/features/information/presentation/widgets/news_states.dart';
@@ -37,7 +38,7 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF7FAFC),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(title: const Text('Notícias e atualizações')),
     body: SafeArea(
       top: false,
@@ -67,9 +68,9 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
                   ),
                 ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Seleção editorial de notícias sobre vacinação. Consulte sempre os canais oficiais de saúde.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF566D7A)),
+                style: TextStyle(fontSize: 11, color: context.appTextSecondary),
               ),
               const SizedBox(height: 14),
               _body(),
