@@ -56,7 +56,25 @@ void main() {
     ], now: DateTime(2026, 9, 16)).single;
     expect(event.kind, VaccinationOccurrenceKind.overdue);
     expect(event.label, 'Atrasada');
-    expect(event.datePrefix, 'Dose prevista para');
+    expect(event.datePrefix, 'Próxima dose atrasada desde');
+  });
+
+  test('applied dose and its overdue next dose remain distinct events', () {
+    final record = VaccinationRecord(
+      id: 'covid-application',
+      vaccineName: 'COVID-19',
+      appliedAt: DateTime(2026, 9, 14),
+      nextDoseAt: DateTime(2026, 9, 15),
+    );
+    final occurrences = VaccinationOccurrence.fromRecords([
+      record,
+    ], now: DateTime(2026, 9, 16));
+
+    expect(occurrences, hasLength(2));
+    expect(occurrences.first.kind, VaccinationOccurrenceKind.applied);
+    expect(occurrences.first.label, 'Aplicada');
+    expect(occurrences.last.kind, VaccinationOccurrenceKind.overdue);
+    expect(occurrences.last.label, 'Atrasada');
   });
 
   test('family palette is blue for children and mint for teenagers', () {

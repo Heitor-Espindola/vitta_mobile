@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vitta_mobile/app/design_system.dart';
@@ -110,6 +112,7 @@ class AccountSecurityScreen extends StatefulWidget {
     this.emailVerified,
     this.sendVerificationEmail,
     this.reloadEmailVerified,
+    this.passwordResetCooldown = const Duration(seconds: 30),
   });
 
   final String email;
@@ -117,6 +120,7 @@ class AccountSecurityScreen extends StatefulWidget {
   final AuthRepository authRepository;
   final Future<void> Function()? sendVerificationEmail;
   final Future<bool?> Function()? reloadEmailVerified;
+  final Duration passwordResetCooldown;
 
   @override
   State<AccountSecurityScreen> createState() => _AccountSecurityScreenState();
@@ -126,11 +130,18 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   bool _sendingReset = false;
   bool _sendingVerification = false;
   bool? _verified;
+  Timer? _resetCooldownTimer;
 
   @override
   void initState() {
     super.initState();
     _verified = widget.emailVerified;
+  }
+
+  @override
+  void dispose() {
+    _resetCooldownTimer?.cancel();
+    super.dispose();
   }
 
   String get _verificationLabel => switch (_verified) {
@@ -143,16 +154,22 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
     if (_sendingReset) return;
 
     setState(() => _sendingReset = true);
+    var sent = false;
     try {
       await widget.authRepository.sendPasswordResetEmail(widget.email);
+      sent = true;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Instruções para redefinir sua senha foram enviadas para seu e-mail.',
+            'E-mail enviado. Aguarde alguns segundos antes de tentar novamente.',
           ),
         ),
       );
+      _resetCooldownTimer?.cancel();
+      _resetCooldownTimer = Timer(widget.passwordResetCooldown, () {
+        if (mounted) setState(() => _sendingReset = false);
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +180,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _sendingReset = false);
+      if (!sent && mounted) setState(() => _sendingReset = false);
     }
   }
 
@@ -370,11 +387,6 @@ class TermsPrivacyScreen extends StatelessWidget {
         title: 'Privacidade e LGPD',
         text:
             'O projeto adota privacidade, necessidade e controle de acesso como princípios alinhados à LGPD.',
-      ),
-      _NoticeCard(
-        icon: Icons.gavel_outlined,
-        text:
-            'Este conteúdo é um resumo informativo do projeto Vitta e não substitui termos jurídicos ou uma política de privacidade completa.',
       ),
     ],
   );

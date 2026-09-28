@@ -83,7 +83,11 @@ class EducationalContentCard extends StatelessWidget {
                     width: selected ? 2 : 1,
                   ),
                 ),
-                child: Icon(content.icon, size: 28, color: content.iconColor),
+                child: Icon(
+                  content.icon,
+                  size: 28,
+                  color: AppEducationalPalette.icon(context, content.iconColor),
+                ),
               ),
             ),
           ),
@@ -123,14 +127,16 @@ class _ContentIcon extends StatelessWidget {
       color: _contentBackground(context, content.color),
       borderRadius: BorderRadius.circular(16),
     ),
-    child: Icon(content.icon, color: content.iconColor, size: size * .55),
+    child: Icon(
+      content.icon,
+      color: AppEducationalPalette.icon(context, content.iconColor),
+      size: size * .55,
+    ),
   );
 }
 
 Color _contentBackground(BuildContext context, Color lightColor) =>
-    context.isDarkMode
-    ? Color.lerp(Theme.of(context).colorScheme.surface, lightColor, .18)!
-    : lightColor;
+    AppEducationalPalette.surface(context, lightColor);
 
 Future<bool?> showEducationalContent(
   BuildContext context,

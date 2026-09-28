@@ -621,25 +621,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Conteúdo includes additional life-stage guides', (tester) async {
+  testWidgets('Conteúdo keeps unique life-stage guides without duplication', (
+    tester,
+  ) async {
     final repository = ImmediateRepository(nextResponse([article('1')]));
     await tester.pumpWidget(
       MaterialApp(home: InformationScreen(newsRepository: repository)),
     );
     await tester.pumpAndSettle();
 
-    await tester.drag(
-      find
-          .byWidgetPredicate(
-            (widget) =>
-                widget is ListView && widget.scrollDirection == Axis.vertical,
-          )
-          .first,
-      const Offset(0, -650),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Guias para cada fase'), findsOneWidget);
-    expect(find.text('Vacinação na Gestação'), findsOneWidget);
+    expect(find.text('Guias para cada fase'), findsNothing);
     expect(
       educationalContents.map((content) => content.title),
       containsAll([
@@ -649,8 +640,17 @@ void main() {
         'Vacinação e Viagens',
       ]),
     );
-    await tester.ensureVisible(find.byKey(const Key('life-stage-content-0')));
-    await tester.tap(find.byKey(const Key('life-stage-content-0')));
+    await tester.tap(find.byKey(const Key('show-all-educational-content')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Vacinação na Gestação'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Vacinação na Gestação'), findsOneWidget);
+    await tester.ensureVisible(find.text('Vacinação na Gestação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vacinação na Gestação'));
     await tester.pumpAndSettle();
     expect(find.textContaining('protege a pessoa gestante'), findsWidgets);
     expect(tester.takeException(), isNull);

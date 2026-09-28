@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
+import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/core/validators/full_name_validator.dart';
@@ -111,6 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _editProfile(_ProfileSection section) async {
+    if (_isViewingDependent) return;
     final user = _user;
     if (user == null) {
       return;
@@ -183,10 +185,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = _user;
+    final accountOwner = _user;
+    final user = _isViewingDependent
+        ? (_wallet.selectedPerson ?? accountOwner)
+        : accountOwner;
     final name = _filled(user?.name, 'Usuário');
+    final ownerName = _filled(accountOwner?.name, 'responsável');
     final email = _filled(user?.email, 'E-mail não informado');
-    final cpf = _filled(user?.cpf, 'Não informado');
+    final cpf = _formattedCpf(user?.cpf);
     final phone = user?.phone?.trim();
     final birthDate = user?.birthDate == null
         ? 'Não informada'
@@ -264,7 +270,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 3),
-                                      Text(email, style: AppTypography.caption),
+                                      Text(
+                                        _isViewingDependent
+                                            ? 'Dependente selecionado'
+                                            : email,
+                                        style: AppTypography.caption,
+                                      ),
                                       const SizedBox(height: 2),
                                       Text(
                                         'CPF $cpf  •  Nascimento $birthDate',
@@ -277,7 +288,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.lg),
-                          const _Label('Conta'),
+                          _Label(
+                            _isViewingDependent
+                                ? 'Dados do dependente'
+                                : 'Conta',
+                          ),
                           const SizedBox(height: AppSpacing.sm),
                           _SettingsGroup(
                             children: [
@@ -285,17 +300,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 icon: Icons.person_outline,
                                 title: 'Dados pessoais',
                                 subtitle: 'Nascimento: $birthDate',
-                                onTap: () =>
-                                    _editProfile(_ProfileSection.personal),
+                                onTap: _isViewingDependent
+                                    ? null
+                                    : () => _editProfile(
+                                        _ProfileSection.personal,
+                                      ),
                               ),
                               _SettingsRow(
                                 icon: Icons.mail_outline,
                                 title: 'Contato',
-                                subtitle: phone == null || phone.isEmpty
+                                subtitle: _isViewingDependent
+                                    ? 'Somente leitura nesta versão'
+                                    : phone == null || phone.isEmpty
                                     ? email
                                     : '$email  •  $phone',
-                                onTap: () =>
-                                    _editProfile(_ProfileSection.contact),
+                                onTap: _isViewingDependent
+                                    ? null
+                                    : () =>
+                                          _editProfile(_ProfileSection.contact),
                               ),
                             ],
                           ),
@@ -320,7 +342,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _SettingsRow(
                                 icon: Icons.shield_outlined,
                                 title: 'Segurança da conta',
-                                subtitle: 'E-mail, senha e autenticação',
+                                subtitle: _isViewingDependent
+                                    ? 'Gerenciada pela conta de $ownerName'
+                                    : 'E-mail, senha e autenticação',
                                 onTap: _openSecurity,
                               ),
                             ],
@@ -711,7 +735,11 @@ class _SettingsRow extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+            Icon(
+              onTap == null ? Icons.lock_outline_rounded : Icons.chevron_right,
+              size: 16,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
@@ -730,4 +758,9 @@ String _initials(String name) {
 String _filled(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
+}
+
+String _formattedCpf(String? value) {
+  final digits = cpfDigitsOnly(value ?? '');
+  return digits.length == 11 ? formatCpf(digits) : 'Não informado';
 }

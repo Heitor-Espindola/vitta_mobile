@@ -197,25 +197,6 @@ class _InformationScreenState extends State<InformationScreen> {
             ),
             const SizedBox(height: 12),
             _newsBody(),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Guias para cada fase',
-              actionLabel: 'Ver todos ›',
-              onAction: _openAllEducationalContents,
-            ),
-            const SizedBox(height: 8),
-            ...List.generate(
-              educationalContents.length - _primaryEducationalContentCount,
-              (offset) {
-                final index = offset + _primaryEducationalContentCount;
-                return EducationalContentCard(
-                  key: Key('life-stage-content-$offset'),
-                  content: educationalContents[index],
-                  compact: false,
-                  onTap: () => _openEducationalContent(index),
-                );
-              },
-            ),
           ],
         ),
       ),

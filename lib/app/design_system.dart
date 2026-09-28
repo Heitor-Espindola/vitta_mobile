@@ -61,6 +61,21 @@ abstract final class AppCardStyle {
       );
 }
 
+abstract final class AppEducationalPalette {
+  static Color surface(BuildContext context, Color accent) {
+    if (!context.isDarkMode) return accent;
+    return Color.alphaBlend(
+      accent.withValues(alpha: .2),
+      Theme.of(context).colorScheme.surfaceContainerHigh,
+    );
+  }
+
+  static Color icon(BuildContext context, Color accent) {
+    if (!context.isDarkMode) return accent;
+    return Color.lerp(accent, Colors.white, .52)!;
+  }
+}
+
 extension VittaThemeColors on BuildContext {
   ThemeData get appTheme => Theme.of(this);
   bool get isDarkMode => appTheme.brightness == Brightness.dark;

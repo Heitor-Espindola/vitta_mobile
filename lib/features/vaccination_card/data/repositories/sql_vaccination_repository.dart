@@ -86,7 +86,7 @@ class SqlVaccinationRepository implements VaccinationRepository {
             manufacturer: row.manufacturerSnapshot ?? row.batch?.manufacturer,
             facilityId: row.ubs?.id,
             facilityName: row.facilityNameSnapshot,
-            professionalUid: row.professionalNameSnapshot,
+            professionalName: row.professionalNameSnapshot,
             notes: row.notes,
             source: row.source,
           ),

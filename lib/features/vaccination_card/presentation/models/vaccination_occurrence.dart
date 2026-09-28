@@ -25,7 +25,7 @@ class VaccinationOccurrence {
   String get datePrefix => switch (kind) {
     VaccinationOccurrenceKind.applied => 'Aplicada em',
     VaccinationOccurrenceKind.upcoming => 'Próxima dose em',
-    VaccinationOccurrenceKind.overdue => 'Dose prevista para',
+    VaccinationOccurrenceKind.overdue => 'Próxima dose atrasada desde',
   };
 
   static List<VaccinationOccurrence> fromRecords(

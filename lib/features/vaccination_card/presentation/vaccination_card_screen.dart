@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
+import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -18,8 +19,8 @@ import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccine.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
+import 'package:vitta_mobile/features/vaccination_card/application/vaccination_booklet_file_saver.dart';
 import 'package:vitta_mobile/features/vaccination_card/presentation/models/vaccination_occurrence.dart';
-import 'package:vitta_mobile/shared/widgets/vitta_logo.dart';
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
 import 'package:vitta_mobile/shared/widgets/vitta_mobile_shell.dart';
@@ -224,33 +225,63 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       final fileName = vaccinationBookletFileName();
       if (widget.shareBooklet != null) {
         await widget.shareBooklet!(bytes, fileName);
-      } else {
+      } else if (VaccinationBookletFileSaver.isDirectDownloadSupported) {
+        final savedPath = await VaccinationBookletFileSaver.saveToDownloads(
+          bytes: bytes,
+          fileName: fileName,
+        );
         if (!mounted) return;
-        final box = context.findRenderObject() as RenderBox?;
-        await SharePlus.instance.share(
-          ShareParams(
-            title: 'Carteira Digital de Vacinação',
-            subject: 'Carteira Digital de Vacinação — Vitta',
-            text: 'Carteira Digital de Vacinação gerada pelo Vitta.',
-            files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
-            fileNameOverrides: [fileName],
-            sharePositionOrigin: box == null
-                ? null
-                : box.localToGlobal(Offset.zero) & box.size,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo em $savedPath'),
+            duration: const Duration(seconds: 7),
+            action: SnackBarAction(
+              label: 'Compartilhar',
+              onPressed: () => unawaited(
+                _shareGeneratedBooklet(bytes: bytes, fileName: fileName),
+              ),
+            ),
           ),
         );
+      } else {
+        await _shareGeneratedBooklet(bytes: bytes, fileName: fileName);
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Não foi possível gerar a caderneta agora. Tente novamente.',
-          ),
-        ),
+        const SnackBar(content: Text('Não foi possível salvar sua caderneta.')),
       );
     } finally {
       if (mounted) setState(() => _sharingBooklet = false);
+    }
+  }
+
+  Future<void> _shareGeneratedBooklet({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    try {
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'Caderneta Digital de Vacinação',
+          subject: 'Caderneta Digital de Vacinação — Vitta',
+          text: 'Caderneta Digital de Vacinação gerada pelo Vitta.',
+          files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+          fileNameOverrides: [fileName],
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível abrir o compartilhamento.'),
+        ),
+      );
     }
   }
 
@@ -261,7 +292,7 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
 
   @override
   Widget build(BuildContext context) => VittaMobileShell(
-    title: 'Carteira',
+    title: 'Caderneta',
     currentTab: VittaTab.card,
     showTopBar: false,
     body: DependentWalletBackground(
@@ -272,12 +303,6 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
           children: [
             _VaccinationCardHeader(dependent: _isViewingDependent),
-            const SizedBox(height: 18),
-            _PersonHeader(
-              person: _person,
-              isOwner:
-                  _person?.effectivePersonId == _guardian?.effectivePersonId,
-            ),
             const SizedBox(height: 18),
             _ModeSelector(
               showBooklet: _showBooklet,
@@ -377,7 +402,7 @@ class _VaccinationCardHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Carteira',
+                    'Caderneta',
                     style: TextStyle(
                       fontSize: 23,
                       height: 1.05,
@@ -424,61 +449,6 @@ class _VaccinationCardHeader extends StatelessWidget {
   }
 }
 
-class _PersonHeader extends StatelessWidget {
-  const _PersonHeader({required this.person, required this.isOwner});
-  final AppUser? person;
-  final bool isOwner;
-
-  @override
-  Widget build(BuildContext context) {
-    final dependentPalette = DependentWalletPalette.of(context);
-    final name = _present(person?.name, 'Usuário');
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: isOwner ? vittaBlue : dependentPalette.peach,
-            foregroundColor: isOwner ? Colors.white : dependentPalette.ink,
-            child: Text(
-              _initials(name),
-              style: TextStyle(
-                color: isOwner ? Colors.white : dependentPalette.ink,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  isOwner
-                      ? 'Minha carteira'
-                      : _present(person?.relationshipToGuardian, 'Dependente'),
-                  style: TextStyle(color: context.appTextSecondary),
-                ),
-              ],
-            ),
-          ),
-          if (isOwner)
-            const Icon(Icons.verified_user_outlined, color: vittaBlue),
-        ],
-      ),
-    );
-  }
-}
-
 class _ModeSelector extends StatelessWidget {
   const _ModeSelector({required this.showBooklet, required this.onChanged});
   final bool showBooklet;
@@ -503,7 +473,7 @@ class _ModeSelector extends StatelessWidget {
         ),
         Expanded(
           child: _ModeOption(
-            label: 'Caderneta',
+            label: 'Histórico',
             icon: Icons.auto_stories_outlined,
             selected: showBooklet,
             onTap: () => onChanged(true),
@@ -727,73 +697,48 @@ class _DigitalBooklet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final validRecords =
+        records
+            .where(VaccinationRecordInsights.isApplied)
+            .toList(growable: false)
+          ..sort(
+            (a, b) => b.effectiveAppliedAt!.compareTo(a.effectiveAppliedAt!),
+          );
     final groups = <String, List<VaccinationRecord>>{};
-    for (final record in records) {
-      final date = record.applicationDate ?? record.nextDoseDate;
+    for (final record in validRecords) {
+      final date = record.applicationDate;
       final label = _ageLabel(person?.birthDate, date);
       groups.putIfAbsent(label, () => []).add(record);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          key: const Key('vitta-booklet-identity'),
-          padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(context),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const VittaLogo(
-                    size: 42,
-                    semanticLabel: 'Logo Vitta na caderneta',
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Carteira Digital de Vacinação',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: sharing ? null : onExport,
-                    tooltip: 'Compartilhar ou baixar caderneta',
-                    icon: sharing
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.ios_share_rounded),
-                  ),
-                ],
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Histórico de aplicações',
+                style: AppTypography.sectionTitle,
               ),
-              const Divider(height: 24),
-              Text(
-                _present(person?.name, 'Usuário'),
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              if (person?.birthDate != null)
-                Text(
-                  'Nascimento: ${formatBrazilianDate(person!.birthDate)}',
-                  style: TextStyle(color: context.appTextSecondary),
-                ),
-              if ((person?.cpf ?? '').trim().isNotEmpty)
-                Text(
-                  'CPF: ${_maskedCpf(person!.cpf!)}',
-                  style: TextStyle(color: context.appTextSecondary),
-                ),
-            ],
-          ),
+            ),
+            OutlinedButton.icon(
+              key: const Key('download-booklet-button'),
+              onPressed: sharing ? null : onExport,
+              icon: sharing
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded, size: 18),
+              label: Text(sharing ? 'Salvando...' : 'Baixar PDF'),
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
-        if (records.isEmpty)
+        const SizedBox(height: 14),
+        if (validRecords.isEmpty)
           const _MessageCard(
             message:
-                'Sua carteira ainda não possui aplicações registradas. Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
+                'Esta caderneta ainda não possui aplicações registradas. Quando um profissional registrar uma aplicação, ela aparecerá aqui.',
           )
         else
           ...groups.entries.map(
@@ -868,8 +813,12 @@ class _VaccineDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final professionalName = record.effectiveProfessionalName?.trim();
     final applicationFields = <MapEntry<String, String>>[
-      MapEntry('Situação', occurrence?.label ?? _statusLabel(record)),
+      MapEntry(
+        'Situação da aplicação',
+        record.applicationDate == null ? 'Não informada' : 'Aplicada',
+      ),
       if (record.dose.trim().isNotEmpty) MapEntry('Dose', record.dose),
       if (record.applicationDate != null)
         MapEntry(
@@ -878,21 +827,34 @@ class _VaccineDetails extends StatelessWidget {
         ),
       if (record.nextDoseDate != null)
         MapEntry('Próxima dose', formatBrazilianDate(record.nextDoseDate)),
+      if (record.nextDoseDate != null)
+        MapEntry(
+          'Status da próxima dose',
+          _nextDoseStatusLabel(record, occurrence: occurrence),
+        ),
       if ((record.batchNumber ?? '').trim().isNotEmpty)
         MapEntry('Lote', record.batchNumber!),
       if ((record.manufacturer ?? '').trim().isNotEmpty)
         MapEntry('Fabricante', record.manufacturer!),
       if ((record.healthUnit ?? '').trim().isNotEmpty)
         MapEntry('Unidade de saúde', record.healthUnit!),
-      if ((record.effectiveProfessionalUid ?? '').trim().isNotEmpty ||
-          record.source == 'professional_panel')
-        const MapEntry('Registro', 'Registrado pelo Portal Vitta'),
+      MapEntry(
+        'Profissional responsável',
+        professionalName == null || professionalName.isEmpty
+            ? 'Registrado pelo Portal Vitta'
+            : professionalName,
+      ),
       if ((record.notes ?? '').trim().isNotEmpty)
         MapEntry('Observação', record.notes!),
     ];
-    final occurrences = VaccinationOccurrence.fromRecords([record]);
-    final detailOccurrence =
-        occurrence ?? (occurrences.isEmpty ? null : occurrences.first);
+    final appliedAt = record.applicationDate;
+    final detailOccurrence = appliedAt == null
+        ? occurrence
+        : VaccinationOccurrence(
+            record: record,
+            kind: VaccinationOccurrenceKind.applied,
+            date: appliedAt,
+          );
     return DraggableScrollableSheet(
       initialChildSize: .88,
       minChildSize: .55,
@@ -1171,11 +1133,20 @@ Color _statusColor(VaccinationRecord record) {
   return const Color(0xFF718096);
 }
 
-String _statusLabel(VaccinationRecord record) {
-  if (_isDone(record)) return 'Aplicada';
-  if (_isLate(record)) return 'Atrasada';
-  if (_isPending(record)) return 'Próxima';
-  return 'Sem data';
+String _nextDoseStatusLabel(
+  VaccinationRecord record, {
+  VaccinationOccurrence? occurrence,
+}) {
+  if (occurrence?.kind == VaccinationOccurrenceKind.overdue) {
+    return 'Atrasada';
+  }
+  if (occurrence?.kind == VaccinationOccurrenceKind.upcoming) {
+    return 'Programada';
+  }
+  return VaccinationRecordInsights.situation(record) ==
+          VaccinationRecordSituation.overdue
+      ? 'Atrasada'
+      : 'Programada';
 }
 
 Color _occurrenceColor(VaccinationOccurrenceKind kind) => switch (kind) {
@@ -1187,21 +1158,6 @@ Color _occurrenceColor(VaccinationOccurrenceKind kind) => switch (kind) {
 String _present(String? value, String fallback) {
   final text = value?.trim();
   return text == null || text.isEmpty ? fallback : text;
-}
-
-String _maskedCpf(String value) {
-  final digits = value.replaceAll(RegExp(r'\D'), '');
-  if (digits.length != 11) return '***.***.***-**';
-  return '***.***.${digits.substring(6, 9)}-**';
-}
-
-String _initials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty);
-  final value = parts.take(2).map((part) => part[0]).join().toUpperCase();
-  return value.isEmpty ? 'U' : value;
 }
 
 String _ageLabel(DateTime? birthDate, DateTime? eventDate) {
@@ -1241,14 +1197,50 @@ String _scheduleText(Object? value) {
   return '';
 }
 
-String vaccinationBookletFileName() => 'carteira-digital-vitta.pdf';
+String vaccinationBookletFileName() => 'caderneta-digital-vitta.pdf';
+
+String vaccinationBookletFormattedCpf(String value) {
+  final digits = cpfDigitsOnly(value);
+  return digits.length == 11 ? formatCpf(digits) : value.trim();
+}
+
+List<VaccinationRecord> vaccinationBookletApplications(
+  Iterable<VaccinationRecord> records,
+) {
+  final applications = records
+      .where(VaccinationRecordInsights.isApplied)
+      .toList(growable: false);
+  applications.sort(
+    (a, b) => b.effectiveAppliedAt!.compareTo(a.effectiveAppliedAt!),
+  );
+  return applications;
+}
+
+List<List<String>> vaccinationBookletTableRows(
+  Iterable<VaccinationRecord> records,
+) => vaccinationBookletApplications(records)
+    .map(
+      (record) => <String>[
+        formatBrazilianDate(record.effectiveAppliedAt),
+        _present(record.vaccineName, 'Vacina'),
+        _present(record.effectiveDoseLabel, '—'),
+        _present(record.effectiveLot, '—'),
+        _present(record.manufacturer, '—'),
+        _present(record.effectiveFacilityName, '—'),
+        'Aplicada',
+      ],
+    )
+    .toList(growable: false);
 
 List<String> vaccinationBookletRecordDetails(VaccinationRecord record) => [
   if (record.dose.trim().isNotEmpty) 'Dose: ${record.dose}',
   if (record.applicationDate != null)
-    'Aplicada em ${formatBrazilianDate(record.applicationDate)}'
-  else if (record.nextDoseDate != null)
-    'Prevista para ${formatBrazilianDate(record.nextDoseDate)}',
+    'Aplicada em ${formatBrazilianDate(record.applicationDate)}',
+  if (record.nextDoseDate != null)
+    VaccinationRecordInsights.situation(record) ==
+            VaccinationRecordSituation.overdue
+        ? 'Próxima dose atrasada desde ${formatBrazilianDate(record.nextDoseDate)}'
+        : 'Próxima dose em ${formatBrazilianDate(record.nextDoseDate)}',
   if ((record.batchNumber ?? '').trim().isNotEmpty)
     'Lote: ${record.batchNumber!.trim()}',
   if ((record.manufacturer ?? '').trim().isNotEmpty)
@@ -1280,6 +1272,7 @@ Future<Uint8List> buildVaccinationBookletPdf({
   final logo = pw.MemoryImage(effectiveLogoBytes);
   final regularFont = pw.Font.ttf(regularFontData);
   final boldFont = pw.Font.ttf(boldFontData);
+  final tableRows = vaccinationBookletTableRows(records);
   final document = pw.Document();
   document.addPage(
     pw.MultiPage(
@@ -1296,7 +1289,7 @@ Future<Uint8List> buildVaccinationBookletPdf({
           ),
         ],
       ),
-      build: (_) => [
+      build: (context) => [
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
@@ -1315,7 +1308,7 @@ Future<Uint8List> buildVaccinationBookletPdf({
                     ),
                   ),
                   pw.Text(
-                    'Carteira Digital de Vacinação',
+                    'Caderneta Digital de Vacinação',
                     style: pw.TextStyle(
                       fontSize: 20,
                       fontWeight: pw.FontWeight.bold,
@@ -1349,7 +1342,7 @@ Future<Uint8List> buildVaccinationBookletPdf({
                   'Nascimento: ${formatBrazilianDate(person!.birthDate)}',
                 ),
               if ((person?.cpf ?? '').trim().isNotEmpty)
-                pw.Text('CPF: ${_maskedCpf(person!.cpf!)}'),
+                pw.Text('CPF: ${vaccinationBookletFormattedCpf(person!.cpf!)}'),
             ],
           ),
         ),
@@ -1359,41 +1352,50 @@ Future<Uint8List> buildVaccinationBookletPdf({
           style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 10),
-        if (records.isEmpty)
+        if (tableRows.isEmpty)
           pw.Text('Nenhum registro disponível.')
         else
-          ...records.map(
-            (record) => pw.Container(
-              width: double.infinity,
-              margin: const pw.EdgeInsets.only(bottom: 8),
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColor.fromHex('#DCE8F0')),
-                borderRadius: pw.BorderRadius.circular(8),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    _present(record.vaccineName, 'Vacina'),
-                    style: pw.TextStyle(
-                      fontSize: 11,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.SizedBox(height: 4),
-                  ...vaccinationBookletRecordDetails(record).map(
-                    (detail) => pw.Padding(
-                      padding: const pw.EdgeInsets.only(bottom: 2),
-                      child: pw.Text(
-                        detail,
-                        style: const pw.TextStyle(fontSize: 9),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          pw.TableHelper.fromTextArray(
+            context: context,
+            headers: const [
+              'Data',
+              'Vacina',
+              'Dose',
+              'Lote',
+              'Fabricante',
+              'Unidade',
+              'Situação',
+            ],
+            data: tableRows,
+            border: pw.TableBorder.all(
+              color: PdfColor.fromHex('#D3E1EA'),
+              width: .6,
             ),
+            headerDecoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#256B9B'),
+            ),
+            headerStyle: pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 7),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 5,
+            ),
+            oddRowDecoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#F4F9FC'),
+            ),
+            columnWidths: const {
+              0: pw.FixedColumnWidth(48),
+              1: pw.FlexColumnWidth(1.35),
+              2: pw.FlexColumnWidth(.8),
+              3: pw.FlexColumnWidth(.75),
+              4: pw.FlexColumnWidth(1.05),
+              5: pw.FlexColumnWidth(1.05),
+              6: pw.FixedColumnWidth(43),
+            },
           ),
         pw.SizedBox(height: 16),
         pw.Text(

@@ -6,6 +6,8 @@ import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.d
 import 'package:vitta_mobile/features/information/domain/models/news_response.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/information_screen.dart';
+import 'package:vitta_mobile/features/information/presentation/models/educational_content.dart';
+import 'package:vitta_mobile/features/information/presentation/widgets/educational_content_widgets.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/profile/presentation/profile_screen.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
@@ -134,6 +136,25 @@ void main() {
     expect(find.byKey(const Key('profile-dependent-theme')), findsOneWidget);
     expect(find.byType(MuuniSpriteFrame), findsNothing);
     expect(find.text('Editar'), findsNothing);
+    expect(find.text('Criança Teste'), findsOneWidget);
+    expect(
+      find.text('CPF 123.456.789-09  •  Nascimento 10/01/2020'),
+      findsOneWidget,
+    );
+    expect(find.text('Pessoa Titular'), findsNothing);
+    expect(
+      find.textContaining('Somente leitura nesta versão', findRichText: true),
+      findsOneWidget,
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -1000));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+        'Gerenciada pela conta de Pessoa Titular',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -201,6 +222,29 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('educational cards use the dark design-system palette', (
+    tester,
+  ) async {
+    final content = educationalContents.first;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.dark,
+        home: Scaffold(
+          body: EducationalContentCard(content: content, onTap: () {}),
+        ),
+      ),
+    );
+
+    final ink = tester.widget<Ink>(find.byType(Ink));
+    final decoration = ink.decoration! as BoxDecoration;
+    expect(decoration.color, isNot(content.color));
+    final icon = tester.widget<Icon>(find.byIcon(content.icon));
+    expect(icon.color, isNot(content.iconColor));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 WalletSelectionController _dependentWallet() {
@@ -219,13 +263,15 @@ const _owner = AppUser(
   role: 'responsible',
 );
 
-const _child = AppUser(
+final _child = AppUser(
   uid: 'child-person',
   personId: 'child-person',
   canAuthenticate: false,
   name: 'Criança Teste',
   email: '',
   role: 'dependent',
+  cpf: '12345678909',
+  birthDate: DateTime(2020, 1, 10),
   guardianIds: ['owner-person'],
 );
 

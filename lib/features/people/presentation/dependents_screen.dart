@@ -117,27 +117,6 @@ class _DependentsScreenState extends State<DependentsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(AppSpacing.normal),
-            decoration: AppCardStyle.decoration(
-              context,
-              color: context.appPrimarySoft,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.science_outlined, color: context.appPrimaryInk),
-                const SizedBox(width: AppSpacing.md),
-                const Expanded(
-                  child: Text(
-                    'Versão acadêmica do Vitta. O familiar será vinculado imediatamente para uso no aplicativo; este fluxo não representa validação governamental.',
-                    style: AppTypography.body,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.normal),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.normal),
             decoration: AppCardStyle.decoration(context),
             child: Form(
               key: _formKey,

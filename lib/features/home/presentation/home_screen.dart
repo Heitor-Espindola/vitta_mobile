@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:share_plus/share_plus.dart';
@@ -17,6 +20,7 @@ import 'package:vitta_mobile/features/people/presentation/family_screen.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/repositories/vaccination_repository.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/services/vaccination_record_insights.dart';
+import 'package:vitta_mobile/features/vaccination_card/application/vaccination_booklet_file_saver.dart';
 import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_card_screen.dart';
 import 'package:vitta_mobile/shared/widgets/dependent_wallet_theme.dart';
 import 'package:vitta_mobile/shared/widgets/muuni_sprite.dart';
@@ -148,33 +152,63 @@ class _HomeScreenState extends State<HomeScreen> {
       final fileName = vaccinationBookletFileName();
       if (widget.shareBooklet != null) {
         await widget.shareBooklet!(bytes, fileName);
-      } else {
+      } else if (VaccinationBookletFileSaver.isDirectDownloadSupported) {
+        final savedPath = await VaccinationBookletFileSaver.saveToDownloads(
+          bytes: bytes,
+          fileName: fileName,
+        );
         if (!mounted) return;
-        final box = context.findRenderObject() as RenderBox?;
-        await SharePlus.instance.share(
-          ShareParams(
-            title: 'Carteira Digital de Vacinação',
-            subject: 'Carteira Digital de Vacinação — Vitta',
-            text: 'Carteira Digital de Vacinação gerada pelo Vitta.',
-            files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
-            fileNameOverrides: [fileName],
-            sharePositionOrigin: box == null
-                ? null
-                : box.localToGlobal(Offset.zero) & box.size,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo em $savedPath'),
+            duration: const Duration(seconds: 7),
+            action: SnackBarAction(
+              label: 'Compartilhar',
+              onPressed: () => unawaited(
+                _shareGeneratedBooklet(bytes: bytes, fileName: fileName),
+              ),
+            ),
           ),
         );
+      } else {
+        await _shareGeneratedBooklet(bytes: bytes, fileName: fileName);
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Não foi possível gerar ou compartilhar sua caderneta.',
-          ),
-        ),
+        const SnackBar(content: Text('Não foi possível salvar sua caderneta.')),
       );
     } finally {
       if (mounted) setState(() => _sharingBooklet = false);
+    }
+  }
+
+  Future<void> _shareGeneratedBooklet({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    try {
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'Caderneta Digital de Vacinação',
+          subject: 'Caderneta Digital de Vacinação — Vitta',
+          text: 'Caderneta Digital de Vacinação gerada pelo Vitta.',
+          files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+          fileNameOverrides: [fileName],
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível abrir o compartilhamento.'),
+        ),
+      );
     }
   }
 
@@ -558,9 +592,9 @@ class _SummaryCard extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.ios_share_rounded, size: 18),
+                  : const Icon(Icons.download_rounded, size: 18),
               label: Text(
-                sharing ? 'Gerando caderneta...' : 'Compartilhar caderneta',
+                sharing ? 'Salvando caderneta...' : 'Baixar caderneta',
               ),
             ),
           ),

@@ -169,7 +169,7 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('share-wallet-button')));
       await tester.pumpAndSettle();
-      expect(sharedName, 'carteira-digital-vitta.pdf');
+      expect(sharedName, 'caderneta-digital-vitta.pdf');
       expect(String.fromCharCodes(sharedBytes!.take(5)), '%PDF-');
       expect(find.byType(SnackBar), findsNothing);
     },
@@ -191,10 +191,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('share-wallet-button')));
     await tester.pump();
-    expect(
-      find.text('Não foi possível gerar ou compartilhar sua caderneta.'),
-      findsOneWidget,
-    );
+    expect(find.text('Não foi possível salvar sua caderneta.'), findsOneWidget);
     expect(find.textContaining('StateError'), findsNothing);
   });
 

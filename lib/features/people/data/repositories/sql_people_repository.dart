@@ -26,6 +26,10 @@ class SqlPeopleRepository implements PeopleRepository {
     final result = await _connector.getAccessibleFamilyMembers().execute(
       fetchPolicy: QueryFetchPolicy.serverOnly,
     );
+    final relationshipsByPatientId = {
+      for (final relationship in result.data.directRelationships)
+        relationship.toPatient.id: relationship.relationshipType,
+    };
     final members = result.data.patientAccesses
         .map((access) {
           final patient = access.patient;
@@ -33,7 +37,10 @@ class SqlPeopleRepository implements PeopleRepository {
           final isCurrent =
               patient.id == currentPersonId ||
               access.accessKind.stringValue == dc.PatientAccessKind.SELF.name;
-          final relationshipLabel = _relationshipLabel(access.accessKind);
+          final relationshipType = relationshipsByPatientId[patient.id];
+          final relationshipLabel = relationshipLabelFromType(
+            relationshipType?.stringValue,
+          );
           final person = AppUser(
             uid: patient.id,
             personId: patient.id,
@@ -63,7 +70,7 @@ class SqlPeopleRepository implements PeopleRepository {
               id: pairId,
               fromPersonId: currentPersonId,
               toPersonId: patient.id,
-              type: _domainRelationshipType(access.accessKind),
+              type: _domainRelationshipType(relationshipType),
               status: RelationshipStatus.verified,
               permissions: RelationshipPermissions(
                 viewVaccination: true,
@@ -136,18 +143,23 @@ class SqlPeopleRepository implements PeopleRepository {
   }
 }
 
-String _relationshipLabel(dc.EnumValue<dc.PatientAccessKind> kind) =>
-    switch (kind.stringValue) {
-      'DEPENDENT' => 'Filho(a)',
+String relationshipLabelFromType(String? relationshipType) =>
+    switch (relationshipType) {
+      'MOTHER' => 'Mãe',
+      'FATHER' => 'Pai',
+      'LEGAL_GUARDIAN' => 'Filho(a)',
+      'TUTOR' => 'Responsável legal',
       'CAREGIVER' => 'Outro familiar',
-      'PROFESSIONAL' => 'Profissional',
-      _ => 'Familiar',
+      _ => 'Dependente',
     };
 
 RelationshipType _domainRelationshipType(
-  dc.EnumValue<dc.PatientAccessKind> kind,
-) => switch (kind.stringValue) {
-  'DEPENDENT' => RelationshipType.legalGuardian,
+  dc.EnumValue<dc.RelationshipType>? type,
+) => switch (type?.stringValue) {
+  'MOTHER' => RelationshipType.mother,
+  'FATHER' => RelationshipType.father,
+  'LEGAL_GUARDIAN' => RelationshipType.legalGuardian,
+  'TUTOR' => RelationshipType.tutor,
   _ => RelationshipType.caregiver,
 };
 

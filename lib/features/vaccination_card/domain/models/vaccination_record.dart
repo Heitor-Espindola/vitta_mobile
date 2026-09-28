@@ -20,6 +20,7 @@ class VaccinationRecord {
     this.manufacturer,
     this.facilityId,
     this.facilityName,
+    this.professionalName,
     this.professionalUid,
     this.notes,
     this.source,
@@ -65,6 +66,7 @@ class VaccinationRecord {
   final String? manufacturer;
   final String? facilityId;
   final String? facilityName;
+  final String? professionalName;
   final String? professionalUid;
   final String? notes;
   final String? source;
@@ -113,6 +115,9 @@ class VaccinationRecord {
       manufacturer: _nullableString(map['manufacturer']),
       facilityId: _nullableString(map['facilityId'] ?? map['healthUnitId']),
       facilityName: _nullableString(map['facilityName'] ?? map['healthUnit']),
+      professionalName: _nullableString(
+        map['professionalNameSnapshot'] ?? map['professionalName'],
+      ),
       professionalUid: _nullableString(
         map['professionalUid'] ??
             map['professionalId'] ??
@@ -153,6 +158,8 @@ class VaccinationRecord {
       if (manufacturer != null) 'manufacturer': manufacturer,
       if (effectiveFacilityId != null) 'facilityId': effectiveFacilityId,
       if (effectiveFacilityName != null) 'facilityName': effectiveFacilityName,
+      if (effectiveProfessionalName != null)
+        'professionalNameSnapshot': effectiveProfessionalName,
       if (effectiveProfessionalUid != null)
         'professionalUid': effectiveProfessionalUid,
       if (notes != null) 'notes': notes,
@@ -181,6 +188,7 @@ class VaccinationRecord {
   String? get effectiveLot => lot ?? _legacyBatchNumber;
   String? get effectiveFacilityId => facilityId ?? _legacyHealthUnitId;
   String? get effectiveFacilityName => facilityName ?? _legacyHealthUnit;
+  String? get effectiveProfessionalName => professionalName;
   String? get effectiveProfessionalUid =>
       professionalUid ??
       _legacyProfessionalId ??

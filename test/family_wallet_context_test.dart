@@ -5,6 +5,7 @@ import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.d
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
 import 'package:vitta_mobile/features/notifications/presentation/notifications_screen.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
+import 'package:vitta_mobile/features/people/data/repositories/sql_people_repository.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/models/relationship.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
@@ -17,6 +18,14 @@ import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_
 import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart';
 
 void main() {
+  test('family relationship labels come from relationshipType', () {
+    expect(relationshipLabelFromType('LEGAL_GUARDIAN'), 'Filho(a)');
+    expect(relationshipLabelFromType('MOTHER'), 'Mãe');
+    expect(relationshipLabelFromType('FATHER'), 'Pai');
+    expect(relationshipLabelFromType('TUTOR'), 'Responsável legal');
+    expect(relationshipLabelFromType('CAREGIVER'), 'Outro familiar');
+  });
+
   test('wallet selection starts at currentPersonId and returns to it', () {
     final controller = WalletSelectionController()..bindCurrentPerson(_owner);
 
@@ -120,7 +129,9 @@ void main() {
 
     expect(repository.requestedPersonId, 'child-person');
     expect(repository.requestedResponsibleId, 'owner-person');
-    expect(find.text('Criança Teste'), findsOneWidget);
+    expect(find.text('Caderneta'), findsWidgets);
+    expect(find.text('Histórico'), findsOneWidget);
+    expect(find.text('Minha carteira'), findsNothing);
     expect(find.text('BCG'), findsOneWidget);
     expect(
       find.byKey(const Key('vaccination-card-header-band')),
@@ -166,6 +177,7 @@ void main() {
             vaccineName: 'BCG',
             doseLabel: 'Dose única',
             appliedAt: DateTime(2026, 9, 14),
+            professionalName: 'Enfermeira Ana',
             professionalUid: uid,
             source: 'professional_panel',
             notes: 'Observação de teste',
@@ -191,7 +203,7 @@ void main() {
       await tester.tap(find.text('BCG').first);
       await tester.pumpAndSettle();
       expect(find.text(uid), findsNothing);
-      expect(find.text('Registrado pelo Portal Vitta'), findsOneWidget);
+      expect(find.text('Enfermeira Ana'), findsOneWidget);
       final audience = find.text('Público/faixa etária');
       await tester.dragUntilVisible(
         audience,
@@ -298,10 +310,55 @@ void main() {
       await tester.tap(find.text('Atrasadas'));
       await tester.pumpAndSettle();
       expect(find.text('Atrasada'), findsOneWidget);
-      expect(find.textContaining('Dose prevista para'), findsOneWidget);
+      expect(
+        find.textContaining('Próxima dose atrasada desde'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('application detail separates applied and overdue statuses', (
+    tester,
+  ) async {
+    final repository = _VaccinationFake(
+      records: [
+        VaccinationRecord(
+          id: 'covid-status',
+          patientId: 'owner-person',
+          vaccineName: 'COVID-19',
+          doseLabel: 'Reforço',
+          appliedAt: DateTime(2026, 9, 14),
+          nextDoseAt: DateTime(2026, 9, 15),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VaccinationCardScreen(
+          authRepository: _AuthFake(),
+          vaccinationRepository: repository,
+          walletController: WalletSelectionController()
+            ..bindCurrentPerson(_owner),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aplicada'), findsOneWidget);
+    expect(find.text('Atrasada'), findsOneWidget);
+    await tester.tap(find.text('Atrasada'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Situação da aplicação'), findsOneWidget);
+    expect(find.text('Data de aplicação'), findsOneWidget);
+    expect(find.text('14/09/2026'), findsOneWidget);
+    expect(find.text('Próxima dose'), findsOneWidget);
+    expect(find.text('15/09/2026'), findsOneWidget);
+    expect(find.text('Status da próxima dose'), findsOneWidget);
+    expect(find.text('Atrasada'), findsWidgets);
+    expect(find.text('Aplicada'), findsWidgets);
+  });
 
   testWidgets('Home summary has no check and recent records have a surface', (
     tester,
@@ -412,7 +469,7 @@ void main() {
 
     expect(repository.requestedPersonId, 'child-person');
     expect(repository.requestedResponsibleId, 'owner-person');
-    expect(find.text('Carteira Digital de Vacinação'), findsOneWidget);
+    expect(find.text('Histórico de aplicações'), findsOneWidget);
   });
 
   testWidgets(
@@ -460,8 +517,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Carteira Digital de Vacinação'), findsOneWidget);
-      expect(find.text('CPF: ***.***.789-**'), findsOneWidget);
+      expect(find.text('Histórico de aplicações'), findsOneWidget);
+      expect(find.text('CPF: ***.***.789-**'), findsNothing);
       expect(find.textContaining('Lote: LOTE-123'), findsOneWidget);
       expect(
         find.textContaining('Fabricante: Instituto Teste'),
@@ -472,9 +529,9 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byTooltip('Compartilhar ou baixar caderneta'));
+      await tester.tap(find.byKey(const Key('download-booklet-button')));
       await tester.pumpAndSettle();
-      expect(sharedName, 'carteira-digital-vitta.pdf');
+      expect(sharedName, 'caderneta-digital-vitta.pdf');
       expect(String.fromCharCodes(sharedBytes!.take(5)), '%PDF-');
 
       await tester.tap(find.text('Vacinas').first);
@@ -484,6 +541,119 @@ void main() {
         findsNothing,
       );
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Caderneta keeps every application of the same vaccine', (
+    tester,
+  ) async {
+    final records = [
+      VaccinationRecord(
+        id: 'bcg-dose-1',
+        patientId: 'owner-person',
+        vaccineName: 'BCG',
+        doseLabel: 'Dose 1',
+        appliedAt: DateTime(2026, 9, 14),
+        lot: 'L1',
+        manufacturer: 'Fabricante A',
+        facilityName: 'UBS A',
+        professionalName: 'Enfermeira Ana',
+        professionalUid: 'uid-tecnico-nao-visivel',
+      ),
+      VaccinationRecord(
+        id: 'bcg-dose-2',
+        patientId: 'owner-person',
+        vaccineName: 'BCG',
+        doseLabel: 'Dose 2',
+        appliedAt: DateTime(2026, 9, 20),
+        lot: 'L2',
+        manufacturer: 'Fabricante B',
+        facilityName: 'UBS B',
+        professionalName: 'Enfermeiro Bruno',
+        professionalUid: 'outro-uid-tecnico',
+      ),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VaccinationCardScreen(
+          authRepository: _AuthFake(),
+          vaccinationRepository: _VaccinationFake(records: records),
+          walletController: WalletSelectionController()
+            ..bindCurrentPerson(_owner),
+          initialShowBooklet: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('BCG'), findsNWidgets(2));
+    expect(find.textContaining('Aplicada em 20/09/2026'), findsOneWidget);
+    expect(find.textContaining('Aplicada em 14/09/2026'), findsOneWidget);
+
+    await tester.tap(find.text('BCG').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Data de aplicação'), findsOneWidget);
+    expect(find.text('20/09/2026'), findsOneWidget);
+    expect(find.text('Enfermeiro Bruno'), findsOneWidget);
+    expect(find.text('outro-uid-tecnico'), findsNothing);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('BCG').last);
+    await tester.pumpAndSettle();
+    expect(find.text('14/09/2026'), findsOneWidget);
+    expect(find.text('Enfermeira Ana'), findsOneWidget);
+    expect(find.text('uid-tecnico-nao-visivel'), findsNothing);
+  });
+
+  test(
+    'PDF table keeps all valid applications and full formatted CPF',
+    () async {
+      final records = [
+        VaccinationRecord(
+          id: 'older',
+          vaccineName: 'Vacina X',
+          doseLabel: 'Dose 1',
+          appliedAt: DateTime(2026, 9, 14),
+          lot: 'LOTE-1',
+          manufacturer: 'Fabricante 1',
+          facilityName: 'UBS 1',
+          professionalUid: 'uid-secreto-1',
+        ),
+        VaccinationRecord(
+          id: 'newer',
+          vaccineName: 'Vacina X',
+          doseLabel: 'Dose 2',
+          appliedAt: DateTime(2026, 9, 20),
+          lot: 'LOTE-2',
+          manufacturer: 'Fabricante 2',
+          facilityName: 'UBS 2',
+          professionalUid: 'uid-secreto-2',
+        ),
+      ];
+
+      expect(vaccinationBookletFormattedCpf('12345678909'), '123.456.789-09');
+      final rows = vaccinationBookletTableRows(records);
+      expect(rows, hasLength(2));
+      expect(rows.first, [
+        '20/09/2026',
+        'Vacina X',
+        'Dose 2',
+        'LOTE-2',
+        'Fabricante 2',
+        'UBS 2',
+        'Aplicada',
+      ]);
+      expect(rows.last.first, '14/09/2026');
+      expect(rows.expand((row) => row), isNot(contains('uid-secreto-1')));
+      expect(rows.expand((row) => row), isNot(contains('uid-secreto-2')));
+
+      final pdf = await buildVaccinationBookletPdf(
+        person: _owner.copyWith(cpf: '12345678909'),
+        records: records,
+        generatedAt: DateTime(2026, 9, 27),
+      );
+      expect(String.fromCharCodes(pdf.take(5)), '%PDF-');
     },
   );
 

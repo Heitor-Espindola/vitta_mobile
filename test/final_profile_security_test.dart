@@ -84,12 +84,43 @@ void main() {
       expect(repository.resetEmail, 'pessoa@example.com');
       expect(
         find.text(
-          'Instruções para redefinir sua senha foram enviadas para seu e-mail.',
+          'E-mail enviado. Aguarde alguns segundos antes de tentar novamente.',
         ),
         findsOneWidget,
       );
     },
   );
+
+  testWidgets('password reset remains disabled after a successful tap', (
+    tester,
+  ) async {
+    final repository = _AuthFake();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AccountSecurityScreen(
+          email: 'pessoa@example.com',
+          authRepository: repository,
+          emailVerified: true,
+          passwordResetCooldown: const Duration(milliseconds: 100),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Redefinir senha'));
+    await tester.pump();
+    expect(repository.resetCalls, 1);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+
+    await tester.pump(const Duration(milliseconds: 101));
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNotNull,
+    );
+  });
 
   testWidgets(
     'help, terms and security remain scrollable with Android system bar',
@@ -127,9 +158,11 @@ void main() {
 
 class _AuthFake implements AuthRepository {
   String? resetEmail;
+  int resetCalls = 0;
   @override
   Future<void> sendPasswordResetEmail(String email) async {
     resetEmail = email;
+    resetCalls++;
   }
 
   @override

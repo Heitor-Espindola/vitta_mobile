@@ -5,15 +5,24 @@ import 'package:vitta_mobile/features/auth/domain/validators/gmail_validator.dar
 import 'package:vitta_mobile/features/auth/presentation/auth_error_mapper.dart';
 
 class PasswordResetController extends ChangeNotifier {
-  PasswordResetController(this._authRepository);
+  PasswordResetController(
+    this._authRepository, {
+    this.cooldown = const Duration(seconds: 30),
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final AuthRepository _authRepository;
+  final Duration cooldown;
+  final DateTime Function() _now;
 
   bool isLoading = false;
   String? lastError;
+  DateTime? _cooldownUntil;
+
+  bool get isCoolingDown => _cooldownUntil?.isAfter(_now()) ?? false;
 
   Future<bool> sendPasswordReset(String email) async {
-    if (isLoading) return false;
+    if (isLoading || isCoolingDown) return false;
 
     final validationError = validateGmail(email);
     if (validationError != null) {
@@ -27,10 +36,14 @@ class PasswordResetController extends ChangeNotifier {
     notifyListeners();
     try {
       await _authRepository.sendPasswordResetEmail(normalizeEmail(email));
+      _cooldownUntil = _now().add(cooldown);
       return true;
     } on FirebaseAuthException catch (error) {
       // A resposta permanece neutra para não revelar contas cadastradas.
-      if (error.code == 'user-not-found') return true;
+      if (error.code == 'user-not-found') {
+        _cooldownUntil = _now().add(cooldown);
+        return true;
+      }
       lastError = mapPasswordResetError(error);
       return false;
     } catch (error) {

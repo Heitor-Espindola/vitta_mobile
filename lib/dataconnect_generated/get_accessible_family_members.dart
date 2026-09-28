@@ -239,11 +239,88 @@ class GetAccessibleFamilyMembersPatientAccessesPatientUser {
 }
 
 @immutable
+class GetAccessibleFamilyMembersDirectRelationships {
+  final EnumValue<RelationshipType> relationshipType;
+  final GetAccessibleFamilyMembersDirectRelationshipsToPatient toPatient;
+  GetAccessibleFamilyMembersDirectRelationships.fromJson(dynamic json)
+    : relationshipType = relationshipTypeDeserializer(json['relationshipType']),
+      toPatient =
+          GetAccessibleFamilyMembersDirectRelationshipsToPatient.fromJson(
+            json['toPatient'],
+          );
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+
+    final GetAccessibleFamilyMembersDirectRelationships otherTyped =
+        other as GetAccessibleFamilyMembersDirectRelationships;
+    return relationshipType == otherTyped.relationshipType &&
+        toPatient == otherTyped.toPatient;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hashAll([relationshipType.hashCode, toPatient.hashCode]);
+
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> json = {};
+    json['relationshipType'] = relationshipTypeSerializer(relationshipType);
+    json['toPatient'] = toPatient.toJson();
+    return json;
+  }
+
+  GetAccessibleFamilyMembersDirectRelationships({
+    required this.relationshipType,
+    required this.toPatient,
+  });
+}
+
+@immutable
+class GetAccessibleFamilyMembersDirectRelationshipsToPatient {
+  final String id;
+  GetAccessibleFamilyMembersDirectRelationshipsToPatient.fromJson(dynamic json)
+    : id = nativeFromJson<String>(json['id']);
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+
+    final GetAccessibleFamilyMembersDirectRelationshipsToPatient otherTyped =
+        other as GetAccessibleFamilyMembersDirectRelationshipsToPatient;
+    return id == otherTyped.id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> json = {};
+    json['id'] = nativeToJson<String>(id);
+    return json;
+  }
+
+  GetAccessibleFamilyMembersDirectRelationshipsToPatient({required this.id});
+}
+
+@immutable
 class GetAccessibleFamilyMembersData {
   final List<GetAccessibleFamilyMembersPatientAccesses> patientAccesses;
+  final List<GetAccessibleFamilyMembersDirectRelationships> directRelationships;
   GetAccessibleFamilyMembersData.fromJson(dynamic json)
     : patientAccesses = (json['patientAccesses'] as List<dynamic>)
           .map((e) => GetAccessibleFamilyMembersPatientAccesses.fromJson(e))
+          .toList(),
+      directRelationships = (json['directRelationships'] as List<dynamic>)
+          .map((e) => GetAccessibleFamilyMembersDirectRelationships.fromJson(e))
           .toList();
   @override
   bool operator ==(Object other) {
@@ -256,17 +333,25 @@ class GetAccessibleFamilyMembersData {
 
     final GetAccessibleFamilyMembersData otherTyped =
         other as GetAccessibleFamilyMembersData;
-    return patientAccesses == otherTyped.patientAccesses;
+    return patientAccesses == otherTyped.patientAccesses &&
+        directRelationships == otherTyped.directRelationships;
   }
 
   @override
-  int get hashCode => patientAccesses.hashCode;
+  int get hashCode =>
+      Object.hashAll([patientAccesses.hashCode, directRelationships.hashCode]);
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> json = {};
     json['patientAccesses'] = patientAccesses.map((e) => e.toJson()).toList();
+    json['directRelationships'] = directRelationships
+        .map((e) => e.toJson())
+        .toList();
     return json;
   }
 
-  GetAccessibleFamilyMembersData({required this.patientAccesses});
+  GetAccessibleFamilyMembersData({
+    required this.patientAccesses,
+    required this.directRelationships,
+  });
 }

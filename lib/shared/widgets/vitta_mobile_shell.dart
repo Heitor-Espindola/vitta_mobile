@@ -132,7 +132,7 @@ class VittaBottomNav extends StatelessWidget {
             ),
             _NavItem(
               icon: Icons.article_outlined,
-              label: 'Carteira',
+              label: 'Caderneta',
               tab: VittaTab.card,
               currentTab: currentTab,
               routeName: AppRoutes.vaccinationCard,

@@ -91,6 +91,24 @@ void main() {
       expect(await controller.sendPasswordReset('pessoa@gmail.com'), isTrue);
       expect(controller.lastError, isNull);
     });
+
+    test('keeps successful reset requests in a short cooldown', () async {
+      var now = DateTime(2026, 9, 27, 12);
+      final repository = FakeAuthRepository();
+      final controller = PasswordResetController(
+        repository,
+        cooldown: const Duration(seconds: 30),
+        now: () => now,
+      );
+
+      expect(await controller.sendPasswordReset('pessoa@gmail.com'), isTrue);
+      expect(await controller.sendPasswordReset('pessoa@gmail.com'), isFalse);
+      expect(repository.resetCalls, 1);
+
+      now = now.add(const Duration(seconds: 31));
+      expect(await controller.sendPasswordReset('pessoa@gmail.com'), isTrue);
+      expect(repository.resetCalls, 2);
+    });
   });
 
   group('Password reset dialog', () {
