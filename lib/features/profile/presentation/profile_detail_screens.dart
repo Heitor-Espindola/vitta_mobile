@@ -560,10 +560,15 @@ class _QuestionCard extends StatelessWidget {
       shadowColor: const Color(0x0A173B50),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        side: BorderSide(color: context.appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
         tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         childrenPadding: const EdgeInsets.fromLTRB(
           AppSpacing.md,

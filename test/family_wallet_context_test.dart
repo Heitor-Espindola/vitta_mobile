@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vitta_mobile/dataconnect_generated/mobile_connector.dart' as dc;
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
@@ -18,6 +19,18 @@ import 'package:vitta_mobile/features/vaccination_card/presentation/vaccination_
 import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart';
 
 void main() {
+  test(
+    'family response remains compatible while connector revisions roll out',
+    () {
+      final data = dc.GetAccessibleFamilyMembersData.fromJson({
+        'patientAccesses': <dynamic>[],
+      });
+
+      expect(data.patientAccesses, isEmpty);
+      expect(data.directRelationships, isEmpty);
+    },
+  );
+
   test('family relationship labels come from relationshipType', () {
     expect(relationshipLabelFromType('LEGAL_GUARDIAN'), 'Filho(a)');
     expect(relationshipLabelFromType('MOTHER'), 'Mãe');

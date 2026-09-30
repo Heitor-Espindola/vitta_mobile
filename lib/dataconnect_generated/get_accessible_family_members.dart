@@ -319,9 +319,16 @@ class GetAccessibleFamilyMembersData {
     : patientAccesses = (json['patientAccesses'] as List<dynamic>)
           .map((e) => GetAccessibleFamilyMembersPatientAccesses.fromJson(e))
           .toList(),
-      directRelationships = (json['directRelationships'] as List<dynamic>)
-          .map((e) => GetAccessibleFamilyMembersDirectRelationships.fromJson(e))
-          .toList();
+      // The production connector may briefly return the previous operation
+      // shape while a new connector revision is rolling out. Relationship
+      // metadata enriches labels only and must never hide authorized members.
+      directRelationships =
+          (json['directRelationships'] as List<dynamic>? ?? const [])
+              .map(
+                (e) =>
+                    GetAccessibleFamilyMembersDirectRelationships.fromJson(e),
+              )
+              .toList();
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {

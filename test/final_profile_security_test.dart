@@ -154,6 +154,26 @@ void main() {
       }
     },
   );
+
+  testWidgets('help cards have no divider or outline lines', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HelpCenterScreen()));
+    await tester.pumpAndSettle();
+
+    final tile = tester.widget<ExpansionTile>(find.byType(ExpansionTile).first);
+    expect(
+      (tile.shape! as RoundedRectangleBorder).side.style,
+      BorderStyle.none,
+    );
+    expect(
+      (tile.collapsedShape! as RoundedRectangleBorder).side.style,
+      BorderStyle.none,
+    );
+
+    await tester.tap(find.text('Como acompanho minhas vacinas?'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('A Home apresenta um resumo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _AuthFake implements AuthRepository {

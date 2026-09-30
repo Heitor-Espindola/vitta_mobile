@@ -284,6 +284,56 @@ void main() {
       expect(result.articles.first.url, endsWith('/one'));
     });
 
+    test('keeps the last feed on the device for up to 30 days', () async {
+      final storage = SharedPreferencesAsync();
+      final article = _article(
+        provider: 'newsdata',
+        date: now,
+        url: 'https://www.gov.br/saude/pt-br/noticias/persistent-feed',
+      );
+      final populatedRepository = FirestoreNewsRepository(
+        source: _FakeSource([article]),
+        storage: storage,
+        now: () => now,
+      );
+      expect(
+        (await populatedRepository.getNews(query: '', page: 1)).articles,
+        hasLength(1),
+      );
+
+      final temporarilyEmptyRepository = FirestoreNewsRepository(
+        source: _FakeSource([]),
+        storage: storage,
+        now: () => now.add(const Duration(days: 29)),
+      );
+      final retained = await temporarilyEmptyRepository.getNews(
+        query: '',
+        page: 1,
+      );
+
+      expect(retained.articles, hasLength(1));
+      expect(retained.articles.single.url, article.url);
+    });
+
+    test('removes locally persisted news after the 30-day window', () async {
+      final storage = SharedPreferencesAsync();
+      final populatedRepository = FirestoreNewsRepository(
+        source: _FakeSource([_article(provider: 'newsapi', date: now)]),
+        storage: storage,
+        now: () => now,
+      );
+      await populatedRepository.getNews(query: '', page: 1);
+
+      final expiredRepository = FirestoreNewsRepository(
+        source: _FakeSource([]),
+        storage: storage,
+        now: () => now.add(const Duration(days: 30, seconds: 1)),
+      );
+      final expired = await expiredRepository.getNews(query: '', page: 1);
+
+      expect(expired.articles, isEmpty);
+    });
+
     test(
       'searches title, description, and journalistic source locally',
       () async {

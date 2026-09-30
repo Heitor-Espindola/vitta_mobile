@@ -78,9 +78,16 @@ class FirestoreNewsRepository implements NewsRepository {
           now.subtract(retention),
           limit: maxArticlesPerRefresh,
         );
-        _memoryArticles = _sanitize(loaded, now);
+        final persisted = await _readPersistentFeed(now);
+        _memoryArticles = _mergeRetained(
+          loaded,
+          persisted ?? const <NewsArticle>[],
+          now,
+        );
         _loadedAt = now;
-        await _savePersistentFeed(_memoryArticles!);
+        if (_memoryArticles!.isNotEmpty) {
+          await _savePersistentFeed(_memoryArticles!);
+        }
       } on FirebaseException catch (error) {
         final cached = await _readPersistentFeed(now);
         if (cached == null) {
@@ -142,6 +149,18 @@ class FirestoreNewsRepository implements NewsRepository {
     final values = byId.values.toList()
       ..sort((a, b) => b.publishedAt!.compareTo(a.publishedAt!));
     return values;
+  }
+
+  static List<NewsArticle> _mergeRetained(
+    Iterable<NewsArticle> remote,
+    Iterable<NewsArticle> persisted,
+    DateTime now,
+  ) {
+    final byIdentity = <String, NewsArticle>{};
+    for (final article in [...persisted, ...remote]) {
+      byIdentity[article.id ?? article.url] = article;
+    }
+    return _sanitize(byIdentity.values, now);
   }
 
   SharedPreferencesAsync? get _preferences {
