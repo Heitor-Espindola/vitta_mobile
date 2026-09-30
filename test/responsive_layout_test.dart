@@ -551,7 +551,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('contact saves phone and private emergency contact immediately', (
+  testWidgets('contact saves phone without exposing emergency contact fields', (
     tester,
   ) async {
     final repository = _TrackingAuthRepository();
@@ -572,31 +572,29 @@ void main() {
       find.byKey(const Key('profile-phone-field')),
       '(16) 98888-7777',
     );
-    await tester.enterText(
-      find.byKey(const Key('emergency-contact-name-field')),
-      'Maria Souza',
-    );
-    await tester.enterText(
+    expect(find.text('Contato de emergência'), findsNothing);
+    expect(find.byKey(const Key('emergency-contact-name-field')), findsNothing);
+    expect(
       find.byKey(const Key('emergency-contact-phone-field')),
-      '(16) 99999-9999',
+      findsNothing,
     );
-    await tester.enterText(
+    expect(
       find.byKey(const Key('emergency-contact-relationship-field')),
-      'Mãe',
+      findsNothing,
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Salvar dados'));
     await tester.pumpAndSettle();
 
     expect(repository.saved?.phone, '(16) 98888-7777');
-    expect(repository.saved?.emergencyContact?.name, 'Maria Souza');
-    expect(repository.saved?.emergencyContact?.relationship, 'Mãe');
+    expect(repository.saved?.name, 'Maria Silva');
+    expect(repository.saved?.emergencyContact, isNull);
     expect(find.text('Dados atualizados com sucesso.'), findsOneWidget);
   });
 
-  testWidgets('profile keeps typed fields open when persistence fails', (
+  testWidgets('personal data keeps the name protected from editing', (
     tester,
   ) async {
-    final repository = _TrackingAuthRepository(fail: true);
+    final repository = _TrackingAuthRepository();
     await tester.pumpWidget(
       MaterialApp(home: ProfileScreen(authRepository: repository)),
     );
@@ -605,17 +603,41 @@ void main() {
       find.textContaining('Dados pessoais', findRichText: true).first,
     );
     await tester.pumpAndSettle();
-    final nameField = find.widgetWithText(TextFormField, 'Nome completo');
-    await tester.enterText(nameField, 'Maria Souza');
+
+    expect(find.text('Nome completo'), findsOneWidget);
+    expect(find.text('Maria Silva'), findsWidgets);
+    expect(find.widgetWithText(TextFormField, 'Nome completo'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Salvar dados'), findsNothing);
+    expect(find.text('Dados pessoais'), findsOneWidget);
+  });
+
+  testWidgets('profile keeps typed phone open when persistence fails', (
+    tester,
+  ) async {
+    final repository = _TrackingAuthRepository(fail: true);
+    await tester.pumpWidget(
+      MaterialApp(home: ProfileScreen(authRepository: repository)),
+    );
+    await tester.pumpAndSettle();
+    final contactEntry = find.textContaining('Contato', findRichText: true);
+    await tester.dragUntilVisible(
+      contactEntry,
+      find.byType(ListView).first,
+      const Offset(0, -120),
+    );
+    await tester.tap(contactEntry);
+    await tester.pumpAndSettle();
+    final phoneField = find.byKey(const Key('profile-phone-field'));
+    await tester.enterText(phoneField, '(16) 97777-6666');
     await tester.tap(find.widgetWithText(FilledButton, 'Salvar dados'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Maria Souza'), findsOneWidget);
+    expect(find.text('(16) 97777-6666'), findsOneWidget);
     expect(
       find.text('Não foi possível salvar. Revise os dados e tente novamente.'),
       findsOneWidget,
     );
-    expect(find.text('Dados pessoais'), findsOneWidget);
+    expect(find.text('Contato'), findsOneWidget);
   });
 
   testWidgets(

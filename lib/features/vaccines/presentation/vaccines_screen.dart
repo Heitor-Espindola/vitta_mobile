@@ -53,8 +53,13 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
   AppUser? _currentPerson;
   AppUser? _selectedPerson;
 
-  List<Vaccine> _fallbackCatalog() =>
-      _vaccines.map((item) => item.toVaccine()).toList(growable: false);
+  List<Vaccine> _fallbackCatalog() {
+    final unique = <String, Vaccine>{};
+    for (final item in _vaccines) {
+      unique.putIfAbsent(item.title.toLowerCase(), item.toVaccine);
+    }
+    return unique.values.toList(growable: false);
+  }
 
   @override
   void initState() {
@@ -151,8 +156,13 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
     final normalizedQuery = _query.toLowerCase();
     final summaries = PatientVaccineSummary.combine(_catalog, _records);
     final vaccines = summaries.where((summary) {
-      final item = _VaccineItem.fromVaccine(summary.vaccine);
-      final belongsToCategory = item.category == _category;
+      final item = _VaccineItem.fromVaccine(
+        summary.vaccine,
+        category: _category,
+      );
+      final belongsToCategory = VaccineAudienceGuidance.categoriesForVaccine(
+        summary.vaccine,
+      ).contains(_category);
       final matchesQuery =
           normalizedQuery.isEmpty ||
           item.title.toLowerCase().contains(normalizedQuery) ||
@@ -216,7 +226,10 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                           (summary) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _VaccineCard(
-                              item: _VaccineItem.fromVaccine(summary.vaccine),
+                              item: _VaccineItem.fromVaccine(
+                                summary.vaccine,
+                                category: _category,
+                              ),
                               summary: summary,
                             ),
                           ),
@@ -864,11 +877,14 @@ class _VaccineItem {
   final String category;
   final Vaccine? catalogVaccine;
 
-  factory _VaccineItem.fromVaccine(Vaccine vaccine) => _VaccineItem(
+  factory _VaccineItem.fromVaccine(
+    Vaccine vaccine, {
+    required String category,
+  }) => _VaccineItem(
     title: vaccine.name,
     description:
         vaccine.description ?? 'Consulte as orientações oficiais desta vacina.',
-    category: _categoryFor(vaccine),
+    category: category,
     catalogVaccine: vaccine,
   );
 
@@ -904,20 +920,6 @@ class _VaccineItem {
     return 'Ainda não temos a idade recomendada para esta vacina. '
         'Pergunte no posto de saúde quem pode tomá-la.';
   }
-}
-
-String _categoryFor(Vaccine vaccine) {
-  final text = [
-    vaccine.recommendedAge,
-    ...vaccine.targetGroups,
-  ].whereType<String>().join(' ').toLowerCase();
-  if (text.contains('gest')) return 'Gestantes';
-  if (text.contains('idos')) return 'Idosos';
-  if (text.contains('adolesc') || text.contains('juven')) return 'Juvenis';
-  final existing = _vaccines.where(
-    (item) => item.title.toLowerCase() == vaccine.name.toLowerCase(),
-  );
-  return existing.isEmpty ? 'Infantis' : existing.first.category;
 }
 
 String _statusLabel(PatientVaccineSummary summary) =>

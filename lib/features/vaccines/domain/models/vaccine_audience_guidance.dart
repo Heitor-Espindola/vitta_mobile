@@ -83,11 +83,86 @@ class VaccineAudienceGuidance {
             'as doses que ela já tomou antes de recomendar a vacina.',
             _pregnancyUrl,
           ),
+        'pneumo20' when category == 'Juvenis' => const VaccineAudienceGuidance(
+          'Para adolescentes e jovens, a pneumocócica 20-valente é indicada '
+          'no calendário do SUS somente para povos indígenas sem histórico '
+          'de vacina pneumocócica conjugada. A equipe de saúde avalia o '
+          'histórico antes da aplicação.',
+          _youthUrl,
+        ),
+        'pneumo20' when category == 'Idosos' => const VaccineAudienceGuidance(
+          'Para pessoas com 60 anos ou mais, a pneumocócica 20-valente é '
+          'indicada no SUS para não vacinados que vivem acamados ou em '
+          'instituições e para povos indígenas sem histórico de vacina '
+          'pneumocócica conjugada. A equipe de saúde avalia cada caso.',
+          _elderlyUrl,
+        ),
         _ => _guidance[key],
       };
     }
     return null;
   }
+
+  /// Returns every app audience covered by the 2026 PNI calendar for a known
+  /// vaccine. A vaccine may belong to more than one audience; reducing this to
+  /// a single value hides valid recommendations (COVID-19, for example).
+  ///
+  /// Unknown catalog entries keep their explicitly registered audiences. The
+  /// legacy child fallback is retained only when the entry has no usable
+  /// audience metadata, so an unclassified remote vaccine is not lost.
+  static List<String> categoriesForVaccine(Vaccine vaccine) {
+    for (final value in [vaccine.name, vaccine.shortName, vaccine.id]) {
+      if (value == null) continue;
+      final key = _aliases[_normalize(value)];
+      final categories = key == null ? null : _audiences[key];
+      if (categories != null) return categories;
+    }
+
+    final registered = <String>{};
+    final text = [
+      vaccine.recommendedAge,
+      ...vaccine.targetGroups,
+    ].whereType<String>().map(_normalize).join(' ');
+    if (text.contains('crianca') ||
+        text.contains('infantil') ||
+        text.contains('bebe')) {
+      registered.add('Infantis');
+    }
+    if (text.contains('adolesc') ||
+        text.contains('jovem') ||
+        text.contains('juven')) {
+      registered.add('Juvenis');
+    }
+    if (text.contains('gest')) registered.add('Gestantes');
+    if (text.contains('idos') || text.contains('60anos')) {
+      registered.add('Idosos');
+    }
+    return registered.isEmpty ? const ['Infantis'] : registered.toList();
+  }
+
+  static const _audiences = <String, List<String>>{
+    'bcg': ['Infantis'],
+    'hepatitea': ['Infantis'],
+    'hepatiteb': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
+    'pentavalente': ['Infantis'],
+    'dtp': ['Infantis'],
+    'poliomielite': ['Infantis'],
+    'pneumo10': ['Infantis'],
+    'pneumo20': ['Infantis', 'Juvenis', 'Idosos'],
+    'rotavirus': ['Infantis'],
+    'meningoc': ['Infantis'],
+    'meningoacwy': ['Infantis', 'Juvenis'],
+    'hpv': ['Infantis', 'Juvenis'],
+    'dt': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
+    'dtpa': ['Juvenis', 'Gestantes', 'Idosos'],
+    'influenza': ['Infantis', 'Gestantes', 'Idosos'],
+    'covid19': ['Infantis', 'Gestantes', 'Idosos'],
+    'febreamarela': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
+    'tripliceviral': ['Infantis', 'Juvenis', 'Idosos'],
+    'varicela': ['Infantis', 'Juvenis', 'Idosos'],
+    'dengue': ['Juvenis'],
+    'vsr': ['Gestantes'],
+  };
 
   static const _guidance = <String, VaccineAudienceGuidance>{
     'bcg': VaccineAudienceGuidance(
@@ -144,6 +219,13 @@ class VaccineAudienceGuidance {
           'qual dose a criança precisa receber.',
       'https://www.gov.br/saude/pt-br/assuntos/noticias-ms/2026/setembro/'
           'sus-ja-vacinou-mais-de-119-mil-criancas-contra-doencas-pneumococicas-em-minas-gerais',
+    ),
+    'pneumo20': VaccineAudienceGuidance(
+      'Crianças recebem a pneumocócica 20-valente aos 2 meses e um reforço '
+      'aos 12 meses. Durante a transição de 2026, o posto de saúde confere '
+      'se a dose dos 4 meses será feita com a pneumocócica 10-valente ou '
+      'com a 20-valente, conforme a disponibilidade e o histórico vacinal.',
+      _childUrl,
     ),
     'rotavirus': VaccineAudienceGuidance(
       'Bebês devem tomar 2 doses: a primeira aos 2 meses e a segunda '
@@ -277,6 +359,13 @@ class VaccineAudienceGuidance {
         'Pneumocócica 10',
         'Pneumo 10',
         'VPC10',
+      ],
+      'pneumo20': [
+        'Pneumocócica 20v',
+        'Pneumocócica 20-valente',
+        'Pneumocócica 20',
+        'Pneumo 20',
+        'VPC20',
       ],
       'rotavirus': [
         'Rotavírus',

@@ -10,6 +10,51 @@ import 'package:vitta_mobile/features/vaccines/domain/models/vaccine_audience_gu
 import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart';
 
 void main() {
+  test(
+    'known vaccines retain every official audience instead of one category',
+    () {
+      List<String> audiences(String name) =>
+          VaccineAudienceGuidance.categoriesForVaccine(
+            Vaccine(id: 'remote-id', name: name),
+          );
+
+      expect(
+        audiences('Covid-19'),
+        unorderedEquals(['Infantis', 'Gestantes', 'Idosos']),
+      );
+      expect(
+        audiences('Hepatite B'),
+        unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+      );
+      expect(
+        audiences('Influenza'),
+        unorderedEquals(['Infantis', 'Gestantes', 'Idosos']),
+      );
+      expect(
+        audiences('Febre amarela'),
+        unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+      );
+      expect(
+        audiences('Meningocócica ACWY'),
+        unorderedEquals(['Infantis', 'Juvenis']),
+      );
+      expect(audiences('VSR'), ['Gestantes']);
+    },
+  );
+
+  test('unknown vaccines retain all explicitly registered audiences', () {
+    const vaccine = Vaccine(
+      id: 'new-vaccine',
+      name: 'Nova vacina',
+      targetGroups: ['Crianças', 'Adolescentes', 'Gestantes', 'Idosos'],
+    );
+
+    expect(
+      VaccineAudienceGuidance.categoriesForVaccine(vaccine),
+      unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+    );
+  });
+
   test('similar vaccine names keep distinct age indications', () {
     String audience(String name) => VaccineAudienceGuidance.forVaccine(
       Vaccine(id: 'remote-id', name: name),
@@ -101,6 +146,54 @@ void main() {
     expect(find.text('Fonte oficial'), findsNothing);
     expect(find.text('Consultar no Ministério da Saúde'), findsNothing);
   });
+
+  testWidgets(
+    'Covid-19 appears for children, pregnant people and older adults',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 850);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VaccinesScreen(
+            authRepository: _AuthFake(),
+            vaccinationRepository: _CatalogFake(
+              const Vaccine(
+                id: 'covid-19',
+                name: 'Covid-19',
+                targetGroups: ['Gestantes'],
+              ),
+            ),
+            walletController: WalletSelectionController(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final card = find.byKey(const Key('vaccine-card-Covid-19'));
+      expect(card, findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('vaccine-category-Juvenis')));
+      await tester.pumpAndSettle();
+      expect(card, findsNothing);
+
+      final categoryScroller = find.descendant(
+        of: find.byKey(const Key('vaccine-category-filters')),
+        matching: find.byType(SingleChildScrollView),
+      );
+      await tester.drag(categoryScroller, const Offset(-260, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('vaccine-category-Gestantes')));
+      await tester.pumpAndSettle();
+      expect(card, findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('vaccine-category-Idosos')));
+      await tester.pumpAndSettle();
+      expect(card, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _openDetails(

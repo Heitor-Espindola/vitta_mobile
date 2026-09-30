@@ -4,9 +4,7 @@ import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
-import 'package:vitta_mobile/core/input_formatters/name_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
-import 'package:vitta_mobile/core/validators/full_name_validator.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
@@ -407,29 +405,15 @@ class _ProfileEditor extends StatefulWidget {
 
 class _ProfileEditorState extends State<_ProfileEditor> {
   final _formKey = GlobalKey<FormState>();
-  late final _nameController = TextEditingController(text: widget.user.name);
   late final _phoneController = TextEditingController(
     text: widget.user.phone ?? '',
-  );
-  late final _emergencyNameController = TextEditingController(
-    text: widget.user.emergencyContact?.name ?? '',
-  );
-  late final _emergencyPhoneController = TextEditingController(
-    text: widget.user.emergencyContact?.phone ?? '',
-  );
-  late final _emergencyRelationshipController = TextEditingController(
-    text: widget.user.emergencyContact?.relationship ?? '',
   );
   bool _isSaving = false;
   String? _error;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _phoneController.dispose();
-    _emergencyNameController.dispose();
-    _emergencyPhoneController.dispose();
-    _emergencyRelationshipController.dispose();
     super.dispose();
   }
 
@@ -439,15 +423,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
       _isSaving = true;
       _error = null;
     });
-    final updated = widget.user.copyWith(
-      name: _nameController.text.trim(),
-      phone: _phoneController.text.trim(),
-      emergencyContact: EmergencyContact(
-        name: _emergencyNameController.text,
-        phone: _emergencyPhoneController.text,
-        relationship: _emergencyRelationshipController.text,
-      ),
-    );
+    final updated = widget.user.copyWith(phone: _phoneController.text.trim());
     try {
       final saved = await widget.onSave(updated);
       if (mounted) Navigator.of(context).pop(saved);
@@ -458,19 +434,6 @@ class _ProfileEditorState extends State<_ProfileEditor> {
         _error = 'Não foi possível salvar. Revise os dados e tente novamente.';
       });
     }
-  }
-
-  String? _validateEmergencyField(String? value) {
-    final fields = [
-      _emergencyNameController.text.trim(),
-      _emergencyPhoneController.text.trim(),
-      _emergencyRelationshipController.text.trim(),
-    ];
-    final hasAny = fields.any((field) => field.isNotEmpty);
-    if (hasAny && (value == null || value.trim().isEmpty)) {
-      return 'Preencha todos os dados do contato de emergência.';
-    }
-    return null;
   }
 
   @override
@@ -509,13 +472,9 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                 ),
                 const SizedBox(height: 16),
                 if (isPersonal) ...[
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome completo',
-                    ),
-                    inputFormatters: [NameInputFormatter()],
-                    validator: validateFullName,
+                  _ProtectedDetail(
+                    label: 'Nome completo',
+                    value: widget.user.name,
                   ),
                   const SizedBox(height: 12),
                   _ProtectedDetail(
@@ -546,59 +505,26 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     decoration: const InputDecoration(labelText: 'Telefone'),
                     keyboardType: TextInputType.phone,
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Contato de emergência',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Dado privado, não exibido automaticamente para profissionais.',
-                    style: AppTypography.caption,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('emergency-contact-name-field'),
-                    controller: _emergencyNameController,
-                    decoration: const InputDecoration(labelText: 'Nome'),
-                    inputFormatters: [NameInputFormatter()],
-                    validator: _validateEmergencyField,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('emergency-contact-phone-field'),
-                    controller: _emergencyPhoneController,
-                    decoration: const InputDecoration(labelText: 'Telefone'),
-                    keyboardType: TextInputType.phone,
-                    validator: _validateEmergencyField,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const Key('emergency-contact-relationship-field'),
-                    controller: _emergencyRelationshipController,
-                    decoration: const InputDecoration(
-                      labelText: 'Parentesco/relação',
+                ],
+                if (!isPersonal) ...[
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.danger),
                     ),
-                    validator: _validateEmergencyField,
+                  ],
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    onPressed: _isSaving ? null : _submit,
+                    child: _isSaving
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Salvar dados'),
                   ),
                 ],
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: AppColors.danger),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _isSaving ? null : _submit,
-                  child: _isSaving
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Salvar dados'),
-                ),
                 const SizedBox(height: AppSpacing.sm),
               ],
             ),

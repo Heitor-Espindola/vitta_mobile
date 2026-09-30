@@ -1,12 +1,12 @@
 # Fontes de “Quem deve tomar?”
 
-Pesquisa realizada em 23/09/2026, com orientações do Ministério da Saúde para o calendário brasileiro do SUS. Os textos são educativos: não calculam elegibilidade individual, não geram agendamentos e não substituem a avaliação do histórico vacinal.
+Pesquisa revisada em 30/09/2026, com orientações do Ministério da Saúde para o calendário brasileiro do SUS. Os textos são educativos: não calculam elegibilidade individual, não geram agendamentos e não substituem a avaliação do histórico vacinal.
 
 Os textos foram revisados em linguagem simples para quem utiliza o SUS. A idade de rotina aparece primeiro, seguida das orientações para atrasos ou situações específicas, em parágrafos separados. Limites como “4 anos, 11 meses e 29 dias” são apresentados como “antes de completar 5 anos”. As recomendações e as fontes da pesquisa foram preservadas.
 
 ## Cobertura
 
-O catálogo local de `vaccines_screen.dart` contém 15 entradas, incluindo repetições por categoria. Todas têm orientação específica: BCG, hepatite B (infantil e gestantes), pentavalente, poliomielite, pneumocócica 10v, rotavírus, HPV, meningocócica ACWY, dT, dTpa, influenza (gestantes e idosos), covid-19 e febre amarela.
+O catálogo local de `vaccines_screen.dart` contém 15 entradas históricas, consolidadas por vacina antes da exibição. A filtragem não reduz mais cada vacina a uma única categoria: uma mesma vacina aparece em todos os públicos previstos no calendário 2026. Por exemplo, covid-19 aparece em crianças, gestantes e idosos; hepatite B aparece nos quatro públicos; influenza aparece em crianças, gestantes e idosos. Indicações condicionais continuam descritas no detalhe da vacina.
 
 O catálogo exibido em produção é carregado pelo repositório de domínio do Firebase SQL Connect. O Firestore permanece apenas nos fluxos explicitamente legados e no sistema de notícias, fora deste catálogo. A implementação também reconhece DTP e hepatite A, visíveis nas imagens fornecidas, além de meningocócica C, tríplice viral, varicela, dengue DNG4 e VSR. Nomes, siglas e IDs conhecidos são associados em `VaccineAudienceGuidance`; não se usa correspondência parcial que possa confundir produtos distintos.
 
