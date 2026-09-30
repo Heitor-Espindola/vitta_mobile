@@ -328,64 +328,59 @@ class ExpandableSearch extends StatefulWidget {
 }
 
 class _ExpandableSearchState extends State<ExpandableSearch> {
-  final _focusNode = FocusNode();
-  bool _expanded = false;
-
-  void _open() {
-    setState(() => _expanded = true);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _focusNode.requestFocus(),
-    );
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
   }
 
-  void _close() {
+  @override
+  void didUpdateWidget(covariant ExpandableSearch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == widget.controller) return;
+    oldWidget.controller.removeListener(_onControllerChanged);
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _clear() {
+    if (widget.controller.text.isEmpty) return;
     widget.controller.clear();
     widget.onChanged?.call('');
     widget.onClosed?.call();
-    _focusNode.unfocus();
-    setState(() => _expanded = false);
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    widget.controller.removeListener(_onControllerChanged);
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: const Duration(milliseconds: 180),
-    child: _expanded
-        ? SizedBox(
-            key: const ValueKey('expanded-search'),
-            height: 44,
-            child: TextField(
-              key: const Key('expandable-search-field'),
-              controller: widget.controller,
-              focusNode: _focusNode,
-              onChanged: widget.onChanged,
-              onSubmitted: widget.onSubmitted,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: widget.hint,
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                suffixIcon: IconButton(
-                  tooltip: 'Fechar pesquisa',
-                  onPressed: _close,
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                ),
+  Widget build(BuildContext context) => SizedBox(
+    key: const ValueKey('always-visible-search'),
+    height: 44,
+    child: TextField(
+      key: const Key('expandable-search-field'),
+      controller: widget.controller,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: widget.controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Limpar pesquisa',
+                onPressed: _clear,
+                icon: const Icon(Icons.close_rounded, size: 20),
               ),
-            ),
-          )
-        : Align(
-            key: const ValueKey('collapsed-search'),
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              tooltip: 'Pesquisar',
-              onPressed: _open,
-              icon: const Icon(Icons.search_rounded),
-            ),
-          ),
+      ),
+    ),
   );
 }
 

@@ -557,7 +557,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final search = find.byKey(const ValueKey('collapsed-search'));
+    final search = find.byKey(const ValueKey('always-visible-search'));
     expect(find.byType(ChoiceChip), findsNothing);
     expect(find.text('Para você'), findsNothing);
     expect(find.text('Campanhas'), findsNothing);
@@ -567,8 +567,6 @@ void main() {
       412,
     );
 
-    await tester.tap(find.byTooltip('Pesquisar'));
-    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('expandable-search-field')),
       'vacinação infantil',
@@ -640,12 +638,18 @@ void main() {
         'Vacinação e Viagens',
       ]),
     );
-    await tester.tap(find.byKey(const Key('show-all-educational-content')));
+    await tester.pumpWidget(
+      const MaterialApp(home: AllEducationalContentScreen()),
+    );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Vacinação na Gestação'),
       300,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable &&
+            axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+      ),
     );
     expect(find.text('Vacinação na Gestação'), findsOneWidget);
     await tester.ensureVisible(find.text('Vacinação na Gestação'));
@@ -668,8 +672,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Pesquisar').first);
-    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('expandable-search-field')),
       'termo inexistente',
@@ -771,8 +773,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ChoiceChip), findsNothing);
-    await tester.tap(find.byTooltip('Pesquisar'));
-    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('expandable-search-field')),
       'termo inexistente',

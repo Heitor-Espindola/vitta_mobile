@@ -431,7 +431,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final filters = find.byKey(const Key('vaccination-card-filters'));
-    final search = find.byKey(const ValueKey('collapsed-search'));
+    final search = find.byKey(const ValueKey('always-visible-search'));
     expect(
       tester.getTopLeft(filters).dy,
       lessThan(tester.getTopLeft(search).dy),
