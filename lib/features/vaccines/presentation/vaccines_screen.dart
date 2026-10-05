@@ -91,10 +91,15 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
       }
       if (catalog.isEmpty) catalog = _fallbackCatalog();
       if (!mounted) return;
+      final selectedPersonChanged =
+          _selectedPerson?.effectivePersonId != selected.effectivePersonId;
       setState(() {
         _catalog = catalog;
         _currentPerson = user;
         _selectedPerson = selected;
+        if (selectedPersonChanged) {
+          _category = vaccineCategoryForBirthDate(selected.birthDate);
+        }
       });
       _recordsSubscription = _vaccinationRepository
           .watchRecordsByPerson(
@@ -942,6 +947,20 @@ DateTime? _statusDate(PatientVaccineSummary summary) =>
     summary.nextDoseAt ?? summary.latestRecord?.effectiveAppliedAt;
 
 const _categories = ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'];
+
+String vaccineCategoryForBirthDate(DateTime? birthDate, {DateTime? now}) {
+  if (birthDate == null) return 'Adultos';
+  final today = now ?? DateTime.now();
+  var age = today.year - birthDate.year;
+  if (today.month < birthDate.month ||
+      (today.month == birthDate.month && today.day < birthDate.day)) {
+    age--;
+  }
+  if (age < 10) return 'Infantis';
+  if (age < 25) return 'Juvenis';
+  if (age < 60) return 'Adultos';
+  return 'Idosos';
+}
 
 const _vaccines = [
   _VaccineItem(

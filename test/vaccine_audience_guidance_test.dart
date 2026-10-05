@@ -10,6 +10,27 @@ import 'package:vitta_mobile/features/vaccines/domain/models/vaccine_audience_gu
 import 'package:vitta_mobile/features/vaccines/presentation/vaccines_screen.dart';
 
 void main() {
+  test('default vaccine category follows the selected patient age', () {
+    final today = DateTime(2026, 10, 5);
+
+    expect(
+      vaccineCategoryForBirthDate(DateTime(2020, 10, 5), now: today),
+      'Infantis',
+    );
+    expect(
+      vaccineCategoryForBirthDate(DateTime(2006, 10, 5), now: today),
+      'Juvenis',
+    );
+    expect(
+      vaccineCategoryForBirthDate(DateTime(1986, 10, 5), now: today),
+      'Adultos',
+    );
+    expect(
+      vaccineCategoryForBirthDate(DateTime(1966, 10, 5), now: today),
+      'Idosos',
+    );
+  });
+
   test(
     'known vaccines retain every official audience instead of one category',
     () {
