@@ -593,6 +593,9 @@ class _RecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final record = occurrence.record;
     final color = _occurrenceColor(occurrence.kind);
+    final showsAppliedDose =
+        occurrence.kind == VaccinationOccurrenceKind.applied &&
+        record.dose.trim().isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -629,12 +632,12 @@ class _RecordCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      if (record.dose.trim().isNotEmpty)
+                      if (showsAppliedDose)
                         Text(
                           record.dose,
                           style: TextStyle(color: context.appTextSecondary),
                         ),
-                      const SizedBox(height: 6),
+                      if (showsAppliedDose) const SizedBox(height: 6),
                       Text(
                         '${occurrence.datePrefix} ${formatBrazilianDate(occurrence.date)}',
                         style: TextStyle(
@@ -814,19 +817,33 @@ class _VaccineDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final professionalName = record.effectiveProfessionalName?.trim();
+    final selectedKind = occurrence?.kind;
+    final isNextDose =
+        selectedKind == VaccinationOccurrenceKind.upcoming ||
+        selectedKind == VaccinationOccurrenceKind.overdue;
     final applicationFields = <MapEntry<String, String>>[
       MapEntry(
-        'Situação da aplicação',
-        record.applicationDate == null ? 'Não informada' : 'Aplicada',
+        isNextDose ? 'Situação selecionada' : 'Situação da aplicação',
+        isNextDose
+            ? selectedKind == VaccinationOccurrenceKind.overdue
+                  ? 'Próxima dose atrasada'
+                  : 'Próxima dose programada'
+            : record.applicationDate == null
+            ? 'Não informada'
+            : 'Aplicada',
       ),
-      if (record.dose.trim().isNotEmpty) MapEntry('Dose', record.dose),
+      if (record.dose.trim().isNotEmpty)
+        MapEntry(isNextDose ? 'Dose anterior' : 'Dose', record.dose),
       if (record.applicationDate != null)
         MapEntry(
-          'Data de aplicação',
+          isNextDose ? 'Aplicação anterior' : 'Data de aplicação',
           formatBrazilianDate(record.applicationDate),
         ),
       if (record.nextDoseDate != null)
-        MapEntry('Próxima dose', formatBrazilianDate(record.nextDoseDate)),
+        MapEntry(
+          isNextDose ? 'Data prevista' : 'Próxima dose prevista',
+          formatBrazilianDate(record.nextDoseDate),
+        ),
       if (record.nextDoseDate != null)
         MapEntry(
           'Status da próxima dose',
@@ -848,13 +865,15 @@ class _VaccineDetails extends StatelessWidget {
         MapEntry('Observação', record.notes!),
     ];
     final appliedAt = record.applicationDate;
-    final detailOccurrence = appliedAt == null
-        ? occurrence
-        : VaccinationOccurrence(
-            record: record,
-            kind: VaccinationOccurrenceKind.applied,
-            date: appliedAt,
-          );
+    final detailOccurrence =
+        occurrence ??
+        (appliedAt == null
+            ? null
+            : VaccinationOccurrence(
+                record: record,
+                kind: VaccinationOccurrenceKind.applied,
+                date: appliedAt,
+              ));
     return DraggableScrollableSheet(
       initialChildSize: .88,
       minChildSize: .55,
@@ -895,7 +914,11 @@ class _VaccineDetails extends StatelessWidget {
             if (detailOccurrence != null)
               _StatusChip(occurrence: detailOccurrence),
             const SizedBox(height: 24),
-            const _DetailTitle('Dados da aplicação'),
+            _DetailTitle(
+              isNextDose
+                  ? 'Próxima dose e aplicação anterior'
+                  : 'Dados da aplicação',
+            ),
             const SizedBox(height: 10),
             ...applicationFields.map(
               (field) => _DetailRow(label: field.key, value: field.value),

@@ -288,6 +288,7 @@ void main() {
             id: 'bcg',
             patientId: 'owner-person',
             vaccineName: 'BCG',
+            doseLabel: 'Dose única',
             appliedAt: today.subtract(const Duration(days: 2)),
             nextDoseAt: today.add(const Duration(days: 20)),
           ),
@@ -320,6 +321,17 @@ void main() {
       expect(find.text('Próxima'), findsOneWidget);
       expect(find.textContaining('Próxima dose em'), findsOneWidget);
       expect(find.text('Aplicada'), findsNothing);
+      expect(find.text('Dose única'), findsNothing);
+      await tester.tap(find.text('Próxima'));
+      await tester.pumpAndSettle();
+      expect(find.text('Situação selecionada'), findsOneWidget);
+      expect(find.text('Próxima dose programada'), findsOneWidget);
+      expect(find.text('Dose anterior'), findsOneWidget);
+      expect(find.text('Dose única'), findsOneWidget);
+      expect(find.text('Aplicação anterior'), findsOneWidget);
+      expect(find.text('Data prevista'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Atrasadas'));
       await tester.pumpAndSettle();
       expect(find.text('Atrasada'), findsOneWidget);
@@ -363,14 +375,14 @@ void main() {
     await tester.tap(find.text('Atrasada'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Situação da aplicação'), findsOneWidget);
-    expect(find.text('Data de aplicação'), findsOneWidget);
+    expect(find.text('Situação selecionada'), findsOneWidget);
+    expect(find.text('Próxima dose atrasada'), findsOneWidget);
+    expect(find.text('Aplicação anterior'), findsOneWidget);
     expect(find.text('14/09/2026'), findsOneWidget);
-    expect(find.text('Próxima dose'), findsOneWidget);
+    expect(find.text('Data prevista'), findsOneWidget);
     expect(find.text('15/09/2026'), findsOneWidget);
     expect(find.text('Status da próxima dose'), findsOneWidget);
     expect(find.text('Atrasada'), findsWidgets);
-    expect(find.text('Aplicada'), findsWidgets);
   });
 
   testWidgets('Home summary has no check and recent records have a surface', (

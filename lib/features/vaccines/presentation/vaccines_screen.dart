@@ -899,6 +899,7 @@ class _VaccineItem {
   String get categoryLabel => switch (category) {
     'Infantis' => 'Infantil',
     'Juvenis' => 'Juvenil',
+    'Adultos' => 'Adulto',
     'Gestantes' => 'Gestante',
     'Idosos' => 'Idoso',
     _ => category,
@@ -940,7 +941,7 @@ Color _statusColor(PatientVaccineSummary summary) => switch (summary.status()) {
 DateTime? _statusDate(PatientVaccineSummary summary) =>
     summary.nextDoseAt ?? summary.latestRecord?.effectiveAppliedAt;
 
-const _categories = ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'];
+const _categories = ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'];
 
 const _vaccines = [
   _VaccineItem(

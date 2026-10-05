@@ -25,6 +25,12 @@ class VaccineAudienceGuidance {
   static const _youthUrl =
       'https://www.gov.br/saude/pt-br/composicao/svsa/pni/calendario-tecnico/'
       'calendario-tecnico-nacional-de-vacinacao-adolescentes-jovens';
+  static const _adultUrl =
+      'https://www.gov.br/saude/pt-br/composicao/svsa/pni/calendario-tecnico/'
+      'calendario-tecnico-nacional-de-vacinacao-adulto';
+  static const _covidUrl =
+      'https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/c/covid-19/'
+      'esquemas-vacinais/esquema-vacinal-covid-19';
 
   /// Match explicit aliases, never substrings: DTP and dTpa, for example,
   /// have different indications. Unknown remote entries retain their own age.
@@ -64,6 +70,42 @@ class VaccineAudienceGuidance {
           'A vacina pode ser tomada em qualquer fase da gestação.',
           _pregnancyUrl,
         ),
+        'covid19' when category == 'Juvenis' => const VaccineAudienceGuidance(
+          'A vacina contra a covid-19 não faz parte da rotina de todos os '
+          'adolescentes e jovens. Quem nunca tomou nenhuma dose, dos 5 aos '
+          '59 anos, pode receber uma dose. Também há vacinação anual '
+          'para grupos especiais, como pessoas imunocomprometidas, indígenas, '
+          'quilombolas, pessoas com comorbidades ou deficiência e adolescentes '
+          'e jovens em medidas socioeducativas. A unidade de saúde confirma '
+          'a indicação individual.',
+          _covidUrl,
+        ),
+        'covid19' when category == 'Adultos' => const VaccineAudienceGuidance(
+          'A vacina contra a covid-19 não faz parte da rotina de todos os '
+          'adultos. Quem nunca tomou nenhuma dose, dos 5 aos 59 anos, pode '
+          'receber uma dose. Grupos especiais têm indicação anual, como '
+          'pessoas imunocomprometidas, indígenas, quilombolas, trabalhadores '
+          'da saúde, pessoas com comorbidades ou deficiência e pessoas em '
+          'situação de rua. A unidade de saúde confirma a indicação.',
+          _covidUrl,
+        ),
+        'influenza' when category == 'Juvenis' => const VaccineAudienceGuidance(
+          'Para adolescentes e jovens, a vacina contra a gripe é oferecida '
+          'anualmente aos grupos definidos pelo Ministério da Saúde, como '
+          'pessoas com comorbidades ou deficiência, povos indígenas, '
+          'trabalhadores da saúde e jovens em medidas socioeducativas. '
+          'Confirme na unidade de saúde se você pertence ao público da '
+          'campanha vigente.',
+          calendarUrl,
+        ),
+        'influenza' when category == 'Adultos' => const VaccineAudienceGuidance(
+          'Para adultos, a vacina contra a gripe é oferecida anualmente aos '
+          'grupos definidos pelo Ministério da Saúde, como pessoas com '
+          'comorbidades ou deficiência, povos indígenas e trabalhadores da '
+          'saúde. Confirme na unidade de saúde se você pertence ao público '
+          'da campanha vigente.',
+          calendarUrl,
+        ),
         'febreamarela' when category == 'Idosos' =>
           const VaccineAudienceGuidance(
             'Pessoas com 60 anos ou mais que nunca tomaram essa vacina precisam '
@@ -90,12 +132,49 @@ class VaccineAudienceGuidance {
           'histórico antes da aplicação.',
           _youthUrl,
         ),
+        'pneumo20' when category == 'Adultos' => const VaccineAudienceGuidance(
+          'Para adultos, a pneumocócica 20-valente é indicada no calendário '
+          'do SUS somente para povos indígenas sem histórico de vacina '
+          'pneumocócica conjugada. A equipe de saúde avalia o histórico '
+          'antes da aplicação.',
+          _adultUrl,
+        ),
         'pneumo20' when category == 'Idosos' => const VaccineAudienceGuidance(
           'Para pessoas com 60 anos ou mais, a pneumocócica 20-valente é '
           'indicada no SUS para não vacinados que vivem acamados ou em '
           'instituições e para povos indígenas sem histórico de vacina '
           'pneumocócica conjugada. A equipe de saúde avalia cada caso.',
           _elderlyUrl,
+        ),
+        'dtpa' when category != 'Gestantes' => VaccineAudienceGuidance(
+          'Nesta fase da vida, a dTpa é indicada no calendário do SUS para '
+          'profissionais de saúde, parteiras e estagiários que atendem '
+          'recém-nascidos. Para as demais pessoas, a vacina de rotina contra '
+          'difteria e tétano é a dT, conforme o histórico vacinal.',
+          category == 'Juvenis'
+              ? _youthUrl
+              : category == 'Idosos'
+              ? _elderlyUrl
+              : _adultUrl,
+        ),
+        'tripliceviral' when category == 'Idosos' =>
+          const VaccineAudienceGuidance(
+            'A partir dos 60 anos, a tríplice viral não é indicada de rotina '
+            'para toda a população. No calendário do SUS, trabalhadores da '
+            'saúde podem precisar de 2 doses, após avaliação do serviço de '
+            'saúde. Gestantes não devem tomar essa vacina.',
+            _elderlyUrl,
+          ),
+        'varicela' when category != 'Infantis' => VaccineAudienceGuidance(
+          'Nesta fase da vida, a vacina contra varicela é indicada no SUS '
+          'somente para povos indígenas e trabalhadores da saúde sem histórico '
+          'da doença ou quando houver dúvida. A aplicação deve ser avaliada '
+          'pelo serviço de saúde. Gestantes não devem tomar essa vacina.',
+          category == 'Idosos'
+              ? _elderlyUrl
+              : category == 'Adultos'
+              ? _adultUrl
+              : _youthUrl,
         ),
         _ => _guidance[key],
       };
@@ -133,6 +212,11 @@ class VaccineAudienceGuidance {
         text.contains('juven')) {
       registered.add('Juvenis');
     }
+    if (text.contains('adult') ||
+        text.contains('25a59') ||
+        text.contains('ate59anos')) {
+      registered.add('Adultos');
+    }
     if (text.contains('gest')) registered.add('Gestantes');
     if (text.contains('idos') || text.contains('60anos')) {
       registered.add('Idosos');
@@ -143,23 +227,23 @@ class VaccineAudienceGuidance {
   static const _audiences = <String, List<String>>{
     'bcg': ['Infantis'],
     'hepatitea': ['Infantis'],
-    'hepatiteb': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
+    'hepatiteb': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
     'pentavalente': ['Infantis'],
     'dtp': ['Infantis'],
     'poliomielite': ['Infantis'],
     'pneumo10': ['Infantis'],
-    'pneumo20': ['Infantis', 'Juvenis', 'Idosos'],
+    'pneumo20': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
     'rotavirus': ['Infantis'],
     'meningoc': ['Infantis'],
     'meningoacwy': ['Infantis', 'Juvenis'],
     'hpv': ['Infantis', 'Juvenis'],
-    'dt': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
-    'dtpa': ['Juvenis', 'Gestantes', 'Idosos'],
-    'influenza': ['Infantis', 'Gestantes', 'Idosos'],
-    'covid19': ['Infantis', 'Gestantes', 'Idosos'],
-    'febreamarela': ['Infantis', 'Juvenis', 'Gestantes', 'Idosos'],
-    'tripliceviral': ['Infantis', 'Juvenis', 'Idosos'],
-    'varicela': ['Infantis', 'Juvenis', 'Idosos'],
+    'dt': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+    'dtpa': ['Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+    'influenza': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+    'covid19': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+    'febreamarela': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+    'tripliceviral': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
+    'varicela': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
     'dengue': ['Juvenis'],
     'vsr': ['Gestantes'],
   };

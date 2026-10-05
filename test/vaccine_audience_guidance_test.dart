@@ -20,19 +20,43 @@ void main() {
 
       expect(
         audiences('Covid-19'),
-        unorderedEquals(['Infantis', 'Gestantes', 'Idosos']),
+        unorderedEquals([
+          'Infantis',
+          'Juvenis',
+          'Adultos',
+          'Gestantes',
+          'Idosos',
+        ]),
       );
       expect(
         audiences('Hepatite B'),
-        unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+        unorderedEquals([
+          'Infantis',
+          'Juvenis',
+          'Adultos',
+          'Gestantes',
+          'Idosos',
+        ]),
       );
       expect(
         audiences('Influenza'),
-        unorderedEquals(['Infantis', 'Gestantes', 'Idosos']),
+        unorderedEquals([
+          'Infantis',
+          'Juvenis',
+          'Adultos',
+          'Gestantes',
+          'Idosos',
+        ]),
       );
       expect(
         audiences('Febre amarela'),
-        unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+        unorderedEquals([
+          'Infantis',
+          'Juvenis',
+          'Adultos',
+          'Gestantes',
+          'Idosos',
+        ]),
       );
       expect(
         audiences('Meningocócica ACWY'),
@@ -46,23 +70,78 @@ void main() {
     const vaccine = Vaccine(
       id: 'new-vaccine',
       name: 'Nova vacina',
-      targetGroups: ['Crianças', 'Adolescentes', 'Gestantes', 'Idosos'],
+      targetGroups: [
+        'Crianças',
+        'Adolescentes',
+        'Adultos',
+        'Gestantes',
+        'Idosos',
+      ],
     );
 
     expect(
       VaccineAudienceGuidance.categoriesForVaccine(vaccine),
-      unorderedEquals(['Infantis', 'Juvenis', 'Gestantes', 'Idosos']),
+      unorderedEquals([
+        'Infantis',
+        'Juvenis',
+        'Adultos',
+        'Gestantes',
+        'Idosos',
+      ]),
     );
   });
 
+  test('known vaccine matrix covers every supported life phase', () {
+    const expected = <String, List<String>>{
+      'BCG': ['Infantis'],
+      'Hepatite A': ['Infantis'],
+      'Hepatite B': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+      'Pentavalente': ['Infantis'],
+      'Tríplice bacteriana (DTP)': ['Infantis'],
+      'Poliomielite (VIP)': ['Infantis'],
+      'Pneumocócica 10-valente': ['Infantis'],
+      'Pneumocócica 20-valente': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
+      'Rotavírus': ['Infantis'],
+      'Meningocócica C': ['Infantis'],
+      'Meningocócica ACWY': ['Infantis', 'Juvenis'],
+      'HPV': ['Infantis', 'Juvenis'],
+      'dT': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+      'dTpa': ['Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+      'Influenza': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+      'Covid-19': ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'],
+      'Febre amarela': [
+        'Infantis',
+        'Juvenis',
+        'Adultos',
+        'Gestantes',
+        'Idosos',
+      ],
+      'Tríplice viral': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
+      'Varicela': ['Infantis', 'Juvenis', 'Adultos', 'Idosos'],
+      'Dengue': ['Juvenis'],
+      'VSR': ['Gestantes'],
+    };
+
+    for (final entry in expected.entries) {
+      expect(
+        VaccineAudienceGuidance.categoriesForVaccine(
+          Vaccine(id: 'remote-id', name: entry.key),
+        ),
+        unorderedEquals(entry.value),
+        reason: entry.key,
+      );
+    }
+  });
+
   test('similar vaccine names keep distinct age indications', () {
-    String audience(String name) => VaccineAudienceGuidance.forVaccine(
-      Vaccine(id: 'remote-id', name: name),
-      'Infantis',
-    )!.description;
+    String audience(String name, {String category = 'Infantis'}) =>
+        VaccineAudienceGuidance.forVaccine(
+          Vaccine(id: 'remote-id', name: name),
+          category,
+        )!.description;
 
     expect(audience('Tríplice bacteriana (DTP)'), contains('15 meses'));
-    expect(audience('dTpa'), contains('20ª semana'));
+    expect(audience('dTpa', category: 'Gestantes'), contains('20ª semana'));
     expect(audience('dT'), contains('7 anos'));
     expect(audience('TRIPLICE VIRAL (SCR)'), contains('1 ano e aos 15 meses'));
     expect(audience('Pneumocócica 10-valente'), contains('Em 2026'));
@@ -99,6 +178,9 @@ void main() {
     ('Gestantes', 'dTpa', '20ª semana'),
     ('Gestantes', 'Hepatite B', 'início da gravidez'),
     ('Gestantes', 'Influenza', 'qualquer fase da gravidez'),
+    ('Juvenis', 'Covid-19', 'não faz parte da rotina de todos'),
+    ('Adultos', 'Covid-19', 'não faz parte da rotina de todos'),
+    ('Adultos', 'Tríplice viral', '30 aos 59 anos'),
     ('Idosos', 'Influenza', '60 anos'),
     ('Idosos', 'Covid-19', 'a cada 6 meses'),
     ('Idosos', 'Febre amarela', 'conversar com a equipe do posto de saúde'),
@@ -148,7 +230,7 @@ void main() {
   });
 
   testWidgets(
-    'Covid-19 appears for children, pregnant people and older adults',
+    'Covid-19 appears in every life phase with conditional guidance',
     (tester) async {
       tester.view.physicalSize = const Size(430, 850);
       tester.view.devicePixelRatio = 1;
@@ -176,7 +258,16 @@ void main() {
 
       await tester.tap(find.byKey(const Key('vaccine-category-Juvenis')));
       await tester.pumpAndSettle();
-      expect(card, findsNothing);
+      expect(card, findsOneWidget);
+
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('não faz parte da rotina de todos'),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
 
       final categoryScroller = find.descendant(
         of: find.byKey(const Key('vaccine-category-filters')),
@@ -184,10 +275,17 @@ void main() {
       );
       await tester.drag(categoryScroller, const Offset(-260, 0));
       await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('vaccine-category-Adultos')));
+      await tester.pumpAndSettle();
+      expect(card, findsOneWidget);
+
       await tester.tap(find.byKey(const Key('vaccine-category-Gestantes')));
       await tester.pumpAndSettle();
       expect(card, findsOneWidget);
 
+      await tester.drag(categoryScroller, const Offset(-260, 0));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('vaccine-category-Idosos')));
       await tester.pumpAndSettle();
       expect(card, findsOneWidget);
