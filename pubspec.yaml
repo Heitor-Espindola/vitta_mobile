@@ -47,6 +47,7 @@ dependencies:
   share_plus: ^13.3.0
   shared_preferences: ^2.5.5
   firebase_data_connect: ^0.3.3
+  video_player: ^2.14.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,6 +82,7 @@ flutter:
     - assets/images/vitta_logo.png
     - assets/images/muuni/muuni_notification_sprite.png
     - assets/images/muuni/muuni_seated_nav.png
+    - assets/videos/vitta_intro.mp4
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
 
