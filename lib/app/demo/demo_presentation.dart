@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
 import 'package:vitta_mobile/features/notifications/domain/services/vaccination_notification_service.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
@@ -15,14 +14,12 @@ abstract final class DemoPresentation {
     defaultValue: false,
   );
 
-  /// O APK normal mostra exemplos em carteiras realmente vazias para que novos
-  /// usuários conheçam a experiência antes do primeiro registro profissional.
-  static const showEmptyWalletExamples =
-      bool.fromEnvironment(
-        'VITTA_EMPTY_WALLET_EXAMPLES',
-        defaultValue: false,
-      ) ||
-      kReleaseMode;
+  /// O APK normal mostra somente aplicações persistidas no SQL Connect.
+  /// Exemplos locais exigem ativação explícita para testes e apresentações.
+  static const showEmptyWalletExamples = bool.fromEnvironment(
+    'VITTA_EMPTY_WALLET_EXAMPLES',
+    defaultValue: false,
+  );
 
   static bool isIllustrativeRecord(VaccinationRecord record) =>
       record.source == 'demo_presentation';
