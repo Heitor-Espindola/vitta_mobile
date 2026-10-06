@@ -3,6 +3,16 @@ import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 
 void main() {
+  test('o APK pode apresentar exemplos quando a carteira está vazia', () {
+    final records = DemoPresentation.recordsForPresentation(
+      const <VaccinationRecord>[],
+      enabled: true,
+    );
+
+    expect(records, isNotEmpty);
+    expect(records.every(DemoPresentation.isIllustrativeRecord), isTrue);
+  });
+
   test('modo de demonstração preenche uma carteira vazia localmente', () {
     final records = DemoPresentation.recordsForPresentation(
       const <VaccinationRecord>[],

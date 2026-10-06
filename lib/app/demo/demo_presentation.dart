@@ -1,26 +1,41 @@
+import 'package:flutter/foundation.dart';
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
 import 'package:vitta_mobile/features/notifications/domain/services/vaccination_notification_service.dart';
 import 'package:vitta_mobile/features/vaccination_card/domain/models/vaccination_record.dart';
 
-/// Dados exclusivamente locais para screenshots e apresentações acadêmicas.
+/// Dados exclusivamente locais para apresentar uma carteira ainda vazia.
 ///
-/// Ative no comando de execução/build com:
-/// `--dart-define=VITTA_DEMO_MODE=true`
-///
-/// Nenhum item desta classe é enviado ao Firebase. Os dados reais continuam
-/// prioritários; a demonstração aparece apenas quando a carteira está vazia.
+/// Nenhum item desta classe é enviado ao Firebase/SQL Connect. Os dados reais
+/// continuam prioritários e substituem os exemplos assim que a primeira
+/// aplicação profissional é registrada.
 abstract final class DemoPresentation {
+  /// Compatibilidade com builds antigos voltados a screenshots acadêmicos.
   static const isEnabled = bool.fromEnvironment(
     'VITTA_DEMO_MODE',
     defaultValue: false,
   );
+
+  /// O APK normal mostra exemplos em carteiras realmente vazias para que novos
+  /// usuários conheçam a experiência antes do primeiro registro profissional.
+  static const showEmptyWalletExamples =
+      bool.fromEnvironment(
+        'VITTA_EMPTY_WALLET_EXAMPLES',
+        defaultValue: false,
+      ) ||
+      kReleaseMode;
+
+  static bool isIllustrativeRecord(VaccinationRecord record) =>
+      record.source == 'demo_presentation';
 
   static List<VaccinationRecord> recordsForPresentation(
     Iterable<VaccinationRecord> records, {
     bool? enabled,
   }) {
     final values = List<VaccinationRecord>.unmodifiable(records);
-    if (values.isNotEmpty || !(enabled ?? isEnabled)) return values;
+    if (values.isNotEmpty ||
+        !(enabled ?? (showEmptyWalletExamples || isEnabled))) {
+      return values;
+    }
     return demoRecords;
   }
 
@@ -33,7 +48,7 @@ abstract final class DemoPresentation {
     if (values.isNotEmpty) {
       return VaccinationNotificationService.derive(values, now: now);
     }
-    if (!(enabled ?? isEnabled)) return const [];
+    if (!(enabled ?? (showEmptyWalletExamples || isEnabled))) return const [];
     final reference = now ?? DateTime.now();
     return [
       VaccinationNotification(

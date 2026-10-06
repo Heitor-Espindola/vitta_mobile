@@ -213,6 +213,12 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                       ),
                       const SizedBox(height: 20),
                       const _EducationalCard(),
+                      if (_records.any(
+                        DemoPresentation.isIllustrativeRecord,
+                      )) ...[
+                        const SizedBox(height: 12),
+                        const _IllustrativeWalletNotice(),
+                      ],
                       const SizedBox(height: 20),
                       const _SectionHeading('Vacinas recomendadas'),
                       const SizedBox(height: 16),
@@ -453,6 +459,34 @@ class _EducationalCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _IllustrativeWalletNotice extends StatelessWidget {
+  const _IllustrativeWalletNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('illustrative-wallet-notice'),
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.visibility_outlined, color: context.appPrimaryInk, size: 20),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text(
+            'Dados ilustrativos para você conhecer o aplicativo. Eles serão substituídos quando uma aplicação real for registrada.',
+            style: TextStyle(fontSize: 12, height: 1.4),
           ),
         ),
       ],
@@ -949,7 +983,7 @@ DateTime? _statusDate(PatientVaccineSummary summary) =>
 const _categories = ['Infantis', 'Juvenis', 'Adultos', 'Gestantes', 'Idosos'];
 
 String vaccineCategoryForBirthDate(DateTime? birthDate, {DateTime? now}) {
-  if (birthDate == null) return 'Adultos';
+  if (birthDate == null) return 'Infantis';
   final today = now ?? DateTime.now();
   var age = today.year - birthDate.year;
   if (today.month < birthDate.month ||

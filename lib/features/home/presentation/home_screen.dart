@@ -67,7 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Stream<List<VaccinationRecord>>? _recordsStream;
   bool _sharingBooklet = false;
 
-  bool get _demoEnabled => widget.demoModeEnabled ?? DemoPresentation.isEnabled;
+  bool get _demoEnabled =>
+      widget.demoModeEnabled ?? DemoPresentation.showEmptyWalletExamples;
 
   @override
   void initState() {
@@ -286,10 +287,14 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, recordsSnapshot) {
             final realRecords =
                 recordsSnapshot.data ?? const <VaccinationRecord>[];
-            final usingDemoRecords = _demoEnabled && realRecords.isEmpty;
+            final usingDemoRecords =
+                _demoEnabled &&
+                recordsSnapshot.hasData &&
+                !recordsSnapshot.hasError &&
+                realRecords.isEmpty;
             final notifications = DemoPresentation.notificationsForPresentation(
               realRecords,
-              enabled: _demoEnabled,
+              enabled: usingDemoRecords,
             );
             final data = _HomeData(
               user: baseData.user,
@@ -297,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
               familyMembers: baseData.familyMembers,
               records: DemoPresentation.recordsForPresentation(
                 realRecords,
-                enabled: _demoEnabled,
+                enabled: usingDemoRecords,
               ),
             );
             final selectedPersonId =

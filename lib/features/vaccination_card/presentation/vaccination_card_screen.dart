@@ -309,6 +309,13 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
               onChanged: (value) => setState(() => _showBooklet = value),
             ),
             const SizedBox(height: 22),
+            if (_records.any(DemoPresentation.isIllustrativeRecord)) ...[
+              const _MessageCard(
+                message:
+                    'Visualização ilustrativa: estas aplicações mostram como a carteira funciona e não fazem parte do seu histórico de saúde.',
+              ),
+              const SizedBox(height: 14),
+            ],
             if (_error != null) ...[
               _MessageCard(message: _error!, error: true),
               Align(
