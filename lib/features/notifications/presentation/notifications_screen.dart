@@ -3,6 +3,7 @@ import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/notifications/domain/models/vaccination_notification.dart';
@@ -44,6 +45,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String? _selectedPersonId;
   String? _selectedPersonName;
   bool _isViewingDependent = false;
+  bool _isViewingChildWallet = false;
   bool _loading = true;
   String? _error;
 
@@ -72,6 +74,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _selectedPersonName = selected.name;
         _isViewingDependent =
             selected.effectivePersonId != user.effectivePersonId;
+        _isViewingChildWallet =
+            _isViewingDependent && isMinistryOfHealthChild(selected.birthDate);
         _records = _vaccinations.watchRecordsByPerson(
           personId: selected.effectivePersonId,
           responsibleId: user.effectivePersonId,
@@ -90,12 +94,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _isViewingDependent
+    backgroundColor: _isViewingChildWallet
         ? DependentWalletPalette.of(context).background
         : Theme.of(context).scaffoldBackgroundColor,
     body: SafeArea(
       child: DependentWalletBackground(
-        enabled: _isViewingDependent,
+        enabled: _isViewingChildWallet,
         child: Column(
           children: [
             AppPageHeader(
@@ -104,7 +108,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? 'Novidades da carteira de ${_selectedPersonName ?? 'seu dependente'}'
                   : 'Atualizações da sua carteira',
               showBack: true,
-              backgroundColor: _isViewingDependent
+              backgroundColor: _isViewingChildWallet
                   ? DependentWalletPalette.of(context).sky
                   : context.appPrimarySoft,
             ),
@@ -137,7 +141,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _markVisibleNotificationsAsViewed(items);
         return LayoutBuilder(
           builder: (context, constraints) {
-            final peek = items.length >= 3 || constraints.maxHeight < 340;
+            final compactMascot = constraints.maxHeight < 340;
+            final mascotSize = compactMascot ? 74.0 : 122.0;
             return Column(
               children: [
                 Expanded(
@@ -151,23 +156,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               _NotificationCard(item: items[index]),
                         ),
                 ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: SizedBox(
-                    key: Key(peek ? 'muuni-peek' : 'muuni-full'),
-                    height: peek ? 46 : 114,
-                    width: 114,
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topLeft,
+                if (_isViewingChildWallet)
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 0, 8),
+                      child: SizedBox.square(
+                        key: Key(
+                          compactMascot ? 'muuni-compact' : 'muuni-full',
+                        ),
+                        dimension: mascotSize,
                         child: MuuniTimedPresence(
                           key: const Key('muuni-notification-animation'),
-                          size: 110,
+                          size: mascotSize,
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },

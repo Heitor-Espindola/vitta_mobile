@@ -79,7 +79,10 @@ class DependentWalletBackground extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           IgnorePointer(
-            child: CustomPaint(painter: _CowSpotsPainter(palette.spot)),
+            child: CustomPaint(
+              key: const Key('dependent-wallet-spots'),
+              painter: _CowSpotsPainter(palette.spot),
+            ),
           ),
           child,
         ],
@@ -95,21 +98,21 @@ class _CowSpotsPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color.withValues(alpha: .055);
+    final paint = Paint()..color = color.withValues(alpha: .105);
     canvas.drawOval(
-      Rect.fromLTWH(-size.width * .12, size.height * .08, 118, 72),
+      Rect.fromLTWH(-size.width * .15, size.height * .07, 154, 92),
       paint,
     );
     canvas.drawOval(
-      Rect.fromLTWH(size.width * .78, size.height * .20, 94, 126),
+      Rect.fromLTWH(size.width * .75, size.height * .18, 126, 158),
       paint,
     );
     canvas.drawOval(
-      Rect.fromLTWH(size.width * .04, size.height * .55, 62, 46),
+      Rect.fromLTWH(size.width * .02, size.height * .53, 92, 66),
       paint,
     );
     canvas.drawOval(
-      Rect.fromLTWH(size.width * .70, size.height * .78, 142, 76),
+      Rect.fromLTWH(size.width * .65, size.height * .76, 190, 104),
       paint,
     );
   }

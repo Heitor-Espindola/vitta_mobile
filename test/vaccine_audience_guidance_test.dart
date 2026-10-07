@@ -112,6 +112,25 @@ void main() {
     );
   });
 
+  test('search accepts common vaccine names and accents', () {
+    const influenza = Vaccine(
+      id: 'remote-influenza',
+      name: 'Influenza',
+      description: 'ProteÃ§Ã£o anual.',
+    );
+    const yellowFever = Vaccine(id: 'remote-fa', name: 'Febre amarela');
+
+    expect(VaccineAudienceGuidance.matchesSearch(influenza, 'gripe'), isTrue);
+    expect(
+      VaccineAudienceGuidance.matchesSearch(yellowFever, 'febre amarela'),
+      isTrue,
+    );
+    expect(
+      VaccineAudienceGuidance.matchesSearch(influenza, 'sarampo'),
+      isFalse,
+    );
+  });
+
   test('known vaccine matrix covers every supported life phase', () {
     const expected = <String, List<String>>{
       'BCG': ['Infantis'],

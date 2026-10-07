@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:vitta_mobile/app/design_system.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/features/information/data/firestore_news_repository.dart';
 import 'package:vitta_mobile/features/information/domain/repositories/news_repository.dart';
 import 'package:vitta_mobile/features/information/presentation/all_educational_content_screen.dart';
@@ -53,6 +54,10 @@ class _InformationScreenState extends State<InformationScreen> {
 
   bool get _isViewingDependent =>
       _wallet.currentPersonId != null && !_wallet.isViewingCurrent;
+
+  bool get _isViewingChildWallet =>
+      _isViewingDependent &&
+      isMinistryOfHealthChild(_wallet.selectedPerson?.birthDate);
 
   void _onChanged() {
     if (mounted) setState(() {});
@@ -111,18 +116,18 @@ class _InformationScreenState extends State<InformationScreen> {
     showTopBar: false,
     body: DependentWalletBackground(
       key: Key(
-        _isViewingDependent
+        _isViewingChildWallet
             ? 'information-dependent-theme'
             : 'information-standard-theme',
       ),
-      enabled: _isViewingDependent,
+      enabled: _isViewingChildWallet,
       child: RefreshIndicator(
         onRefresh: _controller.refreshNews,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           children: [
-            _InformationHero(dependent: _isViewingDependent),
+            _InformationHero(childWallet: _isViewingChildWallet),
             const SizedBox(height: 14),
             ExpandableSearch(
               hint: 'Pesquisar notícias',
@@ -241,9 +246,9 @@ class _InformationScreenState extends State<InformationScreen> {
 }
 
 class _InformationHero extends StatelessWidget {
-  const _InformationHero({required this.dependent});
+  const _InformationHero({required this.childWallet});
 
-  final bool dependent;
+  final bool childWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -287,7 +292,7 @@ class _InformationHero extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            if (dependent)
+            if (childWallet)
               const SizedBox(
                 width: 70,
                 height: 78,

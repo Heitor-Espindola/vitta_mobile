@@ -164,6 +164,16 @@ void main() {
         'Instituto Butantan',
       );
       expect(
+        TrustedNewsSources.nameForUrl(
+          'https://www.cnnbrasil.com.br/saude/noticia',
+        ),
+        'CNN Brasil',
+      );
+      expect(
+        TrustedNewsSources.nameForUrl('https://www.em.com.br/saude/noticia'),
+        'Estado de Minas',
+      );
+      expect(
         TrustedNewsSources.nameForUrl('https://www.paho.org/pt/noticias/x'),
         'OPAS',
       );

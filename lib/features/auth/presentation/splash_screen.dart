@@ -19,53 +19,87 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   late final AuthRepository _repository =
       widget.authRepository ?? DomainRepositoryFactory.auth();
-  late final Stream<AppUser?> _authStream;
   late final VideoPlayerController _videoController;
 
-  Timer? _completionTimer;
+  StreamSubscription<AppUser?>? _authSubscription;
   Timer? _failsafeTimer;
+  AppUser? _user;
+  Object? _authError;
+  bool _authResolved = false;
   bool _videoReady = false;
+  bool _startingIntro = false;
   bool _finishingIntro = false;
   bool _introCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    _authStream = _repository.authStateChanges();
     _videoController = VideoPlayerController.asset(
       'assets/videos/vitta_intro.mp4',
-    );
-    _failsafeTimer = Timer(
-      const Duration(seconds: 4),
-      () => unawaited(_finishIntro()),
+    )..addListener(_handleVideoState);
+    _authSubscription = _repository.authStateChanges().listen(
+      _handleAuthChanged,
+      onError: _handleAuthError,
     );
     unawaited(_startIntro());
   }
 
+  void _handleAuthChanged(AppUser? user) {
+    if (!mounted) return;
+    final enteringAccount = _authResolved && _user == null && user != null;
+    setState(() {
+      _user = user;
+      _authError = null;
+      _authResolved = true;
+    });
+    if (enteringAccount) unawaited(_startIntro());
+  }
+
+  void _handleAuthError(Object error) {
+    if (!mounted) return;
+    setState(() {
+      _authError = error;
+      _authResolved = true;
+    });
+  }
+
+  void _handleVideoState() {
+    if (_videoController.value.isCompleted) {
+      unawaited(_finishIntro());
+    }
+  }
+
   Future<void> _startIntro() async {
+    if (_startingIntro || _finishingIntro) return;
+    _startingIntro = true;
+    _failsafeTimer?.cancel();
+    _failsafeTimer = Timer(
+      const Duration(seconds: 4),
+      () => unawaited(_finishIntro()),
+    );
+    if (mounted) {
+      setState(() => _introCompleted = false);
+    }
     try {
-      await _videoController.initialize();
+      if (!_videoController.value.isInitialized) {
+        await _videoController.initialize();
+      }
       await _videoController.setLooping(false);
       await _videoController.setVolume(0);
+      await _videoController.seekTo(Duration.zero);
       if (!mounted) return;
       setState(() => _videoReady = true);
       await _videoController.play();
-      final duration = _videoController.value.duration;
-      _completionTimer = Timer(
-        duration > Duration.zero
-            ? duration + const Duration(milliseconds: 120)
-            : const Duration(milliseconds: 1200),
-        () => unawaited(_finishIntro()),
-      );
     } catch (_) {
       await _finishIntro();
+    } finally {
+      _startingIntro = false;
     }
   }
 
   Future<void> _finishIntro() async {
     if (!mounted || _introCompleted || _finishingIntro) return;
     _finishingIntro = true;
-    _completionTimer?.cancel();
     _failsafeTimer?.cancel();
     if (_videoController.value.isInitialized) {
       try {
@@ -76,42 +110,45 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     }
     if (!mounted) return;
-    setState(() => _introCompleted = true);
+    setState(() {
+      _introCompleted = true;
+      _finishingIntro = false;
+    });
   }
 
   @override
   void dispose() {
-    _completionTimer?.cancel();
+    _authSubscription?.cancel();
     _failsafeTimer?.cancel();
+    _videoController.removeListener(_handleVideoState);
     _videoController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<AppUser?>(
-    stream: _authStream,
-    builder: (context, snapshot) {
-      if (!_introCompleted ||
-          snapshot.connectionState == ConnectionState.waiting) {
-        return _VittaIntro(
-          controller: _videoController,
-          videoReady: _videoReady,
-          showProgress:
-              _introCompleted &&
-              snapshot.connectionState == ConnectionState.waiting,
-        );
-      }
-      if (snapshot.hasError) {
-        return LoginScreen(
-          authRepository: _repository,
-          initialErrorMessage: mapSignInError(snapshot.error!),
-        );
-      }
-      final user = snapshot.data;
-      if (user == null) return LoginScreen(authRepository: _repository);
-      return HomeScreen(authRepository: _repository);
-    },
-  );
+  Widget build(BuildContext context) {
+    if (!_introCompleted || !_authResolved) {
+      return _VittaIntro(
+        controller: _videoController,
+        videoReady: _videoReady,
+        showProgress: _introCompleted && !_authResolved,
+      );
+    }
+    if (_authError != null) {
+      return LoginScreen(
+        authRepository: _repository,
+        initialErrorMessage: mapSignInError(_authError!),
+        navigateAfterSignIn: false,
+      );
+    }
+    if (_user == null) {
+      return LoginScreen(
+        authRepository: _repository,
+        navigateAfterSignIn: false,
+      );
+    }
+    return HomeScreen(authRepository: _repository);
+  }
 }
 
 class _VittaIntro extends StatelessWidget {

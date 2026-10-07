@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:vitta_mobile/app/design_system.dart';
 import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -158,20 +159,18 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
     final isViewingDependent =
         _selectedPerson != null &&
         _selectedPerson?.effectivePersonId != _currentPerson?.effectivePersonId;
-    final normalizedQuery = _query.toLowerCase();
+    final isViewingChildWallet =
+        isViewingDependent &&
+        isMinistryOfHealthChild(_selectedPerson?.birthDate);
     final summaries = PatientVaccineSummary.combine(_catalog, _records);
     final vaccines = summaries.where((summary) {
-      final item = _VaccineItem.fromVaccine(
-        summary.vaccine,
-        category: _category,
-      );
       final belongsToCategory = VaccineAudienceGuidance.categoriesForVaccine(
         summary.vaccine,
       ).contains(_category);
-      final matchesQuery =
-          normalizedQuery.isEmpty ||
-          item.title.toLowerCase().contains(normalizedQuery) ||
-          item.description.toLowerCase().contains(normalizedQuery);
+      final matchesQuery = VaccineAudienceGuidance.matchesSearch(
+        summary.vaccine,
+        _query,
+      );
       return belongsToCategory && matchesQuery;
     }).toList();
 
@@ -180,9 +179,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
       currentTab: VittaTab.vaccines,
       showTopBar: false,
       body: DependentWalletBackground(
-        enabled: isViewingDependent,
+        enabled: isViewingChildWallet,
         child: ColoredBox(
-          color: isViewingDependent
+          color: isViewingChildWallet
               ? Colors.transparent
               : Theme.of(context).scaffoldBackgroundColor,
           child: ListView(
@@ -194,7 +193,7 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _VaccinesHeader(dependent: isViewingDependent),
+                      _VaccinesHeader(childWallet: isViewingChildWallet),
                       const SizedBox(height: 16),
                       const _SectionHeading('Categorias'),
                       const SizedBox(height: 14),
@@ -258,9 +257,9 @@ class _VaccinesScreenState extends State<VaccinesScreen> {
 }
 
 class _VaccinesHeader extends StatelessWidget {
-  const _VaccinesHeader({required this.dependent});
+  const _VaccinesHeader({required this.childWallet});
 
-  final bool dependent;
+  final bool childWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +274,7 @@ class _VaccinesHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: dependent
+            colors: childWallet
                 ? [dependentPalette.sky, dependentPalette.background]
                 : context.isDarkMode
                 ? const [Color(0xFF182B36), Color(0xFF12212A)]
@@ -313,7 +312,7 @@ class _VaccinesHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            if (dependent)
+            if (childWallet)
               const SizedBox(
                 width: 76,
                 height: 76,

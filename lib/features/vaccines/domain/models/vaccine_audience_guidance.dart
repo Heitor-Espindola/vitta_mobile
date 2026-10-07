@@ -224,6 +224,37 @@ class VaccineAudienceGuidance {
     return registered.isEmpty ? const ['Infantis'] : registered.toList();
   }
 
+  /// Matches the catalog text and the common public names of a vaccine.
+  /// This makes searches such as "gripe" find a remote item named
+  /// "Influenza", even when its optional description is empty.
+  static bool matchesSearch(Vaccine vaccine, String query) {
+    final normalizedQuery = _normalize(query);
+    if (normalizedQuery.isEmpty) return true;
+
+    final searchable = <String?>[
+      vaccine.id,
+      vaccine.name,
+      vaccine.shortName,
+      vaccine.description,
+      vaccine.recommendedAge,
+      ...vaccine.prevents,
+      ...vaccine.targetGroups,
+    ].whereType<String>().map(_normalize);
+    if (searchable.any((value) => value.contains(normalizedQuery))) return true;
+
+    String? vaccineKey;
+    for (final value in [vaccine.name, vaccine.shortName, vaccine.id]) {
+      if (value == null) continue;
+      vaccineKey = _aliases[_normalize(value)];
+      if (vaccineKey != null) break;
+    }
+    if (vaccineKey == null) return false;
+    return _aliases.entries.any(
+      (entry) =>
+          entry.value == vaccineKey && entry.key.contains(normalizedQuery),
+    );
+  }
+
   static const _audiences = <String, List<String>>{
     'bcg': ['Infantis'],
     'hepatitea': ['Infantis'],

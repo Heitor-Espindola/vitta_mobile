@@ -11,6 +11,12 @@ abstract final class TrustedNewsSources {
     'agenciabrasil.ebc.com.br',
     'g1.globo.com',
     'bbc.com',
+    'cnnbrasil.com.br',
+    'terra.com.br',
+    'em.com.br',
+    'osaogoncalo.com.br',
+    'alagoas24horas.com.br',
+    'mixvale.com.br',
   ];
 
   static const _sources = <_TrustedSource>[
@@ -23,6 +29,12 @@ abstract final class TrustedNewsSources {
     _TrustedSource('agenciabrasil.ebc.com.br', 'Agência Brasil'),
     _TrustedSource('g1.globo.com', 'g1'),
     _TrustedSource('bbc.com', 'BBC News Brasil', pathPrefix: '/portuguese/'),
+    _TrustedSource('cnnbrasil.com.br', 'CNN Brasil'),
+    _TrustedSource('terra.com.br', 'Terra', subdomains: true),
+    _TrustedSource('em.com.br', 'Estado de Minas', subdomains: true),
+    _TrustedSource('osaogoncalo.com.br', 'O SÃ£o GonÃ§alo'),
+    _TrustedSource('alagoas24horas.com.br', 'Alagoas 24 Horas'),
+    _TrustedSource('mixvale.com.br', 'Mix Vale'),
   ];
 
   static String? nameForUrl(String url) {

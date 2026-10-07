@@ -12,6 +12,7 @@ import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
@@ -290,19 +291,22 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
       _guardian != null &&
       _person?.effectivePersonId != _guardian?.effectivePersonId;
 
+  bool get _isViewingChildWallet =>
+      _isViewingDependent && isMinistryOfHealthChild(_person?.birthDate);
+
   @override
   Widget build(BuildContext context) => VittaMobileShell(
     title: 'Caderneta',
     currentTab: VittaTab.card,
     showTopBar: false,
     body: DependentWalletBackground(
-      enabled: _isViewingDependent,
+      enabled: _isViewingChildWallet,
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
           children: [
-            _VaccinationCardHeader(dependent: _isViewingDependent),
+            _VaccinationCardHeader(childWallet: _isViewingChildWallet),
             const SizedBox(height: 18),
             _ModeSelector(
               showBooklet: _showBooklet,
@@ -374,9 +378,9 @@ class _VaccinationCardScreenState extends State<VaccinationCardScreen> {
 }
 
 class _VaccinationCardHeader extends StatelessWidget {
-  const _VaccinationCardHeader({required this.dependent});
+  const _VaccinationCardHeader({required this.childWallet});
 
-  final bool dependent;
+  final bool childWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +395,7 @@ class _VaccinationCardHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 18, 16, 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: dependent
+            colors: childWallet
                 ? [dependentPalette.sky, dependentPalette.background]
                 : context.isDarkMode
                 ? const [Color(0xFF182B36), Color(0xFF12212A)]
@@ -430,7 +434,7 @@ class _VaccinationCardHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            if (dependent)
+            if (childWallet)
               const MuuniTimedPresence(
                 key: Key('muuni-card-animation'),
                 size: 54,
@@ -465,8 +469,9 @@ class _ModeSelector extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(4),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.appBorder),
     ),
     child: Row(
       children: [
@@ -517,7 +522,7 @@ class _ModeOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? Theme.of(context).colorScheme.surface
+              ? Theme.of(context).colorScheme.primaryContainer
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: selected
@@ -537,7 +542,7 @@ class _ModeOption extends StatelessWidget {
               icon,
               size: 18,
               color: selected
-                  ? context.appPrimaryInk
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
                   : context.appTextSecondary,
             ),
             const SizedBox(width: 6),
@@ -550,7 +555,7 @@ class _ModeOption extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: selected
-                      ? context.appPrimaryInk
+                      ? Theme.of(context).colorScheme.onPrimaryContainer
                       : context.appTextSecondary,
                 ),
               ),
@@ -789,21 +794,300 @@ class _BookletGroup extends StatelessWidget {
         ),
         Divider(height: 22, color: context.appBorder),
         ...records.map(
-          (record) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              _isDone(record)
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
-              color: _statusColor(record),
-            ),
-            title: Text(
-              _present(record.vaccineName, 'Vacina'),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(vaccinationBookletRecordDetails(record).join('\n')),
-            trailing: const Icon(Icons.chevron_right_rounded),
+          (record) => _BookletRecordCard(
+            record: record,
             onTap: () => onRecordTap(record),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BookletRecordCard extends StatelessWidget {
+  const _BookletRecordCard({required this.record, required this.onTap});
+
+  final VaccinationRecord record;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final appliedAt = record.effectiveAppliedAt;
+    final nextDoseAt = record.effectiveNextDoseAt;
+    final overdue = nextDoseAt != null && _isLate(record);
+    final nextDoseColor = overdue ? AppColors.danger : context.appPrimaryInk;
+    final nextDoseBackground = overdue
+        ? (context.isDarkMode
+              ? const Color(0xFF46262A)
+              : const Color(0xFFFFEEEE))
+        : context.appPrimarySoft;
+    final metadata = <(IconData, String, String)>[
+      if ((record.effectiveLot ?? '').trim().isNotEmpty)
+        (Icons.inventory_2_outlined, 'Lote', record.effectiveLot!.trim()),
+      if ((record.manufacturer ?? '').trim().isNotEmpty)
+        (
+          Icons.precision_manufacturing_outlined,
+          'Fabricante',
+          record.manufacturer!.trim(),
+        ),
+      if ((record.effectiveFacilityName ?? '').trim().isNotEmpty)
+        (
+          Icons.local_hospital_outlined,
+          'Unidade de saúde',
+          record.effectiveFacilityName!.trim(),
+        ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: Key('booklet-record-${record.id}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: _cardDecoration(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: .14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.vaccines_outlined,
+                        color: AppColors.success,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _present(record.vaccineName, 'Vacina'),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              height: 1.15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 7,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const _BookletStatusChip(),
+                              if (appliedAt != null)
+                                _BookletCompactFact(
+                                  icon: Icons.event_available_outlined,
+                                  text: formatBrazilianDate(appliedAt),
+                                ),
+                              if (record.effectiveDoseLabel.trim().isNotEmpty)
+                                _BookletCompactFact(
+                                  icon: Icons.medical_information_outlined,
+                                  text: record.effectiveDoseLabel.trim(),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: context.appPrimarySoft,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: context.appPrimaryInk,
+                        size: 21,
+                      ),
+                    ),
+                  ],
+                ),
+                if (nextDoseAt != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    key: Key('booklet-next-dose-${record.id}'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
+                    decoration: BoxDecoration(
+                      color: nextDoseBackground,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: nextDoseColor.withValues(alpha: .24),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          overdue
+                              ? Icons.warning_amber_rounded
+                              : Icons.calendar_month_outlined,
+                          color: nextDoseColor,
+                          size: 21,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                overdue ? 'Dose atrasada' : 'Próxima dose',
+                                style: TextStyle(
+                                  color: nextDoseColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                overdue
+                                    ? 'Atrasada desde ${formatBrazilianDate(nextDoseAt)}'
+                                    : 'Prevista para ${formatBrazilianDate(nextDoseAt)}',
+                                style: TextStyle(
+                                  color: context.appText,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (metadata.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    child: Divider(height: 1, color: context.appBorder),
+                  ),
+                  ...metadata.map(
+                    (item) => _BookletMetadataRow(
+                      icon: item.$1,
+                      label: item.$2,
+                      value: item.$3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BookletStatusChip extends StatelessWidget {
+  const _BookletStatusChip();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppColors.success.withValues(alpha: .14),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+    ),
+    child: const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_rounded, color: AppColors.success, size: 14),
+        SizedBox(width: 4),
+        Text(
+          'Aplicada',
+          style: TextStyle(
+            color: AppColors.success,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BookletCompactFact extends StatelessWidget {
+  const _BookletCompactFact({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 15, color: context.appTextSecondary),
+      const SizedBox(width: 4),
+      Text(
+        text,
+        style: TextStyle(
+          color: context.appTextSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
+}
+
+class _BookletMetadataRow extends StatelessWidget {
+  const _BookletMetadataRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: context.appTextSecondary),
+        const SizedBox(width: 9),
+        SizedBox(
+          width: 94,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: context.appTextSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.25,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -1143,24 +1427,9 @@ BoxDecoration _cardDecoration(BuildContext context, {Color? color}) =>
       ],
     );
 
-bool _isDone(VaccinationRecord record) {
-  return VaccinationRecordInsights.isApplied(record);
-}
-
 bool _isLate(VaccinationRecord record) {
   return VaccinationRecordInsights.situation(record) ==
       VaccinationRecordSituation.overdue;
-}
-
-bool _isPending(VaccinationRecord record) =>
-    VaccinationRecordInsights.situation(record) ==
-    VaccinationRecordSituation.upcoming;
-
-Color _statusColor(VaccinationRecord record) {
-  if (_isDone(record)) return const Color(0xFF268A5B);
-  if (_isLate(record)) return const Color(0xFFC53D44);
-  if (_isPending(record)) return const Color(0xFF287EB5);
-  return const Color(0xFF718096);
 }
 
 String _nextDoseStatusLabel(

@@ -5,6 +5,7 @@ import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/input_formatters/cpf_input_formatter.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
@@ -44,6 +45,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool get _isViewingDependent =>
       _wallet.currentPersonId != null && !_wallet.isViewingCurrent;
+
+  bool get _isViewingChildWallet =>
+      _isViewingDependent &&
+      isMinistryOfHealthChild(_wallet.selectedPerson?.birthDate);
 
   @override
   void dispose() {
@@ -197,17 +202,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : formatBrazilianDate(user!.birthDate);
 
     return Scaffold(
-      backgroundColor: _isViewingDependent
+      backgroundColor: _isViewingChildWallet
           ? DependentWalletPalette.of(context).background
           : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: DependentWalletBackground(
           key: Key(
-            _isViewingDependent
+            _isViewingChildWallet
                 ? 'profile-dependent-theme'
                 : 'profile-standard-theme',
           ),
-          enabled: _isViewingDependent,
+          enabled: _isViewingChildWallet,
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : ListView(
@@ -216,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     AppPageHeader(
                       title: 'Perfil',
                       showBack: true,
-                      backgroundColor: _isViewingDependent
+                      backgroundColor: _isViewingChildWallet
                           ? DependentWalletPalette.of(context).sky
                           : null,
                     ),
@@ -241,10 +246,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 24,
-                                  backgroundColor: _isViewingDependent
+                                  backgroundColor: _isViewingChildWallet
                                       ? DependentWalletPalette.of(context).peach
                                       : context.appPrimarySoft,
-                                  foregroundColor: _isViewingDependent
+                                  foregroundColor: _isViewingChildWallet
                                       ? DependentWalletPalette.of(context).ink
                                       : context.appPrimaryInk,
                                   child: Text(

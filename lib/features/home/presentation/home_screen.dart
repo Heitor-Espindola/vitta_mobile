@@ -9,6 +9,7 @@ import 'package:vitta_mobile/app/demo/demo_presentation.dart';
 import 'package:vitta_mobile/app/routes.dart';
 import 'package:vitta_mobile/core/config/domain_repository_factory.dart';
 import 'package:vitta_mobile/core/utils/date_text_formatters.dart';
+import 'package:vitta_mobile/core/utils/health_age_groups.dart';
 import 'package:vitta_mobile/features/auth/domain/models/app_user.dart';
 import 'package:vitta_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
@@ -109,15 +110,20 @@ class _HomeScreenState extends State<HomeScreen> {
       final members = await _peopleRepository.getFamilyMembers(
         user.effectivePersonId,
       );
-      await _wallet.restoreSelection(
-        members
-            .where(
-              (member) => member.canViewVaccination(
-                currentPersonId: user.effectivePersonId,
-              ),
-            )
-            .map((member) => member.person),
-      );
+      try {
+        await _wallet.restoreSelection(
+          members
+              .where(
+                (member) => member.canViewVaccination(
+                  currentPersonId: user.effectivePersonId,
+                ),
+              )
+              .map((member) => member.person),
+        );
+      } catch (_) {
+        // A falha ao restaurar uma preferÃªncia local nunca deve esconder os
+        // familiares que jÃ¡ foram carregados do banco.
+      }
       await _notificationReadController.ensureLoaded(
         _wallet.selectedPersonId ?? user.effectivePersonId,
       );
@@ -248,7 +254,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openWallet(AppUser person) {
     _wallet.selectPerson(person);
-    Navigator.of(context).pushReplacementNamed(AppRoutes.vaccinationCard);
   }
 
   Stream<List<VaccinationRecord>> _recordsFor(_HomeData data) {
@@ -334,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final upcoming = data.upcoming;
     final recent = data.recent;
     return DependentWalletBackground(
-      enabled: !data.isViewingCurrent,
+      enabled: data.isViewingChildWallet,
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -349,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: AppSpacing.md),
                   _ViewingWalletBanner(
                     personName: data.selectedPerson?.name ?? 'Familiar',
+                    isChildWallet: data.isViewingChildWallet,
                     onReturn: _wallet.selectCurrentPerson,
                   ),
                 ],
@@ -358,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   message: data.summaryMessage,
                   onShare: () => _shareWallet(data),
                   sharing: _sharingBooklet,
-                  isDependent: !data.isViewingCurrent,
+                  isChildWallet: data.isViewingChildWallet,
                 ),
                 const SizedBox(height: 20),
                 _WalletsSection(
@@ -511,14 +517,14 @@ class _SummaryCard extends StatelessWidget {
     required this.message,
     required this.onShare,
     required this.sharing,
-    required this.isDependent,
+    required this.isChildWallet,
   });
 
   final int appliedCount;
   final String message;
   final VoidCallback onShare;
   final bool sharing;
-  final bool isDependent;
+  final bool isChildWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -527,7 +533,7 @@ class _SummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isDependent
+          colors: isChildWallet
               ? const [Color(0xFF60B7DC), Color(0xFF4D93C5)]
               : const [Color(0xFF3C9FE3), Color(0xFF267BB8)],
           begin: Alignment.topLeft,
@@ -612,10 +618,12 @@ class _SummaryCard extends StatelessWidget {
 class _ViewingWalletBanner extends StatelessWidget {
   const _ViewingWalletBanner({
     required this.personName,
+    required this.isChildWallet,
     required this.onReturn,
   });
 
   final String personName;
+  final bool isChildWallet;
   final VoidCallback onReturn;
 
   @override
@@ -623,13 +631,28 @@ class _ViewingWalletBanner extends StatelessWidget {
     final palette = DependentWalletPalette.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
-      decoration: AppCardStyle.decoration(
-        context,
-        color: palette.peach,
-      ).copyWith(border: Border.all(color: palette.border)),
+      decoration:
+          AppCardStyle.decoration(
+            context,
+            color: isChildWallet
+                ? palette.peach
+                : Theme.of(context).colorScheme.surface,
+          ).copyWith(
+            border: Border.all(
+              color: isChildWallet ? palette.border : context.appBorder,
+            ),
+          ),
       child: Row(
         children: [
-          const MuuniTimedPresence(frame: 11, size: 44),
+          if (isChildWallet)
+            const MuuniTimedPresence(frame: 11, size: 44)
+          else
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: context.appPrimarySoft,
+              foregroundColor: context.appPrimaryInk,
+              child: const Icon(Icons.person_outline_rounded, size: 20),
+            ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -637,7 +660,7 @@ class _ViewingWalletBanner extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: palette.ink,
+                color: isChildWallet ? palette.ink : context.appText,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1151,6 +1174,9 @@ class _HomeData {
 
   bool get isViewingCurrent =>
       selectedPerson?.effectivePersonId == user?.effectivePersonId;
+
+  bool get isViewingChildWallet =>
+      !isViewingCurrent && isMinistryOfHealthChild(selectedPerson?.birthDate);
 
   int get appliedCount => VaccinationRecordInsights.appliedCount(records);
 

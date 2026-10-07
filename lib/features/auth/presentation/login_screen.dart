@@ -9,10 +9,16 @@ import 'package:vitta_mobile/features/auth/presentation/widgets/auth_background.
 import 'package:vitta_mobile/features/auth/presentation/widgets/password_reset_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.authRepository, this.initialErrorMessage});
+  const LoginScreen({
+    super.key,
+    this.authRepository,
+    this.initialErrorMessage,
+    this.navigateAfterSignIn = true,
+  });
 
   final AuthRepository? authRepository;
   final String? initialErrorMessage;
+  final bool navigateAfterSignIn;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -61,9 +67,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
+      if (widget.navigateAfterSignIn) {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.splash, (_) => false);
+      }
     } catch (error) {
       setState(() => _errorMessage = mapSignInError(error));
     } finally {

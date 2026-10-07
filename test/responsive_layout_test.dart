@@ -9,6 +9,7 @@ import 'package:vitta_mobile/features/auth/presentation/register_screen.dart';
 import 'package:vitta_mobile/features/home/presentation/home_screen.dart';
 import 'package:vitta_mobile/features/notifications/application/notification_read_controller.dart';
 import 'package:vitta_mobile/features/notifications/presentation/notifications_screen.dart';
+import 'package:vitta_mobile/features/people/application/wallet_selection_controller.dart';
 import 'package:vitta_mobile/features/people/domain/models/family_member.dart';
 import 'package:vitta_mobile/features/people/domain/repositories/people_repository.dart';
 import 'package:vitta_mobile/features/profile/presentation/profile_screen.dart';
@@ -417,17 +418,21 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('notifications-empty-state')), findsOneWidget);
+    expect(find.byKey(const Key('muuni-notification-animation')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('Muuni remains full after animation with few notifications', (
     tester,
   ) async {
+    final auth = _FakeAuthRepository();
+    final wallet = _childWallet(auth.user);
     await tester.pumpWidget(
       MaterialApp(
         home: NotificationsScreen(
-          authRepository: _FakeAuthRepository(),
+          authRepository: auth,
           vaccinationRepository: _FakeVaccinationRepository(),
+          walletController: wallet,
         ),
       ),
     );
@@ -441,9 +446,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Muuni peeks in its own reserved area when the list is full', (
+  testWidgets('Muuni remains fully visible when the list is full', (
     tester,
   ) async {
+    final auth = _FakeAuthRepository();
+    final wallet = _childWallet(auth.user);
     final records = [
       for (var day = 1; day <= 4; day++)
         VaccinationRecord(
@@ -457,16 +464,24 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NotificationsScreen(
-          authRepository: _FakeAuthRepository(),
+          authRepository: auth,
           vaccinationRepository: _FakeVaccinationRepository(records: records),
+          walletController: wallet,
         ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('muuni-peek')), findsOneWidget);
-    final mascot = tester.getRect(find.byKey(const Key('muuni-peek')));
+    expect(find.byKey(const Key('muuni-full')), findsOneWidget);
+    expect(find.byKey(const Key('muuni-static-sprite')), findsOneWidget);
+    final mascot = tester.getRect(find.byKey(const Key('muuni-full')));
+    final sprite = tester.getRect(find.byKey(const Key('muuni-static-sprite')));
     final list = tester.getRect(find.byType(ListView).first);
     expect(mascot.top, greaterThanOrEqualTo(list.bottom));
+    expect(sprite.size, mascot.size);
+    expect(sprite.left, greaterThanOrEqualTo(mascot.left));
+    expect(sprite.top, greaterThanOrEqualTo(mascot.top));
+    expect(sprite.right, lessThanOrEqualTo(mascot.right));
+    expect(sprite.bottom, lessThanOrEqualTo(mascot.bottom));
     expect(tester.takeException(), isNull);
   });
 
@@ -673,6 +688,22 @@ void main() {
       expect(find.text('Tela anterior'), findsOneWidget);
     },
   );
+}
+
+WalletSelectionController _childWallet(AppUser owner) {
+  final today = DateTime.now();
+  final wallet = WalletSelectionController()..bindCurrentPerson(owner);
+  wallet.selectPerson(
+    AppUser(
+      uid: 'child-person',
+      personId: 'child-person',
+      name: 'Criança Teste',
+      email: '',
+      role: 'dependent',
+      birthDate: DateTime(today.year - 5, today.month, today.day),
+    ),
+  );
+  return wallet;
 }
 
 class _FakePeopleRepository implements PeopleRepository {
