@@ -348,7 +348,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 subtitle: _isViewingDependent
                                     ? 'Gerenciada pela conta de $ownerName'
                                     : 'E-mail, senha e autenticação',
-                                onTap: _openSecurity,
+                                onTap: _isViewingDependent
+                                    ? null
+                                    : _openSecurity,
                               ),
                             ],
                           ),

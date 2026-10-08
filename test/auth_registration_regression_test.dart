@@ -44,6 +44,17 @@ void main() {
   });
 
   group('registration compensation', () {
+    test('Data Connect CPF uniqueness failure has a specific safe message', () {
+      final error = FirebaseException(
+        plugin: 'Data Connect',
+        code: 'DataConnectErrorCode.other',
+        message:
+            'duplicate key value violates unique constraint "user_cpf_uidx"',
+      );
+
+      expect(mapSignUpError(error), 'Este CPF já está cadastrado.');
+    });
+
     test(
       'Firestore failure invokes Auth compensation and keeps original error',
       () async {

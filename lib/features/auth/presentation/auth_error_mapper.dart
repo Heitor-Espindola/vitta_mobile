@@ -55,6 +55,12 @@ String mapSignUpError(Object error) {
       : error;
   final compensationFailed = error is RegistrationCompensationException;
 
+  if (_isDuplicateCpfRegistration(original)) {
+    return compensationFailed
+        ? 'Este CPF já está cadastrado. Se o problema persistir, procure o suporte.'
+        : 'Este CPF já está cadastrado.';
+  }
+
   final message = switch (original) {
     FirebaseAuthException authError => switch (authError.code) {
       'email-already-in-use' => 'Este e-mail já está em uso.',
@@ -74,4 +80,16 @@ String mapSignUpError(Object error) {
 
   if (!compensationFailed) return message;
   return '$message Se o problema persistir, procure o suporte.';
+}
+
+bool _isDuplicateCpfRegistration(Object error) {
+  final text = [
+    error.toString(),
+    if (error is FirebaseException) error.message ?? '',
+  ].join(' ').toLowerCase();
+  return text.contains('user_cpf_uidx') ||
+      (text.contains('cpf') &&
+          (text.contains('duplicate key') ||
+              text.contains('unique constraint') ||
+              text.contains('already exists')));
 }

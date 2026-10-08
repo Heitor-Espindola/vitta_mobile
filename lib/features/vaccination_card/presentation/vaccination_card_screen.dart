@@ -893,10 +893,12 @@ class _BookletRecordCard extends StatelessWidget {
                                   icon: Icons.event_available_outlined,
                                   text: formatBrazilianDate(appliedAt),
                                 ),
-                              if (record.effectiveDoseLabel.trim().isNotEmpty)
+                              if (vaccinationBookletDoseLabel(
+                                record,
+                              ).isNotEmpty)
                                 _BookletCompactFact(
                                   icon: Icons.medical_information_outlined,
-                                  text: record.effectiveDoseLabel.trim(),
+                                  text: vaccinationBookletDoseLabel(record),
                                 ),
                             ],
                           ),
@@ -1461,7 +1463,7 @@ String _present(String? value, String fallback) {
 
 String _ageLabel(DateTime? birthDate, DateTime? eventDate) {
   if (birthDate == null || eventDate == null || eventDate.isBefore(birthDate)) {
-    return 'Data não informada';
+    return 'Ao nascer';
   }
   final months =
       (eventDate.year - birthDate.year) * 12 +
@@ -1522,7 +1524,7 @@ List<List<String>> vaccinationBookletTableRows(
       (record) => <String>[
         formatBrazilianDate(record.effectiveAppliedAt),
         _present(record.vaccineName, 'Vacina'),
-        _present(record.effectiveDoseLabel, '—'),
+        vaccinationBookletDoseLabel(record),
         _present(record.effectiveLot, '—'),
         _present(record.manufacturer, '—'),
         _present(record.effectiveFacilityName, '—'),
@@ -1530,6 +1532,16 @@ List<List<String>> vaccinationBookletTableRows(
       ],
     )
     .toList(growable: false);
+
+String vaccinationBookletDoseLabel(VaccinationRecord record) {
+  final label = record.effectiveDoseLabel.trim();
+  if (label.isNotEmpty) return label;
+  final number = record.doseNumber;
+  if (number != null && number > 0) {
+    return number == 1 ? '1ª dose' : '$numberª dose';
+  }
+  return 'Dose não informada';
+}
 
 List<String> vaccinationBookletRecordDetails(VaccinationRecord record) => [
   if (record.dose.trim().isNotEmpty) 'Dose: ${record.dose}',

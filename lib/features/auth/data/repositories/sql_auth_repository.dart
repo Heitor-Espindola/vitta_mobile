@@ -84,10 +84,9 @@ class SqlAuthRepository implements AuthRepository {
       );
     }
 
-    return RegistrationCompensator.run(
+    final registered = await RegistrationCompensator.run(
       operation: () async {
         await firebaseUser.updateDisplayName(formattedName);
-        await firebaseUser.sendEmailVerification();
         await firebaseUser.getIdToken(true);
         await _connector
             .completeMobileRegistration(
@@ -101,6 +100,12 @@ class SqlAuthRepository implements AuthRepository {
       },
       compensate: firebaseUser.delete,
     );
+    try {
+      await firebaseUser.sendEmailVerification();
+    } on FirebaseAuthException {
+      // O perfil já foi criado. Falha no e-mail não pode desfazer o cadastro.
+    }
+    return registered;
   }
 
   @override

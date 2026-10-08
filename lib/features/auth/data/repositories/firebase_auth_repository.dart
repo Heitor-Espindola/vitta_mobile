@@ -139,12 +139,10 @@ class FirebaseAuthRepository implements AuthRepository {
     final cpfHash = cpfRegistryKey(cpf);
     final registryDocument = _firestore.collection('cpf_registry').doc(cpfHash);
 
-    return RegistrationCompensator.run(
+    final registered = await RegistrationCompensator.run(
       operation: () async {
-        // Qualquer falha anterior ao commit também remove a conta Auth, evitando
-        // órfãos quando atualização de nome ou envio do e-mail falharem.
+        // Qualquer falha anterior ao commit também remove a conta Auth.
         await firebaseUser.updateDisplayName(formattedName);
-        await firebaseUser.sendEmailVerification();
         await _firestore.runTransaction((transaction) async {
           final registrySnapshot = await transaction.get(registryDocument);
           if (registrySnapshot.exists) {
@@ -178,6 +176,12 @@ class FirebaseAuthRepository implements AuthRepository {
       },
       compensate: firebaseUser.delete,
     );
+    try {
+      await firebaseUser.sendEmailVerification();
+    } on FirebaseAuthException {
+      // O perfil já foi criado. Falha no e-mail não pode desfazer o cadastro.
+    }
+    return registered;
   }
 
   @override

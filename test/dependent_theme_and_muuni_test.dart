@@ -155,6 +155,20 @@ void main() {
       ),
       findsOneWidget,
     );
+    final security = find.textContaining(
+      'Segurança da conta',
+      findRichText: true,
+    );
+    expect(
+      find.descendant(
+        of: find.ancestor(of: security, matching: find.byType(InkWell)),
+        matching: find.byIcon(Icons.lock_outline_rounded),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(security);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Voltar'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

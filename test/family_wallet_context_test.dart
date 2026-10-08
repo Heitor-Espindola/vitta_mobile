@@ -158,6 +158,38 @@ void main() {
   });
 
   testWidgets(
+    'booklet labels birth applications as Ao nascer without an unknown group',
+    (tester) async {
+      final newborn = _child.copyWith(birthDate: DateTime(2023, 2, 2));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VaccinationCardScreen(
+            authRepository: _AuthFake(),
+            vaccinationRepository: _VaccinationFake(
+              records: [
+                VaccinationRecord(
+                  id: 'birth-dose',
+                  patientId: newborn.effectivePersonId,
+                  vaccineName: 'BCG',
+                  doseNumber: 1,
+                  appliedAt: DateTime(2023, 2, 2),
+                ),
+              ],
+            ),
+            selectedPerson: newborn,
+            initialShowBooklet: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ao nascer'), findsOneWidget);
+      expect(find.text('Data não informada'), findsNothing);
+      expect(find.text('1ª dose'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'vaccine detail scrolls above Android bar and never exposes professional UID',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
@@ -790,6 +822,17 @@ void main() {
       expect(rows.last.first, '14/09/2026');
       expect(rows.expand((row) => row), isNot(contains('uid-secreto-1')));
       expect(rows.expand((row) => row), isNot(contains('uid-secreto-2')));
+
+      final numberedRows = vaccinationBookletTableRows([
+        VaccinationRecord(
+          id: 'number-only',
+          vaccineName: 'BCG',
+          doseNumber: 1,
+          appliedAt: DateTime(2023, 2, 2),
+        ),
+      ]);
+      expect(numberedRows.single[2], '1ª dose');
+      expect(numberedRows.single[2], isNot('—'));
 
       final pdf = await buildVaccinationBookletPdf(
         person: _owner.copyWith(cpf: '12345678909'),
